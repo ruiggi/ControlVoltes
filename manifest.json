@@ -1,19 +1,19 @@
 {
   "name": "Mi Primera PWA",
   "short_name": "MiPWA",
-  "description": "Mi aplicación web progresiva",
+  "description": "ARP Mi aplicación web progresiva",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2196F3",
   "icons": [
     {
-      "src": "crono192x192.png.png",
+      "src": "crono192x192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "crono512x512.png.png",
+      "src": "crono512x512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
