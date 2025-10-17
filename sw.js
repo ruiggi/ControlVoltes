@@ -1,7 +1,8 @@
-const CACHE_NAME = 'mi-pwa-v1';
+const CACHE_NAME = 'control-vueltas-v1';
 const urlsToCache = [
-  '/',
-  '/index.html'
+  '/ControlVueltas/',
+  '/ControlVueltas/index.html',
+  '/ControlVueltas/crono192x192.png'
 ];
 
 // Instalar el Service Worker
