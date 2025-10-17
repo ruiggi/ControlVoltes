@@ -1,8 +1,9 @@
 {
-  "name": "Mi Primera PWA",
-  "short_name": "MiPWA",
-  "description": "ARP Mi aplicación web progresiva",
-  "start_url": "/",
+  "name": "Control Vueltas",
+  "short_name": "ControlVueltas",
+  "description": "Mi aplicación web progresiva",
+  "start_url": "/ControlVueltas/",
+  "scope": "/ControlVueltas/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2196F3",
