@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Vueltas</title>
+    <title>Control de Voltes</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#333">
     <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDdWMTJIMTdNMjEgMTJDMjEgMTYuOTcwNiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45NzA2IDMgMTJDMyA3LjAyOTQ0IDcuMDI5NDQgMyAxMiAzQzE2Ljk3MDYgMyAyMSA3LjAyOTQ0IDIxIDEyWiIgc3Ryb2tlPSIjZjBmMGYwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==">
@@ -502,7 +502,16 @@
             <div class="title-left">
                 <span>CONTROL DE VOLTES</span>
             </div>
-            <div id="toggle-view-btn"></div>
+            <div id="header-actions" style="display:flex; align-items:center; gap:8px;">
+                <button id="install-btn" style="display:none; align-items:center; gap:6px; padding:4px 8px; border-radius:6px; border:1px solid #0d6efd; background:#0d6efd; color:#fff; font-weight:700; cursor:pointer;">INSTALAR</button>
+                <div id="wake-toggle" role="switch" aria-checked="false" tabindex="0" title="Mantener pantalla activa" style="display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;">
+                    <span id="wake-label" style="font-size:0.85rem;">Pantalla</span>
+                    <span id="wake-indicator" style="width:34px; height:20px; display:inline-flex; align-items:center; padding:2px; border-radius:999px; background:#666; box-sizing:border-box;">
+                        <span style="width:16px; height:16px; border-radius:50%; background:#bbb; transform: translateX(0); transition: transform .2s, background .2s;"></span>
+                    </span>
+                </div>
+                <div id="toggle-view-btn"></div>
+            </div>
         </div>
         <div id="registration-view" style="display: block;">
             <div id="clock-container">
@@ -2459,6 +2468,113 @@
             prompt('Copia el CSV (Coma):', csv);
         }
     };
+
+    // --- PWA: Service Worker + Install prompt ---
+    (function setupPWA(){
+        // Remove inline ephemeral SW and use sw.js file
+        try {
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('sw.js', { scope: './' })
+                        .then((reg) => {
+                            console.debug('[DEBUG] SW registrado');
+                            // Detectar updates del SW
+                            if (reg.waiting) {
+                                showUpdateToast(reg.waiting);
+                            }
+                            reg.addEventListener('updatefound', () => {
+                                const newWorker = reg.installing;
+                                if (!newWorker) return;
+                                newWorker.addEventListener('statechange', () => {
+                                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                        showUpdateToast(newWorker);
+                                    }
+                                });
+                            });
+                            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                                // Recargar cuando el nuevo SW tome control
+                                window.location.reload();
+                            });
+                        })
+                        .catch((e) => console.debug('[DEBUG] SW error', e));
+                });
+            }
+        } catch {}
+        // beforeinstallprompt
+        try {
+            let deferredPrompt = null;
+            const installBtn = document.getElementById('install-btn');
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                if (installBtn) installBtn.style.display = 'flex';
+            });
+            if (installBtn) installBtn.addEventListener('click', async () => {
+                if (!deferredPrompt) return;
+                installBtn.disabled = true;
+                try {
+                    const result = await deferredPrompt.prompt();
+                    console.debug('[DEBUG] A2HS', result.outcome);
+                } catch {}
+                installBtn.style.display = 'none';
+                deferredPrompt = null;
+            });
+        } catch {}
+    })();
+
+    // Toast simple para avisos (instalación/actualización)
+    function showToast(message, actions = []) {
+        try {
+            let toast = document.getElementById('pwa-toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'pwa-toast';
+                toast.style.position = 'fixed';
+                toast.style.bottom = '16px';
+                toast.style.left = '50%';
+                toast.style.transform = 'translateX(-50%)';
+                toast.style.background = '#222';
+                toast.style.color = '#fff';
+                toast.style.padding = '10px 14px';
+                toast.style.borderRadius = '8px';
+                toast.style.boxShadow = '0 4px 10px rgba(0,0,0,0.3)';
+                toast.style.zIndex = '2000';
+                toast.style.display = 'flex';
+                toast.style.gap = '8px';
+                toast.style.alignItems = 'center';
+                document.body.appendChild(toast);
+            }
+            toast.innerHTML = '';
+            const msg = document.createElement('span');
+            msg.textContent = message;
+            toast.appendChild(msg);
+            actions.forEach(({ label, onClick, variant }) => {
+                const btn = document.createElement('button');
+                btn.textContent = label;
+                btn.style.border = '1px solid #0d6efd';
+                btn.style.background = variant === 'secondary' ? 'transparent' : '#0d6efd';
+                btn.style.color = '#fff';
+                btn.style.padding = '4px 8px';
+                btn.style.borderRadius = '6px';
+                btn.style.cursor = 'pointer';
+                btn.addEventListener('click', () => { try { onClick && onClick(); } catch {} });
+                toast.appendChild(btn);
+            });
+            setTimeout(() => { try { toast.remove(); } catch {} }, 8000);
+        } catch {}
+    }
+
+    function showUpdateToast(worker) {
+        showToast('Nueva versión disponible', [
+            { label: 'Actualizar', onClick: () => { try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch {} } },
+            { label: 'Cerrar', onClick: () => {}, variant: 'secondary' }
+        ]);
+        try {
+            navigator.serviceWorker.addEventListener('message', (e) => {
+                // No-op; controllerchange recargará
+            });
+        } catch {}
+    }
 
     // --- Inicialització ---
     // Create app title if it doesn't exist
