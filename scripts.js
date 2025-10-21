@@ -2178,8 +2178,8 @@
             }
         } catch {}
         // beforeinstallprompt
+        let deferredPrompt = null;
         try {
-            let deferredPrompt = null;
             const installBtn = document.getElementById('install-btn');
             window.addEventListener('beforeinstallprompt', (e) => {
                 e.preventDefault();
@@ -2196,6 +2196,43 @@
                 installBtn.style.display = 'none';
                 deferredPrompt = null;
             });
+        } catch {}
+
+        // Force install button logic
+        try {
+            const forceInstallBtn = document.getElementById('force-install-btn');
+            
+            // Check if app is already installed
+            const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
+            if (isInstalled && forceInstallBtn) {
+                forceInstallBtn.style.display = 'none';
+            } else if (forceInstallBtn) {
+                forceInstallBtn.style.display = 'block';
+            }
+
+            if (forceInstallBtn) {
+                forceInstallBtn.addEventListener('click', async () => {
+                    if (deferredPrompt) {
+                        // Chrome/Android - use deferred prompt
+                        forceInstallBtn.disabled = true;
+                        try {
+                            const result = await deferredPrompt.prompt();
+                            console.debug('[DEBUG] Force install', result.outcome);
+                            if (result.outcome === 'accepted') {
+                                forceInstallBtn.style.display = 'none';
+                            }
+                        } catch (e) {
+                            console.debug('[DEBUG] Force install error', e);
+                        }
+                        forceInstallBtn.disabled = false;
+                    } else {
+                        // iOS/Safari - show instructions
+                        showToast('Para instalar: Pulsa el botón compartir → "Añadir a pantalla de inicio"', [
+                            { label: 'Cerrar', onClick: () => {}, variant: 'secondary' }
+                        ]);
+                    }
+                });
+            }
         } catch {}
     })();
 
