@@ -1,12 +1,12 @@
 {
   "name": "Control de Voltes",
   "short_name": "Voltes",
-  "start_url": "/ControlVoltes/ControlVoltes.html",
+  "start_url": "/ControlVoltes/index.html",
   "scope": "/ControlVoltes/",
   "display": "standalone",
   "background_color": "#333333",
   "theme_color": "#333333",
-  "description": "Cronómetro de vueltas con sesiones guardadas.",
+  "description": "Croometro de voletes amb gravació de sessions.",
   "icons": [
     {
       "src": "/ControlVoltes/icons/icon-192.svg",

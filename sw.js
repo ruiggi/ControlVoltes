@@ -1,7 +1,9 @@
-const CACHE_NAME = 'control-voltes-cache-v1';
+const CACHE_NAME = 'control-voltes-cache-v3';
 const URLS_TO_CACHE = [
   '/ControlVoltes/',
-  '/ControlVoltes/ControlVoltes.html',
+  '/ControlVoltes/index.html',
+  '/ControlVoltes/styles.css',
+  '/ControlVoltes/scripts.js',
   '/ControlVoltes/manifest.json',
   '/ControlVoltes/icons/icon-192.svg',
   '/ControlVoltes/icons/icon-512.svg',

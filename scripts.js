@@ -1,581 +1,98 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Vueltas</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#333">
-    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDdWMTJIMTdNMjEgMTJDMjEgMTYuOTcwNiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45NzA2IDMgMTJDMyA3LjAyOTQ0IDcuMDI5NDQgMyAxMiAzQzE2Ljk3MDYgMyAyMSA3LjAyOTQ0IDIxIDEyWiIgc3Ryb2tlPSIjZjBmMGYwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IiNmMGYwZjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDdWMTJIMTdNMjEgMTJDMjEgMTYuOTcwNiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45NzA2IDMgMTJDMyA3LjAyOTQ0IDcuMDI5NDQgMyAxMiAzQzE2Ljk3MDYgMyAyMSA3LjAyOTQ0IDIxIDEyWiIgc3Ryb2tlPSIjZjBmMGYwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==">
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-        }
-		:root {
-    --bg-color: #1a1a1a;
-    --primary-color: #f0f0f0;
-    --secondary-color: #a0a0a0;
-    --accent-color: #00aaff;
-    --work-color: #28a745;
-    --rest-color: #ffc107;
-    --danger-color: #dc3545;
-    --card-bg-color: #2c2c2c;
-    }
-
-    body {
-        font-family: "Arial Narrow", Arial, sans-serif;
-        background-color: var(--bg-color);
-        color: var(--primary-color);
-        margin: 0;
-        padding: 5px;
-        overscroll-behavior: none;
-    }
-
-    /* Asegura que los controles de formulario usen la misma tipografía */
-    button,
-    input,
-    select,
-    textarea {
-        font-family: inherit;
-    }
-
-    /* Accesibilidad: enfoque visible para controles interactivos */
-    button:focus-visible,
-    .lap-type-toggle:focus-visible,
-    .control-btn:focus-visible,
-    .session-item button:focus-visible,
-    .delete-btn:focus-visible,
-    #toggle-view-btn:focus-visible,
-    #clock-container:focus-visible {
-        outline: 2px solid var(--accent-color);
-        outline-offset: 2px;
-    }
-
-    #main-container {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        max-width: 500px;
-        margin: 0 auto;
-        margin-top: 44px;
-        width: 100%;
-        padding: 10px;
-        box-sizing: border-box;
-    }
-
-    #registration-view,
-    #sessions-view {
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-        padding-top: 1px; /* Reduced from 60px to minimize space below title */
-    }
-
-    #app-title {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        width: 100%;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        box-sizing: border-box;
-        font-weight: 700;
-        letter-spacing: 0.02em;
-        opacity: 1;
-        font-size: 1.1rem;
-        color: black;
-        background-color: white;
-        padding: 6px 20px; /* slightly tighter */
-        z-index: 1000; /* Higher z-index to ensure it's always on top */
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    /* Left section of title: stopwatch icon + text */
-    .title-left {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex: 1 1 auto;
-        min-width: 0; /* allow flex child to shrink */
-    }
-    .title-left span {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .title-left svg {
-        width: 24px;
-        height: 24px;
-    }
-    /* Toggle button placed at the right inside the title bar */
-    #toggle-view-btn {
-        position: static;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 4px; /* keep a comfortable tap target */
-        cursor: pointer;
-        z-index: 101;
-    }
-    /* Constrain right icon size */
-    #toggle-view-btn svg {
-        width: 24px;
-        height: 24px;
-    }
-    /* Text label next to the toggle icon */
-    #toggle-view-btn .toggle-label {
-        margin-left: 8px;
-        font-weight: 700;
-        color: black;
-        letter-spacing: 0.02em;
-    }
-
-    #clock-container {
-        width: 100%;
-        padding: 5px !important;
-        background-color: #2E7D32; /* Verde oscuro */
-        border-radius: 25px; /* Bordes redondeados */
-        cursor: pointer;
-        user-select: none;
-        -webkit-tap-highlight-color: transparent; /* Evita el destello azul en móviles */
-        transition: background-color 0.2s;
-        border: 1px solid #3a3a3a;
-    }
-
-    #clock-container:active {
-        background-color: #444;
-    }
-
-    #clock {
-        font-family: Arial Black, sans-serif;
-        font-size: 5rem;
-        font-weight: 600;
-        text-align: center;
-        letter-spacing: 2px;
-        color: #ffffff; /* Texto blanco por defecto */
-    }
-
-    .clock-subtitle {
-        text-align: center;
-        color: var(--secondary-color);
-        font-size: 0.8rem;
-        margin-top: 5px;
-    }
-
-    #summary-container {
-        display: flex;
-        justify-content: space-between;
-        width: 100%;
-        background-color: #242a2f;
-        padding: 5px !important;
-        border-radius: 15px;
-        border: 1px solid #3a3a3a;
-        gap: 5px;
-    }
-
-    .summary-item {
-        text-align: center;
-        flex: 1 1 0;
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 3px; /* gaps más pequeños dentro de cada item */
-        padding: 3px 3px; /* compacto dentro del item */
-        border: 1px solid #3a3a3a; /* borde para resaltar cada item */
-        border-radius: 10px;
-    }
-
-    .summary-item span {
-        font-size: 1.05rem; /* labels más grandes */
-        color: var(--secondary-color);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 5px;
-    }
-
-    /* Igualar tamaño de iconos al texto del label */
-    .summary-item span svg {
-        width: 1.2em;  /* iconos más grandes */
-        height: 1.2em;
-        flex-shrink: 0;
-    }
-
-    .summary-item strong {
-        font-size: clamp(1.2rem, 5vw, 1.8rem); /* valor más grande */
-        font-weight: 600; /* un poco más grueso */
-        white-space: nowrap; /* Mantiene SS.ms en una sola línea */
-        display: flex;
-        align-items: center;
-        justify-content: center; /* Centra vertical y horizontalmente el valor */
-        line-height: 1; /* Evita que el superíndice desplace el bloque */
-    }
-
-    #laps-container {
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        padding: 5px !important;
-    }
-
-    .lap-item {
-        display: flex;
-        align-items: center;
-        gap: 3px;
-        padding: 3px 3px;
-        background-color: var(--card-bg-color);
-        border-radius: 10px;
-        border: 1px solid #3a3a3a;
-        border-left: 5px solid var(--secondary-color);
-        margin: 0 2px;
-    }
-
-    .lap-index {
-        font-weight: 600;
-        color: var(--secondary-color);
-        min-width: 1.5em;
-        text-align: right;
-    }
-
-    .lap-item.work {
-        border-left-color: var(--work-color);
-    }
-
-    .lap-item.rest {
-        border-left-color: var(--rest-color);
-    }
-
-    .lap-time {
-        font-size: clamp(0.95rem, 3.8vw, 1.2rem);
-        font-weight: 500;
-        white-space: nowrap;
-        flex: 0 0 auto;
-    }
-
-    .lap-duration {
-        font-size: clamp(0.85rem, 3.2vw, 1rem);
-        color: var(--secondary-color);
-        white-space: nowrap;
-        flex: 0 0 auto;
-    }
-
-    .lap-name {
-        flex: 1 1 auto;
-        min-width: 0;
-        font-size: clamp(0.9rem, 3.5vw, 1.1rem);
-        border: none;
-        background: none;
-        color: var(--primary-color);
-        padding: 3px 3px;
-        border-radius: 3px;
-        width: 100%;
-    }
-
-    .lap-name::placeholder {
-        color: var(--secondary-color);
-    }
-
-    .lap-name:focus {
-        outline: none;
-        background-color: #444;
-    }
-
-    .delete-btn {
-        border: none;
-        background: none;
-        color: var(--secondary-color);
-        cursor: pointer;
-        font-size: 1.5rem;
-        padding: 0 5px;
-        line-height: 1;
-        flex: 0 0 auto;
-    }
-
-    .delete-btn:hover {
-        color: var(--danger-color);
-    }
-
-        /* Botón de edición en vista de sesión (propio, no reutiliza finalize-btn) */
-        .session-edit-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            border-radius: 8px;
-            border: 1px solid #28a745; /* Verde */
-            background: #28a745; /* Verde */
-            color: #fff;
-            font-weight: 700;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-transform: uppercase;
-            height: 36px;
-        }
-
-    .lap-type-toggle {
-        padding: 3px 3px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: 700;
-        border: 1px solid var(--secondary-color);
-        background-color: transparent;
-        color: var(--secondary-color);
-        transition: all 0.2s;
-        white-space: nowrap;
-        flex: 0 0 auto;
-        min-width: auto;
-        display: flex;
-        justify-content: center;
-        box-sizing: border-box;
-        margin: 0 4px;
-        text-transform: uppercase;
-    }
-
-    .lap-type-toggle.work {
-        border-color: var(--work-color);
-        background-color: var(--work-color);
-        color: #fff;
-    }
-
-    .lap-type-toggle.rest {
-        border-color: var(--rest-color);
-        background-color: var(--rest-color);
-        color: #333;
-    }
-
-    #controls-container {
-        width: 100%;
-        height: 64px;
-    }
-
-    .control-btn {
-        width: 100%;
-        padding: 5px;
-        font-size: 1.2rem;
-        font-weight: 500;
-        border-radius: 10px;
-        border: none;
-        cursor: pointer;
-        background-color: var(--accent-color);
-        color: #fff;
-        transition: background-color 0.2s;
-    }
-
-    .control-btn:hover {
-        background-color: #0088cc;
-    }
-
-    #sessions-list {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-    }
-
-    /* Disposición más compacta en pantallas muy estrechas */
-    @media (max-width: 360px) {
-        .lap-item {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 5px;
-            padding: 3px 3px;
-            margin: 0 1px;
-        }
-        .lap-time,
-        .lap-duration,
-        .lap-type-toggle,
-        .delete-btn {
-            align-self: flex-start;
-        }
-    }
-
-    /* Media queries adicionales para móviles */
-    @media (max-width: 480px) {
-        body {
-            padding: 2px;
-        }
-        #main-container {
-            padding: 2px;
-            max-width: none;
-        }
-        /* Tighter title padding on very small screens */
-        #app-title {
-            padding: 6px 12px;
-            padding-left: max(12px, env(safe-area-inset-left));
-            padding-right: max(12px, env(safe-area-inset-right));
-        }
-        /* Slightly smaller icons on narrow widths */
-        .title-left svg,
-        #toggle-view-btn svg {
-            width: 22px;
-            height: 22px;
-        }
-        /* no absolute toggle positioning on mobile either */
-        .session-top-bar {
-            padding: 8px;
-            font-size: 0.9em;
-        }
-        .session-top-bar button {
-            padding: 6px 10px;
-            font-size: 0.8em;
-        }
-        #session-info {
-            padding: 15px;
-        }
-        #session-name-row {
-            margin: 8px 0 15px 0;
-        }
-        #session-name-row .nameLabel {
-            font-size: 1.1em;
-        }
-    }
-
-    .session-item {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        padding: 5px;
-        background-color: var(--card-bg-color);
-        border-radius: 10px;
-        border: 1px solid #3a3a3a;
-    }
-
-    .session-item > span {
-        flex-grow: 1;
-        font-size: 1.1rem;
-    }
-
-    .session-item button {
-        padding: 6px 10px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: 500;
-        border: 1px solid var(--secondary-color);
-        background-color: transparent;
-        color: var(--secondary-color);
-        transition: all 0.2s;
-    }
-
-    .session-item button:hover {
-        background-color: var(--secondary-color);
-        color: var(--bg-color);
-    }
-
-    /* Metadatos de sesión: fila debajo del nombre de archivo */
-    .session-meta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-        margin-top: 4px;
-    }
-
-    .session-meta .meta {
-        background-color: rgba(255,255,255,0.08);
-        border: 1px solid #3a3a3a;
-        border-radius: 6px;
-        padding: 2px 6px;
-        font-size: 0.9rem;
-        color: var(--secondary-color);
-    }
-    #sessions-container h2 {
-    font-size: 1.3rem;
-    margin-bottom: 10px;
-    margin-top: 5px;
-    color: var(--primary-color);
-}    
-    </style>
-</head>
-<body>
-    <div id="main-container" style="position: relative;">
-        <div id="app-title">
-            <div class="title-left">
-                <span>CONTROL DE VOLTES</span>
-            </div>
-            <div id="header-actions" style="display:flex; align-items:center; gap:8px;">
-                <button id="install-btn" style="display:none; align-items:center; gap:6px; padding:4px 8px; border-radius:6px; border:1px solid #0d6efd; background:#0d6efd; color:#fff; font-weight:700; cursor:pointer;">INSTALAR</button>
-                <div id="wake-toggle" role="switch" aria-checked="false" tabindex="0" title="Mantener pantalla activa" style="display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;">
-                    <span id="wake-label" style="font-size:0.85rem;">Pantalla</span>
-                    <span id="wake-indicator" style="width:34px; height:20px; display:inline-flex; align-items:center; padding:2px; border-radius:999px; background:#666; box-sizing:border-box;">
-                        <span style="width:16px; height:16px; border-radius:50%; background:#bbb; transform: translateX(0); transition: transform .2s, background .2s;"></span>
-                    </span>
-                </div>
-                <div id="toggle-view-btn"></div>
-            </div>
-        </div>
-        <div id="registration-view" style="display: block;">
-            <div id="clock-container">
-                <div id="clock" aria-live="polite" aria-atomic="true">00:00:00.000</div>
-            </div>
-            <div id="summary-container">
-                <div class="summary-item">
-                    <span>Trabajo</span>
-                    <strong id="total-work" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
-                </div>
-                <div class="summary-item">
-                    <span>Reposo</span>
-                    <strong id="total-rest" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
-                </div>
-                <div class="summary-item">
-                    <span>Total</span>
-                    <strong id="total-time" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
-                </div>
-            </div>
-            <div id="controls-container">
-                <button id="finalize-btn" class="control-btn">Finalizar y Guardar</button>
-            </div>
-            <div id="laps-container">
-                <!-- Las vueltas se añadirán aquí dinámicamente -->
-            </div>
-        </div>
-        <div id="sessions-view" style="display: none;">
-            <div id="sessions-container">
-                <h2>SESSIONS GUARDADES</h2>
-                <div id="sessions-list">
-                    <!-- Las sesiones guardadas se añadirán aquí -->
-                </div>
-            </div>
-        </div>
-    </div>
-    <script>
 	document.addEventListener('DOMContentLoaded', () => {
-    // Referències a els elements del DOM
-    const clockElement = document.getElementById('clock');
-    const clockContainer = document.getElementById('clock-container');
-    const totalWorkElement = document.getElementById('total-work');
-    const totalRestElement = document.getElementById('total-rest');
-    const totalTimeElement = document.getElementById('total-time');
-    const lapsContainer = document.getElementById('laps-container');
-    const finalizeBtn = document.getElementById('finalize-btn');
-    try { finalizeBtn.style.height = '64px'; } catch {}
-    const sessionsList = document.getElementById('sessions-list');
-    const sessionsContainer = document.getElementById('sessions-container');
-    const toggleViewBtn = document.getElementById('toggle-view-btn');
-    const registrationView = document.getElementById('registration-view');
-    const sessionsView = document.getElementById('sessions-view');
-
-    let laps = [];
-    let clockInterval;
-    let isReadOnly = false;
-    let isViewingSession = false; // Permite editar tipo en vista de sesión guardada
-    let currentSessionKey = null; // Clave de la sesión en vista
-    let isRecording = false;  // Add this line
-    let sessionDirty = false;
-    let pendingRename = null;
-    let recordingName = 'Indeterminat';
-    const sessionPrefix = 'stopwatch_session_';
-    // Keep a reference to the temporary finalize handler used in view mode
-    let finalizeViewHandler = null;
+    // Estado centralizado de la aplicación
+    const appState = {
+        // Referencias DOM (cachear una sola vez)
+        dom: {},
+        
+        // Estado de la aplicación
+        laps: [],
+        isRecording: false,
+        isReadOnly: false,
+        isViewingSession: false,
+        currentSessionKey: null,
+        sessionDirty: false,
+        pendingRename: null,
+        recordingName: 'Indeterminat',
+        
+        // Intervalos
+        clockInterval: null,
+        lastLapUpdateId: null,
+        
+        // Constantes
+        SESSION_PREFIX: 'stopwatch_session_',
+        
+        // Referencias temporales
+        finalizeViewHandler: null,
+    };
+    
+    // Función para inicializar caché DOM
+    function initDOMCache() {
+        appState.dom = {
+            // Elementos principales
+            clock: document.getElementById('clock'),
+            clockContainer: document.getElementById('clock-container'),
+            
+            // Summary
+            totalWork: document.getElementById('total-work'),
+            totalRest: document.getElementById('total-rest'),
+            totalTime: document.getElementById('total-time'),
+            
+            // Laps y controles
+            lapsContainer: document.getElementById('laps-container'),
+            finalizeBtn: document.getElementById('finalize-btn'),
+            
+            // Vistas
+            registrationView: document.getElementById('registration-view'),
+            sessionsView: document.getElementById('sessions-view'),
+            sessionsList: document.getElementById('sessions-list'),
+            sessionsContainer: document.getElementById('sessions-container'),
+            
+            // Header
+            toggleViewBtn: document.getElementById('toggle-view-btn'),
+            wakeToggle: document.getElementById('wake-toggle'),
+            wakeIndicator: document.getElementById('wake-indicator'),
+            wakeLabel: document.getElementById('wake-label'),
+        };
+        
+        // Aplicar estilo inicial al botón finalizar
+        try { 
+            if (appState.dom.finalizeBtn) {
+                appState.dom.finalizeBtn.style.height = '64px';
+            }
+        } catch {}
+        
+        console.debug('[DOM] Cache inicializado');
+    }
+    
+    // Inicializar caché DOM
+    initDOMCache();
+    
+    // Aliases para compatibilidad con código existente
+    const clockElement = appState.dom.clock;
+    const clockContainer = appState.dom.clockContainer;
+    const totalWorkElement = appState.dom.totalWork;
+    const totalRestElement = appState.dom.totalRest;
+    const totalTimeElement = appState.dom.totalTime;
+    const lapsContainer = appState.dom.lapsContainer;
+    const finalizeBtn = appState.dom.finalizeBtn;
+    const sessionsList = appState.dom.sessionsList;
+    const sessionsContainer = appState.dom.sessionsContainer;
+    const toggleViewBtn = appState.dom.toggleViewBtn;
+    const registrationView = appState.dom.registrationView;
+    const sessionsView = appState.dom.sessionsView;
+    
+    // Aliases para variables de estado (compatibilidad)
+    let laps = appState.laps;
+    let clockInterval = appState.clockInterval;
+    let isReadOnly = appState.isReadOnly;
+    let isViewingSession = appState.isViewingSession;
+    let currentSessionKey = appState.currentSessionKey;
+    let isRecording = appState.isRecording;
+    let sessionDirty = appState.sessionDirty;
+    let pendingRename = appState.pendingRename;
+    let recordingName = appState.recordingName;
+    const sessionPrefix = appState.SESSION_PREFIX;
+    let finalizeViewHandler = appState.finalizeViewHandler;
 
     const disketteIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" stroke-width="1.5" stroke="black" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" /><path d="M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M14 4l0 4l-6 0l0 -4" /></svg>`;
     const stopwatchIcon = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 7V12H17M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -597,16 +114,10 @@
 </svg>`;
 
     const restIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-        <!-- Cup body -->
-        <path d="M3 10v5a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3v-5z" />
-        <!-- Handle -->
-        <path d="M15 11h2a2 2 0 1 1 0 4h-2" />
-        <!-- Base -->
-        <path d="M5 20h10" />
-        <!-- Steam -->
-        <path d="M8 4c0 1 1 1 1 2s-1 1-1 2" />
-        <path d="M11 3c0 1 1 1 1 2s-1 1-1 2" />
-        <path d="M14 4c0 1 1 1 1 2s-1 1-1 2" />
+        <!-- Cup body -->         <path d="M3 10v5a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3v-5z" />
+        <!-- Handle --> <path d="M15 11h2a2 2 0 1 1 0 4h-2" />
+        <!-- Base --> <path d="M5 20h10" />
+        <!-- Steam --> <path d="M7 4c0 1 1 1 1 2s-1 1-1 2" />  <path d="M11 4c0 1 1 1 1 2s-1 1-1 2" />
     </svg>`;
     const totalIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
         <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
@@ -618,6 +129,65 @@
     const editIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
     const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
     const xIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+    const screenIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`;
+
+    // --- WakeLockManager Class ---
+    class WakeLockManager {
+        constructor() {
+            this.wakeLock = null;
+            this.isSupported = 'wakeLock' in navigator;
+            
+            // Gestión de visibilitychange para re-adquirir el wake lock
+            if (this.isSupported) {
+                document.addEventListener('visibilitychange', async () => {
+                    if (document.visibilityState === 'visible' && this.wakeLock !== null) {
+                        await this.request();
+                    }
+                });
+            }
+        }
+
+        async request() {
+            if (!this.isSupported) {
+                console.warn('[WakeLock] No soportado en este navegador');
+                return false;
+            }
+
+            try {
+                this.wakeLock = await navigator.wakeLock.request('screen');
+                console.debug('[WakeLock] Activado');
+                
+                this.wakeLock.addEventListener('release', () => {
+                    console.debug('[WakeLock] Liberado');
+                });
+                
+                return true;
+            } catch (err) {
+                console.error('[WakeLock] Error al activar:', err);
+                this.wakeLock = null;
+                return false;
+            }
+        }
+
+        async release() {
+            if (this.wakeLock !== null) {
+                try {
+                    await this.wakeLock.release();
+                    this.wakeLock = null;
+                    console.debug('[WakeLock] Liberado manualmente');
+                    return true;
+                } catch (err) {
+                    console.error('[WakeLock] Error al liberar:', err);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        isActive() {
+            return this.wakeLock !== null && !this.wakeLock.released;
+        }
+    }
 
     // --- Modal util ---
     const showModal = ({ title = '', message = '', okText = 'Aceptar', cancelText = 'Cancelar', type = 'confirm', defaultValue = '' } = {}) => {
@@ -1484,8 +1054,14 @@
         });
         renderLaps();
         updateSummary();
+        
+        // Iniciar actualización incremental de la última vuelta
+        if (laps.length >= 2) {
+            startLastLapUpdate();
+        }
     };
 
+    // Actualizar solo la duración de la última vuelta (optimizado)
     const updateLastLapDuration = () => {
         if (isReadOnly || laps.length === 0) return;
         const lastLapElement = lapsContainer.firstChild;
@@ -1495,18 +1071,94 @@
                 const now = new Date();
                 const lastLap = laps[laps.length - 1];
                 const duration = (now - lastLap.time) / 1000;
-                durationSpan.innerHTML = formatSummaryDurationHTML(duration);
+                const formatted = formatSummaryDurationHTML(duration);
+                
+                // Solo actualizar si cambió (optimización)
+                if (durationSpan.innerHTML !== formatted) {
+                    durationSpan.innerHTML = formatted;
+                }
             }
         }
     };
+    
+    // Variables para actualización incremental de última vuelta
+    let lastLapUpdateId = null;
+    
+    // Iniciar actualización periódica de la última vuelta
+    function startLastLapUpdate() {
+        if (lastLapUpdateId) return; // Ya está actualizando
+        
+        lastLapUpdateId = setInterval(() => {
+            if (laps.length < 2) return;
+            
+            const lastLapElement = lapsContainer.firstChild;
+            if (!lastLapElement) return;
+            
+            const durationSpan = lastLapElement.querySelector('.lap-time');
+            if (durationSpan) {
+                const lastLap = laps[laps.length - 1];
+                const duration = (Date.now() - lastLap.time) / 1000;
+                const formatted = formatSummaryDurationHTML(duration);
+                
+                // Solo actualizar si cambió
+                if (durationSpan.innerHTML !== formatted) {
+                    durationSpan.innerHTML = formatted;
+                }
+            }
+        }, 100); // Actualizar cada 100ms (suficiente para mostrar cambios)
+        
+        console.debug('[Laps] Actualización incremental iniciada');
+    }
+    
+    // Detener actualización de última vuelta
+    function stopLastLapUpdate() {
+        if (lastLapUpdateId) {
+            clearInterval(lastLapUpdateId);
+            lastLapUpdateId = null;
+            console.debug('[Laps] Actualización incremental detenida');
+        }
+    }
 
-    const startClock = () => {
-        clearInterval(clockInterval);
-        clockInterval = setInterval(() => {
-            clockElement.innerHTML = formatTime(new Date());
+    // Variables para requestAnimationFrame
+    let lastClockUpdate = 0;
+    let rafId = null;
+    
+    // Función de actualización del reloj con requestAnimationFrame
+    function updateClock() {
+        const now = Date.now();
+        
+        // Throttling: actualizar cada 50ms
+        if (now - lastClockUpdate >= 50) {
+            lastClockUpdate = now;
+            
+            const time = new Date();
+            const formatted = formatTime(time);
+            
+            // Solo actualizar DOM si cambió el contenido
+            if (clockElement.innerHTML !== formatted) {
+                clockElement.innerHTML = formatted;
+            }
+            
+            // Actualizar duración de última vuelta si está grabando
             updateLastLapDuration();
-        }, 10); // Update more frequently for milliseconds
-        clockElement.innerHTML = formatTime(new Date());
+        }
+        
+        // Continuar el loop
+        rafId = requestAnimationFrame(updateClock);
+    }
+    
+    const startClock = () => {
+        if (rafId) return; // Ya está corriendo
+        rafId = requestAnimationFrame(updateClock);
+        console.debug('[Clock] Iniciado con requestAnimationFrame');
+    };
+    
+    const stopClock = () => {
+        if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+            console.debug('[Clock] Detenido');
+        }
     };
 
     const finalizeSession = async () => {
@@ -1533,14 +1185,38 @@
 
         // Aplicar regla: la última vuelta debe llamarse "-FINAL-" al finalizar
         enforceFinalLapName();
+        
+        // Pedir nombre de la sesión antes de guardar
+        const sessionNameInput = await showModal({
+            title: 'Nom de la sessió',
+            message: 'Introdueix un nom per a aquesta sessió:',
+            type: 'prompt',
+            defaultValue: recordingName || 'Indeterminat',
+            okText: 'Desar',
+            cancelText: 'Cancel·lar'
+        });
+        
+        // Si el usuario cancela, no guardar
+        if (sessionNameInput === null || sessionNameInput === undefined) {
+            console.debug('[Session] Guardado cancelado por el usuario');
+            return;
+        }
+        
         const timestamp = formatSessionName(new Date(laps[0].time));
-        const sessionNameValue = String(recordingName || '').trim() || 'Indeterminat';
+        const sessionNameValue = String(sessionNameInput || '').trim() || 'Indeterminat';
         const fullSessionName = `${timestamp}_${sessionNameValue}.txt`;
         try {
             localStorage.setItem(sessionPrefix + fullSessionName, JSON.stringify(laps));
+            
+            // Detener actualización incremental
+            stopLastLapUpdate();
+            
             laps = [];
             isRecording = false;
             recordingName = 'Indeterminat';
+            
+            // Restaurar texto del botón
+            finalizeBtn.textContent = 'PREM EL RELLOTGE PER COMENÇAR';
             
             // Restaurar color original del clock-container
             clockContainer.style.backgroundColor = '#2E7D32'; // Verde oscuro original
@@ -1933,6 +1609,7 @@
                     originalLapsState = JSON.parse(JSON.stringify(laps));
                     
                     // Cambiar botones
+                    sessionEditBtn.innerHTML = `${checkIcon} GUARDAR CAMBIOS`;
                     finalizeBtn.innerHTML = `${checkIcon} VALIDAR`;
                     viewDeleteBtn.innerHTML = `${xIcon} CANCELAR`;
                     
@@ -1961,6 +1638,7 @@
                 } else {
                     // Modo Edición → Vista
                     // Cambiar botones
+                    sessionEditBtn.innerHTML = `${editIcon} EDITAR`;
                     finalizeBtn.innerHTML = `${editIcon} EDITAR`;
                     viewDeleteBtn.innerHTML = `${largeTrashIcon} ELIMINAR`;
                     
@@ -2169,7 +1847,7 @@
             sessionInfoContainer.parentNode.insertBefore(nameRow, sessionInfoContainer.nextSibling);
             
             // Update display
-            try { clearInterval(clockInterval); } catch {}
+            try { stopClock(); } catch {}
             try { renderLaps(); } catch (e) { console.error('renderLaps error', e); }
             try { updateSummary(); } catch (e) { console.error('updateSummary error', e); }
             try { lapsContainer.style.display = 'flex'; } catch {}
@@ -2471,7 +2149,6 @@
 
     // --- PWA: Service Worker + Install prompt ---
     (function setupPWA(){
-        // Remove inline ephemeral SW and use sw.js file
         try {
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
@@ -2582,7 +2259,7 @@
     if (!appTitle) {
         appTitle = document.createElement('div');
         appTitle.id = 'app-title';
-        appTitle.textContent = 'CONTROL DE VOLTES';
+        appTitle.textContent = 'LAPS';
         document.body.appendChild(appTitle);
     }
 
@@ -2611,6 +2288,90 @@
     finalizeBtn.addEventListener('click', finalizeSession);
     startClock();
     renderSessions();
+
+    // --- Wake Lock Integration ---
+    const wakeLockManager = new WakeLockManager();
+    const wakeToggle = document.getElementById('wake-toggle');
+    const wakeIndicator = document.getElementById('wake-indicator');
+    const wakeLabel = document.getElementById('wake-label');
+    const WAKE_LOCK_PREF_KEY = 'wakeLockEnabled';
+
+    // Función para actualizar el estado visual del switch
+    function updateWakeLockUI(isActive) {
+        const toggle = wakeIndicator?.querySelector('span');
+        if (!toggle) return;
+        
+        if (isActive) {
+            wakeToggle.setAttribute('aria-checked', 'true');
+            wakeIndicator.style.background = '#0d6efd';
+            toggle.style.transform = 'translateX(14px)';
+            toggle.style.background = '#fff';
+            if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} BLOQ.`;
+        } else {
+            wakeToggle.setAttribute('aria-checked', 'false');
+            wakeIndicator.style.background = '#666';
+            toggle.style.transform = 'translateX(0)';
+            toggle.style.background = '#bbb';
+            if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} LIBRE`;
+        }
+    }
+
+    // Cargar preferencia guardada
+    async function loadWakeLockPreference() {
+        try {
+            const saved = localStorage.getItem(WAKE_LOCK_PREF_KEY);
+            if (saved === 'true' && wakeLockManager.isSupported) {
+                const success = await wakeLockManager.request();
+                updateWakeLockUI(success);
+            }
+        } catch (err) {
+            console.error('[WakeLock] Error cargando preferencia:', err);
+        }
+    }
+
+    // Toggle Wake Lock
+    async function toggleWakeLock() {
+        if (!wakeLockManager.isSupported) {
+            console.warn('[WakeLock] No soportado');
+            return;
+        }
+
+        try {
+            if (wakeLockManager.isActive()) {
+                await wakeLockManager.release();
+                localStorage.setItem(WAKE_LOCK_PREF_KEY, 'false');
+                updateWakeLockUI(false);
+            } else {
+                const success = await wakeLockManager.request();
+                localStorage.setItem(WAKE_LOCK_PREF_KEY, success ? 'true' : 'false');
+                updateWakeLockUI(success);
+            }
+        } catch (err) {
+            console.error('[WakeLock] Error en toggle:', err);
+            updateWakeLockUI(false);
+        }
+    }
+
+    // Event listeners para el switch
+    if (wakeToggle) {
+        wakeToggle.addEventListener('click', toggleWakeLock);
+        wakeToggle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleWakeLock();
+            }
+        });
+
+        // Ocultar si no está soportado
+        if (!wakeLockManager.isSupported) {
+            wakeToggle.style.display = 'none';
+        }
+    }
+
+    // Inicializar Wake Lock
+    // Establecer texto inicial por defecto
+    if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} LIBRE`;
+    loadWakeLockPreference();
 
     // Ocultar vista de sessions a l'inici
     sessionsView.style.display = 'none';
@@ -2702,57 +2463,4 @@
     clockContainer.style.maxWidth = '100%';  // Add max-width
     clockContainer.style.width = '100%';     // Add width
     clockContainer.style.boxSizing = 'border-box'; // Ensure padding is included in width
-
-    // === PWA inline: dynamic manifest and service worker registration ===
-    try {
-        // 1) Build manifest dynamically (single-file app)
-        const manifest = {
-            name: 'Windsurf TIMER',
-            short_name: 'TIMER',
-            start_url: './',
-            scope: './',
-            display: 'standalone',
-            background_color: getComputedStyle(document.documentElement).getPropertyValue('--bg-color')?.trim() || '#1a1a1a',
-            theme_color: getComputedStyle(document.documentElement).getPropertyValue('--accent-color')?.trim() || '#00aaff',
-            icons: [
-                {
-                    src: 'data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IiNmMGYwZjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDdWMTJIMTdNMjEgMTJDMjEgMTYuOTcwNiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45NzA2IDMgMTJDMyA3LjAyOTQ0IDcuMDI5NDQgMyAxMiAzQzE2Ljk3MDYgMyAyMSA3LjAyOTQ0IDIxIDEyWiIgc3Ryb2tlPSIjZjBmMGYwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==',
-                    sizes: '192x192',
-                    type: 'image/svg+xml'
-                },
-                {
-                    src: 'data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IiNmMGYwZjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDdWMTJIMTdNMjEgMTJDMjEgMTYuOTcwNiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45NzA2IDMgMTJDMyA3LjAyOTQ0IDcuMDI5NDQgMyAxMiAzQzE2Ljk3MDYgMyAyMSA3LjAyOTQ0IDIxIDEyWiIgc3Ryb2tlPSIjZjBmMGYwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==',
-                    sizes: '512x512',
-                    type: 'image/svg+xml'
-                }
-            ]
-        };
-        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-        const manifestUrl = URL.createObjectURL(manifestBlob);
-        let manifestLink = document.querySelector('link[rel="manifest"]');
-        if (!manifestLink) {
-            manifestLink = document.createElement('link');
-            manifestLink.rel = 'manifest';
-            document.head.appendChild(manifestLink);
-        }
-        manifestLink.href = manifestUrl;
-
-        // 2) Register a Service Worker from a Blob URL
-        if ('serviceWorker' in navigator) {
-            const swCode = `const CACHE='timer-cache-v1';\nconst PRECACHE=['./','index.html'];\nself.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(PRECACHE)));self.skipWaiting();});\nself.addEventListener('activate',e=>{e.waitUntil(self.clients.claim());});\nself.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET'){return;}e.respondWith(caches.match(r).then(res=>res||fetch(r).then(resp=>{const copy=resp.clone();caches.open(CACHE).then(c=>c.put(r,copy));return resp;}).catch(()=>{if(r.mode==='navigate'){return caches.match('index.html');}})));});`;
-            const swBlob = new Blob([swCode], { type: 'text/javascript' });
-            const swUrl = URL.createObjectURL(swBlob);
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register(swUrl, { scope: './' }).catch(() => {});
-            });
-        }
-    } catch (e) {
-        // Silenciar errores PWA para no romper la app principal
-        try { console.warn('PWA inline setup failed', e); } catch {}
-    }
-    // === End PWA inline ===
 });
-
-	</script>
-</body>
-</html>
