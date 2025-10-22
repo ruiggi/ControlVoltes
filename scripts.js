@@ -100,33 +100,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const disketteIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" stroke-width="1.5" stroke="black" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" /><path d="M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M14 4l0 4l-6 0l0 -4" /></svg>`;
     const stopwatchIcon = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 7V12H17M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" stroke-width="2" stroke="#f0f0f0" fill="none">
+    const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" stroke-width="3" stroke="#f0f0f0" fill="none">
         <path d="M7 4v16l13 -8z" />
-    </svg>`;
+        </svg>`;
     const workIcon = `
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-  <!-- Mancuerna W4: placas con sombrero/base y barra central -->
-  <rect x="2" y="7" width="4" height="1" rx=".5"/>
-  <rect x="2" y="8" width="4" height="8" rx="1.2"/>
-  <rect x="2" y="16" width="4" height="1" rx=".5"/>
-  <rect x="6.5" y="9.5" width="1.5" height="5" rx=".75"/>
-  <rect x="8.5" y="11" width="7" height="2" rx="1"/>
-  <rect x="16" y="9.5" width="1.5" height="5" rx=".75"/>
-  <rect x="18" y="7" width="4" height="1" rx=".5"/>
-  <rect x="18" y="8" width="4" height="8" rx="1.2"/>
-  <rect x="18" y="16" width="4" height="1" rx=".5"/>
-</svg>`;
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <!-- Mancuerna W4: placas con sombrero/base y barra central -->
+        <rect x="2" y="7" width="4" height="1" rx=".5"/>
+        <rect x="2" y="8" width="4" height="8" rx="1.2"/>
+        <rect x="2" y="16" width="4" height="1" rx=".5"/>
+        <rect x="6.5" y="9.5" width="1.5" height="5" rx=".75"/>
+        <rect x="8.5" y="11" width="7" height="2" rx="1"/>
+        <rect x="16" y="9.5" width="1.5" height="5" rx=".75"/>
+        <rect x="18" y="7" width="4" height="1" rx=".5"/>
+        <rect x="18" y="8" width="4" height="8" rx="1.2"/>
+        <rect x="18" y="16" width="4" height="1" rx=".5"/>
+        </svg>`;
 
     const restIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
         <!-- Cup body -->         <path d="M3 10v5a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3v-5z" />
         <!-- Handle --> <path d="M15 11h2a2 2 0 1 1 0 4h-2" />
         <!-- Base --> <path d="M5 20h10" />
         <!-- Steam --> <path d="M7 4c0 1 1 1 1 2s-1 1-1 2" />  <path d="M11 4c0 1 1 1 1 2s-1 1-1 2" />
-    </svg>`;
+        </svg>`;
     const totalIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
         <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
         <path d="M12 7v5l3 3" />
-    </svg>`;
+        </svg>`;
     const searchIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`;
     const trashIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>`;
     const clockIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12"></polyline><polyline points="12 12 16 14"></polyline></svg>`;
@@ -2253,7 +2253,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     finalizeBtn.innerHTML = `${checkIcon} VALIDAR`;
                     viewDeleteBtn.innerHTML = `${xIcon} CANCELAR`;
                     
-                    // Ocultar botones de compartir
+                    // Ocultar botón toggle de compartir y las opciones
+                    toggleShareBtn.style.display = 'none';
                     bottomRow.style.display = 'none';
                     shareOptionsVisible = false;
                     
@@ -2285,6 +2286,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     sessionEditBtn.innerHTML = `${editIcon} EDITAR`;
                     finalizeBtn.innerHTML = `${editIcon} EDITAR`;
                     viewDeleteBtn.innerHTML = `${largeTrashIcon} ELIMINAR`;
+                    
+                    // Mostrar botón toggle de compartir
+                    toggleShareBtn.style.display = 'flex';
                     
                     // No mostrar automáticamente los botones de compartir al salir del modo edición
                     // El usuario debe usar el toggle si los quiere ver
@@ -2908,6 +2912,17 @@ document.addEventListener('DOMContentLoaded', () => {
         let deferredPrompt = null;
         try {
             const installBtn = document.getElementById('install-btn');
+            // Fijar botón de instalación a la parte inferior de la pantalla
+            if (installBtn) {
+                installBtn.style.position = 'fixed';
+                installBtn.style.bottom = '20px';
+                installBtn.style.left = '50%';
+                installBtn.style.transform = 'translateX(-50%)';
+                installBtn.style.zIndex = '9999';
+                installBtn.style.padding = '12px 24px';
+                installBtn.style.fontSize = '1.1rem';
+                installBtn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+            }
             window.addEventListener('beforeinstallprompt', (e) => {
                 e.preventDefault();
                 deferredPrompt = e;
@@ -3274,6 +3289,139 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- Modal de información al pulsar título VOLTES ---
+    const appTitleText = document.getElementById('app-title-text');
+    if (appTitleText) {
+        appTitleText.style.cursor = 'pointer';
+        appTitleText.addEventListener('click', async () => {
+            const appVersion = '1.0.1'; // Versión desde manifest.json
+            
+            // Crear contenedor del modal con opciones
+            const modalContent = document.createElement('div');
+            modalContent.style.textAlign = 'left';
+            modalContent.style.width = '100%';
+            
+            const infoText = document.createElement('div');
+            infoText.innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <strong style="font-size: 1.4rem;">VOLTES</strong><br>
+                    <span style="opacity: 0.8;">Versió ${appVersion}</span>
+                </div>
+                <div style="margin-bottom: 15px; line-height: 1.6;">
+                    <strong>© 2025 Albert Ruiz Pujol</strong><br>
+                    <a href="mailto:ruiggi@gmail.com" style="color:rgb(255, 255, 255); text-decoration: none;">ruiggi@gmail.com</a><br>
+                    <a href="https://ruiggi.github.io/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://ruiggi.github.io/ControlVoltes/</a>
+                </div>
+            `;
+            modalContent.appendChild(infoText);
+            
+            // Botones de acción
+            const actionsContainer = document.createElement('div');
+            actionsContainer.style.display = 'flex';
+            actionsContainer.style.flexDirection = 'column';
+            actionsContainer.style.gap = '10px';
+            actionsContainer.style.marginTop = '20px';
+            
+            // Botón Forzar instalación
+            const forceInstallBtn = document.createElement('button');
+            forceInstallBtn.textContent = '📲 Forzar instal·lació';
+            forceInstallBtn.style.padding = '12px';
+            forceInstallBtn.style.backgroundColor = '#0d6efd';
+            forceInstallBtn.style.color = '#fff';
+            forceInstallBtn.style.border = 'none';
+            forceInstallBtn.style.borderRadius = '6px';
+            forceInstallBtn.style.fontWeight = '700';
+            forceInstallBtn.style.cursor = 'pointer';
+            forceInstallBtn.style.fontSize = '1rem';
+            forceInstallBtn.addEventListener('click', () => {
+                const forceBtn = document.getElementById('force-install-btn');
+                if (forceBtn) forceBtn.click();
+                // Cerrar modal
+                document.querySelector('.modal-overlay')?.remove();
+            });
+            
+            // Botón Actualizar aplicación
+            const updateBtn = document.createElement('button');
+            updateBtn.textContent = '🔄 Actualitzar aplicació';
+            updateBtn.style.padding = '12px';
+            updateBtn.style.backgroundColor = '#28a745';
+            updateBtn.style.color = '#fff';
+            updateBtn.style.border = 'none';
+            updateBtn.style.borderRadius = '6px';
+            updateBtn.style.fontWeight = '700';
+            updateBtn.style.cursor = 'pointer';
+            updateBtn.style.fontSize = '1rem';
+            updateBtn.addEventListener('click', async () => {
+                try {
+                    const registration = await navigator.serviceWorker.getRegistration();
+                    if (registration) {
+                        await registration.update();
+                        window.location.reload();
+                    }
+                } catch (e) {
+                    alert('Error actualitzant l\'aplicació');
+                }
+            });
+            
+            actionsContainer.appendChild(forceInstallBtn);
+            actionsContainer.appendChild(updateBtn);
+            modalContent.appendChild(actionsContainer);
+            
+            // Mostrar modal personalizado
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.style.position = 'fixed';
+            overlay.style.top = '0';
+            overlay.style.left = '0';
+            overlay.style.width = '100vw';
+            overlay.style.height = '100vh';
+            overlay.style.backgroundColor = 'rgba(0,0,0,0.75)';
+            overlay.style.zIndex = '9999';
+            overlay.style.display = 'flex';
+            overlay.style.alignItems = 'center';
+            overlay.style.justifyContent = 'center';
+            overlay.style.padding = '20px';
+            overlay.style.boxSizing = 'border-box';
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.backgroundColor = 'var(--card-bg-color)';
+            modal.style.borderRadius = '12px';
+            modal.style.padding = '24px';
+            modal.style.maxWidth = '500px';
+            modal.style.width = '95vw';
+            modal.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+            modal.style.border = '1px solid var(--accent-color)';
+            
+            modal.appendChild(modalContent);
+            
+            // Botón ACEPTAR
+            const okButton = document.createElement('button');
+            okButton.textContent = 'ACEPTAR';
+            okButton.style.width = '100%';
+            okButton.style.padding = '14px';
+            okButton.style.marginTop = '20px';
+            okButton.style.backgroundColor = '#666';
+            okButton.style.color = '#fff';
+            okButton.style.border = 'none';
+            okButton.style.borderRadius = '6px';
+            okButton.style.fontWeight = '700';
+            okButton.style.cursor = 'pointer';
+            okButton.style.fontSize = '1.1rem';
+            okButton.style.textTransform = 'uppercase';
+            okButton.addEventListener('click', () => overlay.remove());
+            
+            modal.appendChild(okButton);
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+            
+            // Cerrar al hacer clic fuera del modal
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.remove();
+            });
+        });
+    }
+
     // Inicializar Wake Lock
     // Establecer texto inicial por defecto
     if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} LIBRE`;
@@ -3294,21 +3442,24 @@ document.addEventListener('DOMContentLoaded', () => {
     timeContainer.style.display = 'flex';
     timeContainer.style.alignItems = 'center';
     timeContainer.style.width = '100%';
-    timeContainer.style.justifyContent = 'space-between';
-    timeContainer.style.padding = '0 20px';
+    timeContainer.style.justifyContent = 'center'; // Centrado para mejor distribución
+    timeContainer.style.padding = '0 5px'; // Reducido de 20px a 5px
+    timeContainer.style.gap = '5px'; // Pequeño gap entre elementos
 
     const playIconSpan = document.createElement('span');
     playIconSpan.innerHTML = playIcon;
     playIconSpan.style.display = 'flex';
-    playIconSpan.style.alignItems = 'center';
+    playIconSpan.style.alignItems = 'left';
     playIconSpan.style.flexShrink = '0';
+    playIconSpan.style.marginRight = '150'; // Sin margen adicional
 
-    clockElement.style.fontSize = '5rem';
-    clockElement.style.flex = '1';
+    clockElement.style.fontSize = '4rem';
+    clockElement.style.flex = '1 1 auto'; // Permite que se ajuste
     clockElement.style.textAlign = 'center';
-    clockElement.style.margin = '0 20px';
+    clockElement.style.margin = '0'; // Sin márgenes
     clockElement.style.fontFamily = '"Arial Narrow", Arial, sans-serif';
-    clockElement.style.letterSpacing = '-0.05em';
+    clockElement.style.letterSpacing = '-0.08em'; // Más compacto (de -0.05em a -0.08em)
+    clockElement.style.minWidth = '0'; // Permite compresión si es necesario
 
     timeContainer.appendChild(playIconSpan);
     timeContainer.appendChild(clockElement);
