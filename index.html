@@ -15,15 +15,15 @@
 <body>
     <div id="main-container" style="position: relative;">
         <div id="app-title">
-            <div class="title-left">
-                <span>VOLTES</span>
+            <div id="title-left" class="title-left">
+                <span id="app-title-text">VOLTES</span>
             </div>
             <div id="header-actions" style="display:flex; align-items:center; gap:8px;">
                 <button id="install-btn" style="display:none; align-items:center; gap:6px; padding:4px 8px; border-radius:6px; border:1px solid #0d6efd; background:#0d6efd; color:#fff; font-weight:700; cursor:pointer;">INSTALAR</button>
                 <div id="wake-toggle" role="switch" aria-checked="false" tabindex="0" title="Mantener pantalla activa">
                     <span id="wake-label"></span>
                     <span id="wake-indicator" style="width:34px; height:20px; display:inline-flex; align-items:center; padding:2px; border-radius:999px; background:#666; box-sizing:border-box;">
-                        <span style="width:16px; height:16px; border-radius:50%; background:#bbb; transform: translateX(0); transition: transform .2s, background .2s;"></span>
+                        <span id="wake-indicator-dot" style="width:16px; height:16px; border-radius:50%; background:#bbb; transform: translateX(0); transition: transform .2s, background .2s;"></span>
                     </span>
                 </div>
                 <div id="toggle-view-btn"></div>
@@ -34,22 +34,22 @@
                 <div id="clock" aria-live="polite" aria-atomic="true">00:00:00.000</div>
             </div>
             <div id="summary-container">
-                <div class="summary-item">
-                    <span>Trabajo</span>
+                <div id="summary-work" class="summary-item">
+                    <span id="summary-work-label">Trabajo</span>
                     <strong id="total-work" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
                 </div>
-                <div class="summary-item">
-                    <span>Reposo</span>
+                <div id="summary-rest" class="summary-item">
+                    <span id="summary-rest-label">Reposo</span>
                     <strong id="total-rest" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
                 </div>
-                <div class="summary-item">
-                    <span>Total</span>
+                <div id="summary-total" class="summary-item">
+                    <span id="summary-total-label">Total</span>
                     <strong id="total-time" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
                 </div>
             </div>
             <div id="controls-container">
                 <button id="finalize-btn" class="control-btn">PREM EL RELLOTGE PER COMENÇAR</button>
-                <button id="force-install-btn" class="control-btn" style="display:none; margin-top:8px;">Instalar app</button>
+                <button id="force-install-btn" class="control-btn" style="display:none;">Instalar app</button>
             </div>
             <div id="laps-container">
                 <!-- Las vueltas se añadirán aquí dinámicamente -->
@@ -57,7 +57,15 @@
         </div>
         <div id="sessions-view" style="display: none;">
             <div id="sessions-container">
-                <h2>SESSIONS GUARDADES</h2>
+                <div id="sessions-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                    <h2 id="sessions-title" style="margin: 0;">SESSIONS GUARDADES</h2>
+                    <button id="multiselect-toggle-btn" type="button" aria-label="Activar mode multiselecci贸" title="Mode multiselecci贸" style="background: transparent; border: none; cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center;">
+                        <!-- Icono se añadirá dinámicamente desde scripts.js -->
+                    </button>
+                </div>
+                <div id="multiselect-actions-bar" style="display: none;">
+                    <!-- Barra de acciones se añadirá dinámicamente desde scripts.js -->
+                </div>
                 <div id="sessions-list">
                     <!-- Las sesiones guardadas se añadirán aquí -->
                 </div>

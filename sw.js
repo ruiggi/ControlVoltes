@@ -1,4 +1,4 @@
-const CACHE_NAME = 'control-voltes-cache-v3';
+const CACHE_NAME = 'control-voltes-cache-v4';
 const URLS_TO_CACHE = [
   '/ControlVoltes/',
   '/ControlVoltes/index.html',
@@ -28,13 +28,33 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  event.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE_NAME).then((cache) => cache.put(req, copy)).catch(() => {});
-      return res;
-    }).catch(() => cached))
-  );
+  const url = new URL(req.url);
+  
+  // Network First para archivos principales de la app
+  const isAppFile = url.pathname.endsWith('.html') || 
+                    url.pathname.endsWith('.js') || 
+                    url.pathname.endsWith('.css') || 
+                    url.pathname.endsWith('.json');
+  
+  if (isAppFile) {
+    // Network First: intenta red primero, caché como fallback
+    event.respondWith(
+      fetch(req).then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(req, copy)).catch(() => {});
+        return res;
+      }).catch(() => caches.match(req))
+    );
+  } else {
+    // Cache First para otros recursos (imágenes, iconos, etc.)
+    event.respondWith(
+      caches.match(req).then((cached) => cached || fetch(req).then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(req, copy)).catch(() => {});
+        return res;
+      }).catch(() => cached))
+    );
+  }
 });
 
 self.addEventListener('message', (event) => {

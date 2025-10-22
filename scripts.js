@@ -1,4 +1,4 @@
-	document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     // Estado centralizado de la aplicación
     const appState = {
         // Referencias DOM (cachear una sola vez)
@@ -12,7 +12,7 @@
         currentSessionKey: null,
         sessionDirty: false,
         pendingRename: null,
-        recordingName: 'Indeterminat',
+        recordingName: 'SessióSenseNom',
         
         // Intervalos
         clockInterval: null,
@@ -92,6 +92,10 @@
     let pendingRename = appState.pendingRename;
     let recordingName = appState.recordingName;
     const sessionPrefix = appState.SESSION_PREFIX;
+    
+    // Estado para modo multiselección
+    let isMultiSelectMode = false;
+    let selectedSessions = new Set(); // Set de session keys seleccionadas
     let finalizeViewHandler = appState.finalizeViewHandler;
 
     const disketteIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" stroke-width="1.5" stroke="black" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" /><path d="M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M14 4l0 4l-6 0l0 -4" /></svg>`;
@@ -125,10 +129,11 @@
     </svg>`;
     const searchIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`;
     const trashIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>`;
+    const clockIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12"></polyline><polyline points="12 12 16 14"></polyline></svg>`;
     const shareIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 1 1 0-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 1 1 5.367-2.684 3 3 0 0 1-5.367 2.684zm0 9.316a3 3 0 1 1 5.367 2.684 3 3 0 0 1-5.367-2.684z"/></svg>`;
     const editIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
-    const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-    const xIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+    const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    const xIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
     const screenIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`;
 
     // --- WakeLockManager Class ---
@@ -190,7 +195,7 @@
     }
 
     // --- Modal util ---
-    const showModal = ({ title = '', message = '', okText = 'Aceptar', cancelText = 'Cancelar', type = 'confirm', defaultValue = '' } = {}) => {
+    const showModal = ({ id = '', title = '', message = '', okText = 'Aceptar', cancelText = 'Cancelar', type = 'confirm', defaultValue = '' } = {}) => {
         return new Promise((resolve) => {
             try {
                 // Create modal overlay
@@ -199,7 +204,7 @@
                     direction: 'column',
                     justify: 'center',
                     align: 'center',
-                    backgroundColor: 'rgba(0,0,0,0.65)',
+                    backgroundColor: 'rgba(0,0,0,0.75)', // Más oscuro para mejor visibilidad
                     padding: '20px'
                 });
 
@@ -210,7 +215,9 @@
                     width: '100vw',
                     height: '100vh',
                     zIndex: '9999',
-                    backdropFilter: 'blur(2px)'
+                    backdropFilter: 'blur(4px)', // Más blur para mejor efecto
+                    padding: 'max(20px, 5vw)', // Padding responsive
+                    boxSizing: 'border-box'
                 });
 
                 // Create modal content
@@ -221,31 +228,42 @@
                     align: 'center',
                     backgroundColor: 'var(--card-bg-color)',
                     borderRadius: '12px',
-                    padding: '20px',
-                    gap: '16px'
+                    padding: '24px', // Aumentar padding
+                    gap: '20px' // Aumentar gap entre elementos
                 });
 
                 Object.assign(modal.style, {
                     border: '1px solid var(--accent-color)',
                     boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
                     textAlign: 'center',
-                    maxWidth: '400px',
-                    width: '90%',
+                    maxWidth: '500px', // Aumentar el ancho máximo
+                    width: '95vw', // Ajustar al ancho de la pantalla
+                    maxWidth: 'min(500px, 95vw)', // Máximo 500px pero no más del 95% del viewport
                     transform: 'scale(0.96)',
                     opacity: '0',
-                    transition: 'transform 120ms ease-out, opacity 120ms ease-out'
+                    transition: 'transform 120ms ease-out, opacity 120ms ease-out',
+                    fontSize: '1.1rem', // Aumentar el tamaño de fuente base del modal
+                    boxSizing: 'border-box',
+                    margin: '0 auto' // Centrar horizontalmente
                 });
 
                 modal.setAttribute('role', type === 'alert' ? 'alertdialog' : 'dialog');
                 modal.setAttribute('aria-modal', 'true');
+                
+                // Añadir identificador al modal si se proporciona
+                if (id) {
+                    modal.setAttribute('id', id);
+                    modal.setAttribute('data-modal-id', id);
+                }
 
                 // Add title
                 if (title) {
                     const titleEl = createTextSpan({
                         text: title,
-                        fontSize: '1.6rem',
+                        fontSize: '1.8rem', // Aumentar tamaño del título
                         fontWeight: '700'
                     });
+                    titleEl.id = `${id}-title`;
                     modal.appendChild(titleEl);
                 }
 
@@ -253,63 +271,214 @@
                 if (message) {
                     const messageEl = createTextSpan({
                         text: message,
-                        fontSize: '1.1rem'
+                        fontSize: '1.2rem' // Aumentar tamaño del mensaje
                     });
+                    messageEl.id = `${id}-message`;
+                    // Si el mensaje contiene HTML (como <br>), usar innerHTML en lugar de textContent
+                    if (message.includes('<br>') || message.includes('<')) {
+                        messageEl.innerHTML = message;
+                    }
                     Object.assign(messageEl.style, {
+                        color: '#fff',
                         lineHeight: '1.6',
-                        marginBottom: '20px'
+                        marginBottom: '5px' // Espacio reducido a 5px
                     });
                     modal.appendChild(messageEl);
                 }
+
 
                 // Add input for prompt type
                 let inputEl = null;
                 if (type === 'prompt') {
                     inputEl = createInput({
                         value: defaultValue || '',
-                        placeholder: 'Introduir valor'
+                        placeholder: 'Introduir nom de sessió...'
                     });
+                    inputEl.id = `${id}-input`;
+                    // High contrast input: white background, black text, larger font
+                    inputEl.style.fontSize = '1.6rem'; // Tamaño de texto mayor
+                    inputEl.style.padding = '18px 20px'; // Padding aumentado
+                    inputEl.style.width = '100%';
+                    inputEl.style.boxSizing = 'border-box';
+                    inputEl.style.border = '3px solid #333'; // Borde oscuro para contraste
+                    inputEl.style.backgroundColor = '#fff'; // Fondo blanco
+                    inputEl.style.borderRadius = '8px';
+                    inputEl.style.marginBottom = '20px';
+                    inputEl.style.color = '#000'; // Texto negro
+                    inputEl.style.fontWeight = '600'; // Texto grueso
+                    inputEl.style.textShadow = 'none'; // Sin sombra de texto
                     modal.appendChild(inputEl);
                     setTimeout(() => { inputEl.focus(); inputEl.select(); }, 0);
                 }
 
-                // Create buttons container
+                // Detectar si es el modal de GUARDAR SESSIÓ o un modal de confirmación simple
+                const normalizedTitle = String(title || '').toUpperCase();
+                const isSaveSessionModal = /GUARDAR\s+SESSI(Ó|O)/.test(normalizedTitle);
+                const isDeleteSessionModal = id === 'modal-delete-session-confirm';
+
+                // Create buttons container - columna para GUARDAR SESSIÓ, fila para otros
                 const buttonsContainer = createContainer({
-                    direction: 'row',
+                    direction: isDeleteSessionModal ? 'row' : 'column',
                     justify: 'center',
-                    gap: '12px'
+                    gap: '16px' // Aumentar gap entre botones
                 });
+                buttonsContainer.id = `${id}-buttons-container`;
+                buttonsContainer.className = 'modal-buttons';
+                buttonsContainer.style.width = '100%';
 
-                // Determine if this is a delete action
-                const isDeleteAction = /eliminar|delete|suprimir/i.test((okText || title || ''));
-
-                // Create OK button
-                const okBtn = createButton({
-                    text: okText,
-                    icon: isDeleteAction ? trashIcon : '',
-                    variant: isDeleteAction ? 'danger' : 'primary',
-                    size: 'medium',
-                    onClick: () => {
-                        cleanup();
-                        resolve(type === 'prompt' ? inputEl?.value : true);
-                    }
-                });
-
-                buttonsContainer.appendChild(okBtn);
-
-                // Create Cancel button for non-alert types
+                // Create buttons for non-alert types
+                let okBtn = null;
                 if (type !== 'alert') {
-                    const cancelBtn = createButton({
-                        text: cancelText,
-                        icon: xIcon,
-                        variant: 'secondary',
-                        size: 'medium',
+                    if (isDeleteSessionModal) {
+                        // Para modal de eliminar sesión: orden CANCEL.LAR (rojo, izq) - CONFIRMAR (verde, der)
+                        const cancelBtn = createButton({
+                            text: cancelText,
+                            icon: xIcon,
+                            variant: 'danger',
+                            size: 'large',
+                            onClick: () => {
+                                cleanup();
+                                resolve(false);
+                            }
+                        });
+                        cancelBtn.id = `${id}-cancel-btn`;
+                        cancelBtn.className = 'modal-delete-session-cancel-btn';
+                        cancelBtn.style.fontSize = '1.2rem';
+                        cancelBtn.style.padding = '16px 20px';
+                        cancelBtn.style.flex = '1';
+                        if (cancelBtn.querySelector('svg')) {
+                            cancelBtn.querySelector('svg').style.width = '24px';
+                            cancelBtn.querySelector('svg').style.height = '24px';
+                        }
+                        buttonsContainer.appendChild(cancelBtn);
+
+                        okBtn = createButton({
+                            text: okText,
+                            icon: checkIcon,
+                            variant: 'success',
+                            size: 'large',
+                            onClick: () => {
+                                cleanup();
+                                resolve(true);
+                            }
+                        });
+                        okBtn.id = `${id}-ok-btn`;
+                        okBtn.className = 'modal-delete-session-ok-btn';
+                        okBtn.style.fontSize = '1.2rem';
+                        okBtn.style.padding = '16px 20px';
+                        okBtn.style.flex = '1';
+                        if (okBtn.querySelector('svg')) {
+                            okBtn.querySelector('svg').style.width = '24px';
+                            okBtn.querySelector('svg').style.height = '24px';
+                        }
+                        buttonsContainer.appendChild(okBtn);
+                    } else {
+                        // Para modal de guardar sesión: orden vertical OK - CONTINUAR - CANCEL
+                        okBtn = createButton({
+                            text: isSaveSessionModal ? 'GUARDAR SESSIÓ' : okText,
+                            icon: checkIcon,
+                            variant: 'success',
+                            size: 'large',
+                            onClick: () => {
+                                console.debug('[DEBUG] OK button clicked, input value:', inputEl?.value);
+                                cleanup();
+                                resolve(type === 'prompt' ? inputEl?.value : true);
+                            }
+                        });
+                        okBtn.id = `${id}-ok-btn`;
+                        okBtn.style.width = '100%';
+                        okBtn.style.fontSize = '1.2rem';
+                        okBtn.style.padding = '16px 20px';
+                        okBtn.style.position = 'relative';
+                        okBtn.style.zIndex = '10';
+                        okBtn.style.cursor = 'pointer';
+                        if (okBtn.querySelector('svg')) {
+                            okBtn.querySelector('svg').style.width = '32px';
+                            okBtn.querySelector('svg').style.height = '32px';
+                        }
+                        buttonsContainer.appendChild(okBtn);
+
+                        // Continue button (middle) - only for GUARDAR SESSIÓ modal
+                        if (isSaveSessionModal) {
+                            const continueBtn = createButton({
+                                text: 'CONTINUAR GRABACIÓN',
+                                icon: clockIcon,
+                                variant: 'info',
+                                size: 'large',
+                                onClick: () => {
+                                    cleanup();
+                                    // Retornar objeto con el nombre y la acción
+                                    resolve({
+                                        action: '__CONTINUE_RECORDING__',
+                                        name: inputEl?.value || 'SessióSenseNom'
+                                    });
+                                }
+                            });
+                            continueBtn.id = `${id}-continue-btn`;
+                            continueBtn.style.width = '100%';
+                            continueBtn.style.fontSize = '1.2rem';
+                            continueBtn.style.padding = '16px 20px';
+                            if (continueBtn.querySelector('svg')) {
+                                continueBtn.querySelector('svg').style.width = '32px';
+                                continueBtn.querySelector('svg').style.height = '32px';
+                            }
+                            buttonsContainer.appendChild(continueBtn);
+                        }
+
+                        // Cancel button (bottom)
+                        const cancelBtn = createButton({
+                            text: cancelText,
+                            icon: xIcon,
+                            variant: 'danger',
+                            size: 'large',
+                            onClick: () => {
+                                cleanup();
+                                resolve(isSaveSessionModal ? '__NEW_RECORDING__' : false);
+                            }
+                        });
+                        cancelBtn.id = `${id}-cancel-btn`;
+                        cancelBtn.style.width = '100%';
+                        cancelBtn.style.fontSize = '1.2rem';
+                        cancelBtn.style.padding = '16px 20px';
+                        if (cancelBtn.querySelector('svg')) {
+                            cancelBtn.querySelector('svg').style.width = '32px';
+                            cancelBtn.querySelector('svg').style.height = '32px';
+                        }
+                        // subtitle under cancel - only for GUARDAR SESSIÓ modal
+                        if (isSaveSessionModal) {
+                            try {
+                                const subtitle = document.createElement('div');
+                                subtitle.id = `${id}-cancel-subtitle`;
+                                subtitle.textContent = '(CANCELAR Y EMPEZAR NUEVA GRABACIÓN)';
+                                subtitle.style.fontSize = '0.9rem';
+                                subtitle.style.opacity = '.9';
+                                subtitle.style.fontWeight = '600';
+                                subtitle.style.lineHeight = '1.2';
+                                subtitle.style.marginTop = '-2px';
+                                subtitle.style.textAlign = 'center';
+                                cancelBtn.style.flexDirection = 'column';
+                                cancelBtn.appendChild(subtitle);
+                            } catch {}
+                        }
+                        buttonsContainer.appendChild(cancelBtn);
+                    }
+                } else {
+                    // Alert type keeps a single centered OK button
+                    okBtn = createButton({
+                        text: okText,
+                        icon: '',
+                        variant: 'primary',
+                        size: 'large', // Usar botones más grandes
                         onClick: () => {
                             cleanup();
-                            resolve(type === 'prompt' ? null : false);
+                            resolve(true);
                         }
                     });
-                    buttonsContainer.appendChild(cancelBtn);
+                    okBtn.id = `${id}-ok-btn`;
+                    okBtn.style.fontSize = '1.2rem'; // Texto más grande
+                    okBtn.style.padding = '16px 20px'; // Padding más grande
+                    buttonsContainer.style.justifyContent = 'center';
+                    buttonsContainer.appendChild(okBtn);
                 }
 
                 modal.appendChild(buttonsContainer);
@@ -319,11 +488,13 @@
                 const onKey = (e) => {
                     if (e.key === 'Escape') {
                         e.preventDefault();
+                        console.debug('[DEBUG] Escape pressed, canceling modal');
                         cleanup();
                         resolve(type === 'prompt' ? null : false);
                     }
-                    if (e.key === 'Enter') {
+                    if (e.key === 'Enter' && type === 'prompt' && inputEl) {
                         e.preventDefault();
+                        console.debug('[DEBUG] Enter pressed, clicking OK button');
                         okBtn.click();
                     }
                 };
@@ -392,9 +563,11 @@
         btn.type = 'button';
         btn.className = className;
 
-        // Set content
+        // Set content with icon above text
         if (icon && text) {
-            btn.innerHTML = `${icon} ${text}`;
+            btn.innerHTML = `${icon}<br>${text}`;
+            btn.style.flexDirection = 'column';
+            btn.style.gap = '4px';
         } else if (icon) {
             btn.innerHTML = icon;
         } else {
@@ -429,9 +602,19 @@
                 color: 'var(--secondary-color)'
             },
             danger: {
-                border: '1px solid #e74c3c',
-                backgroundColor: 'transparent',
-                color: '#e74c3c'
+                border: '1px solid #dc3545',
+                backgroundColor: '#dc3545',
+                color: '#fff'
+            },
+            success: {
+                border: '1px solid #28a745',
+                backgroundColor: '#28a745',
+                color: '#fff'
+            },
+            info: {
+                border: '1px solid #0d6efd',
+                backgroundColor: '#0d6efd',
+                color: '#fff'
             }
         };
 
@@ -511,13 +694,16 @@
         input.readOnly = readOnly;
 
         // Common input styling
-        input.style.border = '1px solid #3a3a3a';
-        input.style.backgroundColor = 'transparent';
-        input.style.color = '#f0f0f0';
-        input.style.borderRadius = '6px';
-        input.style.padding = '6px 8px';
-        input.style.fontSize = '1rem';
+        input.style.border = '3px solid #666';
+        input.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+        input.style.color = '#fff';
+        input.style.borderRadius = '8px';
+        input.style.padding = '12px 16px';
+        input.style.fontSize = '1.1rem';
         input.style.fontFamily = 'inherit';
+        input.style.fontWeight = '600';
+        input.style.transition = 'all 0.2s ease';
+        input.style.textShadow = '0 1px 2px rgba(0,0,0,0.3)';
 
         if (onChange) input.addEventListener('change', onChange);
         if (onFocus) input.addEventListener('focus', onFocus);
@@ -605,14 +791,25 @@
         }
     };
 
-    // Backward compatibility aliases
+    // Backward compatibility aliases - definidas aquí para que estén disponibles antes de su uso
     const formatTime = (date) => formatTimeDuration(date, { type: 'time', showMs: true, msSize: '0.5em' });
     const formatDuration = (seconds) => formatTimeDuration(seconds, { type: 'duration', showMs: true, msSize: '0.5em', fallback: '0:00:00.000' });
     const formatDurationCompact = (seconds) => formatTimeDuration(seconds, { type: 'duration', showMs: true, compact: true, fallback: '0:00.000' });
     const formatDurationHTML = (seconds) => formatTimeDuration(seconds, { type: 'duration', showMs: true, msSize: '0.25em', fallback: '0:00:00<span style="font-size:0.25em; vertical-align: super">.000</span>' });
     const formatSummaryDurationHTML = (seconds) => formatTimeDuration(seconds, { type: 'duration', showMs: true, msSize: '0.5em', fallback: '0:00:00<span style="font-size:0.5em; vertical-align: super">.000</span>' });
     const formatDurationHTMLFull = (seconds) => formatTimeDuration(seconds, { type: 'duration', showMs: true, msSize: '1em', fallback: '0:00:00.000' });
-    
+
+    // Function to format session name timestamp (yyyy-mm-dd_hh-mm-ss)
+    const formatSessionName = (date) => {
+        const year = String(date.getFullYear());
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
+    };
+
     // Plain text version for exports (no HTML)
     const formatDurationPlain = (seconds) => {
         if (isNaN(seconds) || seconds < 0) return '0:00:00.000';
@@ -625,35 +822,143 @@
         const ms = String(remainingMs % 1000).padStart(3, '0');
         return `${String(hours)}:${String(minutes).padStart(2, '0')}:${String(sec).padStart(2, '0')}.${ms}`;
     };
+    const resetAppState = () => {
+        // Limpiar estado de la aplicación
+        laps = [];
+        isRecording = false;
+        recordingName = 'SessióSenseNom';
+        sessionDirty = false;
+        pendingRename = null;
 
-    const formatSessionName = (date) => {
-        const y = date.getFullYear();
-        const mo = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        const h = String(date.getHours()).padStart(2, '0');
-        const mi = String(date.getMinutes()).padStart(2, '0');
-        const s = String(date.getSeconds()).padStart(2, '0');
-        return `${y}-${mo}-${d}_${h}-${mi}-${s}`;
+        // Detener actualizaciones
+        stopLastLapUpdate();
+        stopClock();
+
+        // Limpiar contenedores de la interfaz
+        clearElement(lapsContainer);
+
+        // Limpiar contenedores de resumen
+        totalWorkElement.textContent = '0:00:00.000';
+        totalRestElement.textContent = '0:00:00.000';
+        totalTimeElement.textContent = '0:00:00.000';
+
+        // Remover elementos dinámicos
+        unmountRecordingNameRow();
+
+        // Remover cualquier información de sesión si existe
+        const sessionInfo = document.getElementById('session-info');
+        if (sessionInfo) sessionInfo.remove();
+
+        const sessionNameRow = document.getElementById('session-name-row');
+        if (sessionNameRow) sessionNameRow.remove();
+
+        // Remover barras superiores si existen
+        const sessionTopBar = document.getElementById('session-top-bar');
+        if (sessionTopBar) sessionTopBar.remove();
+
+        // Resetear márgenes de registration view
+        registrationView.style.marginTop = '0';
+
+        // Asegurar que la vista de registro esté activa
+        sessionsView.style.display = 'none';
+        registrationView.style.display = 'block';
+
+        // Resetear botón toggle
+        toggleViewBtn.innerHTML = `${disketteIcon} <span class="toggle-label">LLISTAT</span>`;
+        toggleViewBtn.setAttribute('aria-label', 'Canviar a vista de sessions');
+
+        // Resetear botón finalizar
+        finalizeBtn.textContent = 'PREM EL RELLOTGE PER COMENÇAR';
+        finalizeBtn.style.position = 'static';
+        finalizeBtn.style.display = '';
+        finalizeBtn.style.alignItems = '';
+        finalizeBtn.style.justifyContent = '';
+        finalizeBtn.style.height = '64px';
+        finalizeBtn.style.borderRadius = '';
+        finalizeBtn.style.border = '';
+        finalizeBtn.style.backgroundColor = '';
+        finalizeBtn.style.color = '';
+        finalizeBtn.style.fontWeight = '';
+        finalizeBtn.style.cursor = '';
+        finalizeBtn.style.transition = '';
+        finalizeBtn.style.textTransform = '';
+
+        // Asegurar que el botón finalize esté en su contenedor correcto
+        const controlsContainer = document.getElementById('controls-container');
+        if (controlsContainer && !controlsContainer.contains(finalizeBtn)) {
+            controlsContainer.appendChild(finalizeBtn);
+        }
+        if (controlsContainer) controlsContainer.style.display = 'block';
+
+        // Resetear estilos del clock container
+        clockContainer.style.backgroundColor = '#2E7D32';
+        clockContainer.style.color = '#ffffff';
+        clockElement.style.color = '#ffffff';
+        clockContainer.style.display = 'flex';
+
+        // Actualizar texto de instrucciones
+        updateInstructionText();
+
+        // Reiniciar el reloj
+        startClock();
+
+        // Renderizar elementos actualizados
+        console.debug('[App] Estado reiniciado completamente');
     };
 
-    // Helpers para parsear/renombrar sesiones
     const parseSessionKey = (fullKey) => {
-        const fileName = fullKey.replace(sessionPrefix, ''); // yyyy-mm-dd_hh-mi-ss_<name>.txt
-        // timestamp fijo de 19 chars (YYYY-MM-DD_HH-MM-SS)
-        const timestamp = fileName.slice(0, 19);
-        const nameWithExt = fileName.slice(20);
-        const dot = nameWithExt.lastIndexOf('.');
-        const name = dot > -1 ? nameWithExt.slice(0, dot) : nameWithExt;
-        const [dateStr, timeStr] = timestamp.split('_');
-        return { fileName, timestamp, dateStr, timeStr: timeStr.replaceAll('-', ':'), name };
+        const fileName = fullKey.replace(sessionPrefix, ''); // yyyy-mm-dd_hh-mi-ss_name.txt o name.txt
+        const dot = fileName.lastIndexOf('.');
+
+        if (dot === -1) {
+            return {
+                fileName,
+                timestamp: null,
+                dateStr: null,
+                timeStr: null,
+                name: fileName
+            };
+        }
+
+        const name = fileName.slice(0, dot);
+        const ext = fileName.slice(dot + 1);
+
+        // Verificar si el nombre contiene el patrón de timestamp (19 caracteres: yyyy-mm-dd_hh-mm-ss)
+        const timestampPattern = /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}/;
+
+        if (timestampPattern.test(name)) {
+            // Tiene timestamp completo: yyyy-mm-dd_hh-mm-ss_name
+            const timestamp = name.slice(0, 19); // 19 chars: yyyy-mm-dd_hh-mm-ss
+            const userName = name.slice(20);    // Todo después del timestamp + "_"
+            const [dateStr, timeStr] = timestamp.split('_');
+            return { fileName, timestamp, dateStr, timeStr: timeStr.replaceAll('-', ':'), name: userName };
+        } else {
+            // Solo nombre personalizado (sin timestamp)
+            return {
+                fileName,
+                timestamp: null,
+                dateStr: null,
+                timeStr: null,
+                name: name
+            };
+        }
     };
 
     const renameSession = (oldKey, newName) => {
         try {
             const data = localStorage.getItem(oldKey);
             if (data == null) return null;
-            const { timestamp } = parseSessionKey(oldKey);
-            const newFileName = `${timestamp}_${newName}.txt`;
+            const parsedInfo = parseSessionKey(oldKey);
+
+            // Si la sesión original tiene timestamp, mantenerlo para el nuevo nombre
+            // Si no tiene timestamp (nombre personalizado), no añadir timestamp
+            let newFileName;
+            if (parsedInfo.timestamp) {
+                newFileName = `${parsedInfo.timestamp}_${newName}.txt`;
+            } else {
+                newFileName = `${newName}.txt`;
+            }
+
             const newKey = sessionPrefix + newFileName;
             // Evitar colisiones simples
             if (newKey !== oldKey && localStorage.getItem(newKey) != null) {
@@ -784,14 +1089,17 @@
         laps.forEach((lap, index) => {
             const lapItem = document.createElement('div');
             lapItem.className = `lap-item ${lap.type}`;
+            lapItem.id = `lap-item-${index}`;
 
             // Índice correlativo (1-based)
             const lapIndex = document.createElement('span');
             lapIndex.className = 'lap-index';
+            lapIndex.id = `lap-index-${index}`;
             lapIndex.textContent = String(index + 1);
 
             const lapTime = document.createElement('span');
             lapTime.className = 'lap-duration';
+            lapTime.id = `lap-time-${index}`;
             const t = (lap.time instanceof Date) ? lap.time : new Date(lap.time);
             lapTime.innerHTML = formatTime(t);
 
@@ -804,6 +1112,7 @@
             const lapNameInput = document.createElement('input');
             lapNameInput.className = 'lap-name';
             lapNameInput.type = 'text';
+            lapNameInput.id = `lap-name-${index}`;
             lapNameInput.value = lap.name;
             lapNameInput.style.textAlign = 'center'; // Centrar el texto
             lapNameInput.style.flex = '1'; // Tomar todo el espacio disponible
@@ -821,6 +1130,7 @@
             if (isViewingSession) {
                 const editNameBtn = document.createElement('button');
                 editNameBtn.type = 'button';
+                editNameBtn.id = `lap-edit-btn-${index}`;
                 editNameBtn.title = 'Editar nombre de la vuelta';
                 editNameBtn.style.display = 'flex';
                 editNameBtn.style.alignItems = 'center';
@@ -836,6 +1146,7 @@
                 
                 editNameBtn.addEventListener('click', async () => {
                     const newName = await showModal({ 
+                        id: 'modal-edit-lap-name',
                         title: 'Editar nombre de vuelta', 
                         type: 'prompt', 
                         defaultValue: lap.name || '', 
@@ -857,6 +1168,7 @@
 
             const durationSpan = document.createElement('span');
             durationSpan.className = 'lap-time';
+            durationSpan.id = `lap-duration-${index}`;
 
             if (index < laps.length - 1) {
                 const nextRaw = laps[index + 1].time;
@@ -871,6 +1183,7 @@
 
             const lapTypeToggle = document.createElement('button');
             lapTypeToggle.className = `lap-type-toggle ${lap.type}`;
+            lapTypeToggle.id = `lap-type-toggle-${index}`;
             const isWork = lap.type === 'work';
             lapTypeToggle.innerHTML = `${isWork ? workIcon : restIcon} ${isWork ? 'Treball' : 'Descans'}`;
             lapTypeToggle.style.display = 'flex';
@@ -922,6 +1235,7 @@
             const deleteBtn = document.createElement('button');
             deleteBtn.type = 'button';
             deleteBtn.className = 'delete-btn';
+            deleteBtn.id = `lap-delete-btn-${index}`;
             deleteBtn.title = 'Eliminar volta';
             deleteBtn.setAttribute('aria-label', 'Eliminar volta');
             deleteBtn.innerHTML = `
@@ -932,11 +1246,25 @@
                 <path d="M14 11v6"/>
                 <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
               </svg>`;
-            deleteBtn.addEventListener('click', () => {
-                if (!isReadOnly && confirm(`Segur que vols eliminar "${lap.name}"?`)) {
-                    laps.splice(index, 1);
-                    renderLaps();
-                    updateSummary();
+            deleteBtn.addEventListener('click', async () => {
+                if (!isReadOnly) {
+                    const confirmDelete = await showModal({
+                        id: 'modal-delete-lap-confirm',
+                        title: 'Eliminar volta',
+                        message: `Segur que vols eliminar "${lap.name}"?`,
+                        okText: 'ELIMINAR',
+                        cancelText: 'CANCEL.LAR',
+                        type: 'confirm',
+                        buttonLayout: 'horizontal',
+                        reverseButtons: false,
+                        okButtonStyle: 'background: #4CAF50; color: white; border: 1px solid #4CAF50;',
+                        cancelButtonStyle: 'background: #f44336; color: white; border: 1px solid #f44336;'
+                    });
+                    if (confirmDelete) {
+                        laps.splice(index, 1);
+                        renderLaps();
+                        updateSummary();
+                    }
                 }
             });
 
@@ -975,12 +1303,14 @@
         row.style.margin = '10px 0';
 
         const label = document.createElement('span');
+        label.id = 'recording-name-label';
         label.textContent = 'SESSIÓ:';
         label.style.opacity = '0.9';
 
         const input = document.createElement('input');
+        input.id = 'recording-name-input';
         input.type = 'text';
-        input.value = recordingName || 'Indeterminat';
+        input.value = recordingName || 'SessióSenseNom';
         input.placeholder = 'Nom de la sessió';
         input.style.flex = '1 1 auto';
         input.style.minWidth = '0';
@@ -1000,6 +1330,7 @@
 
         // Botón de edición (lápiz) para enfocar y preseleccionar
         const editBtn = document.createElement('button');
+        editBtn.id = 'recording-name-edit-btn';
         editBtn.setAttribute('aria-label', 'Editar nom de la sessió');
         editBtn.title = 'Editar nom';
         editBtn.style.display = 'flex';
@@ -1029,6 +1360,13 @@
     const unmountRecordingNameRow = () => {
         const existing = document.getElementById('recording-name-row');
         if (existing) existing.remove();
+    };
+    
+    const updateRecordingNameRow = () => {
+        const input = document.getElementById('recording-name-input');
+        if (input) {
+            input.value = recordingName || 'SessióSenseNom';
+        }
     };
 
     const addLap = () => {
@@ -1162,6 +1500,7 @@
     };
 
     const finalizeSession = async () => {
+        console.debug('[DEBUG] finalizeSession started');
         // Safety: ensure view-mode finalize handler is detached
         try {
             if (finalizeViewHandler) {
@@ -1171,49 +1510,120 @@
         } catch {}
         // If currently recording, mark a lap as if the user tapped the clock
         if (isRecording && typeof clockContainer !== 'undefined' && clockContainer) {
+            console.debug('[DEBUG] Adding final lap');
             try { clockContainer.click(); } catch {}
             // Allow the click handler (addLap) to run before proceeding
             await new Promise(r => setTimeout(r, 25));
         }
         // If still no laps, inform the user and abort finalize
         if (laps.length === 0) {
+            console.debug('[DEBUG] No laps, showing info modal');
             try {
-                await showModal({ title: 'Informació', message: 'Prem sobre el Rellotge superior per inicial el reigstres de voltes.', type: 'alert', okText: 'D’acord' });
+                await showModal({ id: 'modal-no-laps-info', title: 'Informació', message: 'Prem sobre el Rellotge superior per inicial el reigstres de voltes.', type: 'alert', okText: 'D’acord' });
             } catch {}
             return;
         }
 
-        // Aplicar regla: la última vuelta debe llamarse "-FINAL-" al finalizar
-        enforceFinalLapName();
-        
+        console.debug('[DEBUG] Laps available, showing save modal');
+
         // Pedir nombre de la sesión antes de guardar
         const sessionNameInput = await showModal({
-            title: 'Nom de la sessió',
+            id: 'modal-finalize-session',
+            title: 'GUARDAR SESSIÓ',
             message: 'Introdueix un nom per a aquesta sessió:',
             type: 'prompt',
-            defaultValue: recordingName || 'Indeterminat',
-            okText: 'Desar',
-            cancelText: 'Cancel·lar'
+            defaultValue: recordingName || 'SessióSenseNom',
+            okText: 'GUARDAR SESSIÓ',
+            cancelText: 'CANCEL.LAR'
         });
+
+        console.debug('[DEBUG] Modal result:', sessionNameInput);
         
-        // Si el usuario cancela, no guardar
-        if (sessionNameInput === null || sessionNameInput === undefined) {
-            console.debug('[Session] Guardado cancelado por el usuario');
-            return;
+        // Manejar respuesta del modal (puede ser string o objeto)
+        let action = null;
+        let newName = null;
+        
+        if (typeof sessionNameInput === 'object' && sessionNameInput !== null) {
+            // Es un objeto con acción y nombre
+            action = sessionNameInput.action;
+            newName = sessionNameInput.name;
+        } else {
+            // Es un string (nombre) o null/undefined
+            action = sessionNameInput;
         }
         
+        // Si el usuario cancela, elige continuar grabación o iniciar nueva, no guardar
+        if (action === null || action === undefined || action === '__CONTINUE_RECORDING__' || action === '__NEW_RECORDING__') {
+            console.debug('[Session] Guardado cancelado por el usuario');
+            
+            // Reanudar grabación si aplica
+            if (action === '__CONTINUE_RECORDING__') {
+                // Actualizar el nombre de la sesión si se modificó
+                if (newName && newName.trim() !== '' && newName !== 'SessióSenseNom') {
+                    recordingName = newName.trim();
+                    console.debug('[Session] Nombre de sesión actualizado:', recordingName);
+                    // Actualizar la fila del nombre si existe
+                    updateRecordingNameRow();
+                }
+                try { startClock(); } catch {}
+                isRecording = true;
+            } 
+            // Cancelación simple - reiniciar completamente la aplicación
+            else if (action === null || action === undefined) {
+                console.debug('[Session] Cancelación simple');
+                resetAppState();
+            }
+            
+            // Iniciar nueva grabación si se eligió cancelar
+            if (action === '__NEW_RECORDING__') {
+                console.debug('[Session] Iniciando nueva grabación');
+                resetAppState();
+                return;
+            }
+            
+            return;
+        }
+
+        console.debug('[DEBUG] User provided session name, proceeding with save');
+        // Aplicar regla: la última vuelta debe llamarse "-FINAL-" solo cuando se va a guardar realmente
+        enforceFinalLapName();
+
         const timestamp = formatSessionName(new Date(laps[0].time));
-        const sessionNameValue = String(sessionNameInput || '').trim() || 'Indeterminat';
-        const fullSessionName = `${timestamp}_${sessionNameValue}.txt`;
+        // Usar 'action' que contiene el nombre real (no el objeto)
+        const sessionNameInputTrimmed = String(action || '').trim();
+        const defaultName = 'SessióSenseNom';
+
+        // Detectar si el usuario dejó el nombre vacío o sin cambios significativos
+        const isEmptyOrDefault = sessionNameInputTrimmed === '' ||
+                                 sessionNameInputTrimmed === defaultName ||
+                                 sessionNameInputTrimmed === 'Sessió Sense Nom';
+
+        let fullSessionName;
+        if (isEmptyOrDefault) {
+            // Nombre vacío o por defecto: usar timestamp + nombre por defecto
+            fullSessionName = `${timestamp}_${defaultName}.txt`;
+        } else {
+            // Usuario proporcionó un nombre: usar timestamp + nombre personalizado
+            fullSessionName = `${timestamp}_${sessionNameInputTrimmed}.txt`;
+        }
+
+        console.debug('[DEBUG] Saving session:', {
+            timestamp,
+            sessionNameInputTrimmed,
+            isEmptyOrDefault,
+            fullSessionName,
+            lapsCount: laps.length
+        });
         try {
             localStorage.setItem(sessionPrefix + fullSessionName, JSON.stringify(laps));
+            console.debug('[DEBUG] Session saved successfully to localStorage');
             
             // Detener actualización incremental
             stopLastLapUpdate();
             
             laps = [];
             isRecording = false;
-            recordingName = 'Indeterminat';
+            recordingName = 'SessióSenseNom';
             
             // Restaurar texto del botón
             finalizeBtn.textContent = 'PREM EL RELLOTGE PER COMENÇAR';
@@ -1231,13 +1641,136 @@
             sessionsView.style.display = 'block';
             registrationView.style.display = 'none';
             toggleViewBtn.innerHTML = `${stopwatchIcon} <span class=\"toggle-label\">REGISTRAR</span>`;
+            console.debug('[DEBUG] Session save completed, switched to sessions view');
         } catch (e) {
-            await showModal({ title: 'Error', message: "Error en desar la sessió. L'emmagatzematge pot estar ple.", type: 'alert', okText: 'Tancar' });
+            console.error('[DEBUG] Error saving session:', e);
+            await showModal({ id: 'modal-save-session-error', title: 'Error', message: "Error en desar la sessió. L'emmagatzematge pot estar ple.", type: 'alert', okText: 'Tancar' });
             console.error(e);
         }
     };
 
+    // --- Funciones de modo multiselección ---
+    const toggleMultiSelectMode = () => {
+        isMultiSelectMode = !isMultiSelectMode;
+        selectedSessions.clear();
+        
+        const multiselectToggleBtn = document.getElementById('multiselect-toggle-btn');
+        const multiselectActionsBar = document.getElementById('multiselect-actions-bar');
+        
+        if (isMultiSelectMode) {
+            // Activar modo multiselección
+            multiselectToggleBtn.style.color = '#0d6efd';
+            multiselectToggleBtn.setAttribute('aria-label', 'Desactivar mode multiselecció');
+            multiselectToggleBtn.title = 'Desactivar mode multiselecció';
+            multiselectActionsBar.style.display = 'flex';
+        } else {
+            // Desactivar modo multiselección
+            multiselectToggleBtn.style.color = '#888';
+            multiselectToggleBtn.setAttribute('aria-label', 'Activar mode multiselecció');
+            multiselectToggleBtn.title = 'Activar mode multiselecció';
+            multiselectActionsBar.style.display = 'none';
+        }
+        
+        // Re-renderizar sesiones para mostrar/ocultar checkboxes
+        renderSessions();
+    };
+    
+    const toggleSessionSelection = (sessionKey) => {
+        if (!isMultiSelectMode) return;
+        
+        if (selectedSessions.has(sessionKey)) {
+            selectedSessions.delete(sessionKey);
+        } else {
+            selectedSessions.add(sessionKey);
+        }
+        
+        // Actualizar checkbox visual
+        const checkbox = document.getElementById(`checkbox-${sessionKey}`);
+        if (checkbox) {
+            checkbox.checked = selectedSessions.has(sessionKey);
+        }
+        
+        // Actualizar contador en la barra de acciones
+        updateMultiselectActionBar();
+    };
+    
+    const updateMultiselectActionBar = () => {
+        const countSpan = document.getElementById('multiselect-count');
+        if (countSpan) {
+            const count = selectedSessions.size;
+            countSpan.textContent = count > 0 ? `(${count} seleccionades)` : '';
+        }
+    };
+    
+    const deleteSelectedSessions = async () => {
+        if (selectedSessions.size === 0) {
+            await showModal({
+                id: 'modal-no-selection',
+                title: 'Cap selecció',
+                message: 'No hi ha sessions seleccionades per eliminar.',
+                type: 'alert',
+                okText: 'D\'acord'
+            });
+            return;
+        }
+        
+        const count = selectedSessions.size;
+        const ok = await showModal({
+            id: 'modal-delete-multiple-sessions',
+            title: 'ELIMINAR SESSIONS',
+            message: `Segur que vols eliminar ${count} ${count === 1 ? 'sessió' : 'sessions'}?`,
+            okText: 'CONFIRMAR (Eliminar)',
+            cancelText: 'CANCEL.LAR (Conservar)',
+            type: 'confirm'
+        });
+        
+        if (ok) {
+            // Eliminar todas las sesiones seleccionadas
+            selectedSessions.forEach(sessionKey => {
+                localStorage.removeItem(sessionKey);
+            });
+            
+            // Limpiar selección y salir del modo multiselección
+            selectedSessions.clear();
+            isMultiSelectMode = false;
+            
+            // Re-renderizar lista
+            renderSessions();
+            
+            // Ocultar barra de acciones
+            const multiselectActionsBar = document.getElementById('multiselect-actions-bar');
+            const multiselectToggleBtn = document.getElementById('multiselect-toggle-btn');
+            if (multiselectActionsBar) multiselectActionsBar.style.display = 'none';
+            if (multiselectToggleBtn) {
+                multiselectToggleBtn.style.color = '#888';
+                multiselectToggleBtn.setAttribute('aria-label', 'Activar mode multiselecció');
+                multiselectToggleBtn.title = 'Activar mode multiselecció';
+            }
+        }
+    };
+    
+    const cancelMultiSelect = () => {
+        selectedSessions.clear();
+        isMultiSelectMode = false;
+        
+        const multiselectToggleBtn = document.getElementById('multiselect-toggle-btn');
+        const multiselectActionsBar = document.getElementById('multiselect-actions-bar');
+        
+        if (multiselectToggleBtn) {
+            multiselectToggleBtn.style.color = '#888';
+            multiselectToggleBtn.setAttribute('aria-label', 'Activar mode multiselecció');
+            multiselectToggleBtn.title = 'Activar mode multiselecció';
+        }
+        if (multiselectActionsBar) {
+            multiselectActionsBar.style.display = 'none';
+        }
+        
+        // Re-renderizar para ocultar checkboxes
+        renderSessions();
+    };
+
     const renderSessions = () => {
+        console.debug('[DEBUG] renderSessions started');
         // Asegurar que no quede la barra superior de sesión colgada
         try {
             const danglingTopBar = document.getElementById('session-top-bar');
@@ -1252,19 +1785,31 @@
         const sessions = Object.keys(localStorage)
             .filter(key => key.startsWith(sessionPrefix))
             .sort((a, b) => {
-                // Extract date from session key (format: stopwatch_session_yyyy-mm-dd_hh-mi-ss)
-                const dateA = a.split('_')[2] + a.split('_')[3];
-                const dateB = b.split('_')[2] + b.split('_')[3];
-                return dateB.localeCompare(dateA); // Most recent first
+                // Extraer información de ambas claves
+                const infoA = parseSessionKey(a);
+                const infoB = parseSessionKey(b);
+
+                // Si ambas tienen timestamp, ordenar por fecha y hora
+                if (infoA.timestamp && infoB.timestamp) {
+                    return infoB.timestamp.localeCompare(infoA.timestamp); // Más reciente primero
+                }
+
+                // Si una tiene timestamp y otra no, las que tienen timestamp van primero
+                if (infoA.timestamp && !infoB.timestamp) return -1;
+                if (!infoA.timestamp && infoB.timestamp) return 1;
+
+                // Si ninguna tiene timestamp, ordenar alfabéticamente por nombre
+                return infoA.name.localeCompare(infoB.name);
             });
 
         // Mantener visible el contenedor y el título aunque no haya sesiones
         sessionsContainer.parentElement.style.display = 'block';
         
         // Rest of renderSessions remains the same
-        // Mostrar mensaje vacío cuando no hay sesiones
+        // Mostrar mensaje vacío cuando no haya sesiones
         if (sessions.length === 0) {
             const emptyMsg = document.createElement('div');
+            emptyMsg.id = 'sessions-empty-message';
             emptyMsg.textContent = 'No hi ha sessions desades';
             emptyMsg.style.color = '#aaa';
             emptyMsg.style.textAlign = 'center';
@@ -1273,13 +1818,15 @@
             return;
         }
 
-        sessions.forEach(sessionKey => {
+        sessions.forEach((sessionKey, sessionIndex) => {
             const sessionItem = document.createElement('div');
             sessionItem.className = 'session-item';
+            sessionItem.id = `session-item-${sessionIndex}`;
 
             const info = parseSessionKey(sessionKey);
 
             const nameSpan = document.createElement('span');
+            nameSpan.id = `session-name-span-${sessionIndex}`;
             nameSpan.style.marginTop = '4px';
             nameSpan.style.display = 'block';
             nameSpan.style.fontSize = '0.9em';
@@ -1287,6 +1834,7 @@
             nameSpan.textContent = info.fileName;
 
             const detail = document.createElement('div');
+            detail.id = `session-detail-${sessionIndex}`;
             detail.style.color = '#f0f0f0';
             detail.style.fontSize = '1.1rem';
             detail.style.fontWeight = '600';
@@ -1304,11 +1852,24 @@
                     }
                 }
             } catch {}
+            console.debug('[DEBUG] formatDurationCompact available:', typeof formatDurationCompact === 'function');
             const totalStr = lapsCount > 0 ? `  |  ${formatDurationCompact(totalSeconds)}  |  ${lapsCount} voltes` : '';
-            detail.innerHTML = `${info.dateStr}  |  ${info.timeStr}${totalStr}`;
+
+            // Mostrar fecha y hora correctamente según el tipo de sesión
+            let displayInfo;
+            if (info.timestamp) {
+                // Sesión con timestamp: mostrar fecha y hora formateadas
+                displayInfo = `${info.dateStr}  |  ${info.timeStr}${totalStr}`;
+            } else {
+                // Sesión con nombre personalizado: solo mostrar el nombre sin fecha
+                displayInfo = `${info.name}${totalStr}`;
+            }
+
+            detail.innerHTML = displayInfo;
 
             // First line: session name (bold and larger)
             const nameLine = document.createElement('div');
+            nameLine.id = `session-name-line-${sessionIndex}`;
             nameLine.textContent = info.name;
             nameLine.style.color = '#f0f0f0';
             nameLine.style.fontSize = '1.3rem';
@@ -1317,6 +1878,7 @@
 
             // Left column with two rows (filename, and date | time | name)
             const infoCol = document.createElement('div');
+            infoCol.id = `session-info-col-${sessionIndex}`;
             infoCol.style.display = 'flex';
             infoCol.style.flexDirection = 'column';
             infoCol.style.flex = '1 1 auto';
@@ -1327,11 +1889,13 @@
 
             // Right column with actions
             const buttonsContainer = document.createElement('div');
+            buttonsContainer.id = `session-buttons-container-${sessionIndex}`;
             buttonsContainer.style.display = 'flex';
             buttonsContainer.style.flexDirection = 'column';
             buttonsContainer.style.gap = '5px';
 
             const viewBtn = document.createElement('button');
+            viewBtn.id = `session-view-btn-${sessionIndex}`;
             viewBtn.innerHTML = `${searchIcon}`;
             viewBtn.setAttribute('aria-label', 'Veure');
             viewBtn.title = 'Veure';
@@ -1344,7 +1908,8 @@
 
             // Left delete button
             const deleteBtn = document.createElement('button');
-            deleteBtn.setAttribute('aria-label', 'Eliminar sessió');
+            deleteBtn.id = `session-delete-btn-${sessionIndex}`;
+            deleteBtn.setAttribute('aria-label', 'ELIMINAR SESSIÓ');
             deleteBtn.title = 'Eliminar';
             deleteBtn.style.display = 'flex';
             deleteBtn.style.alignItems = 'center';
@@ -1359,10 +1924,11 @@
                 e.preventDefault();
                 e.stopPropagation();
                 const ok = await showModal({
-                    title: 'Eliminar sessió',
-                    message: `Segur que vols eliminar la sessió "${sessionKey.replace(sessionPrefix, '')}"?`,
-                    okText: 'Eliminar',
-                    cancelText: 'Cancel·lar',
+                    id: 'modal-delete-session-confirm',
+                    title: 'ELIMINAR SESSIÓ',
+                    message: `Segur que vols eliminar la sessió:<br>"${sessionKey.replace(sessionPrefix, '')}"?`,
+                    okText: 'CONFIRMAR (Eliminar)',
+                    cancelText: 'CANCEL.LAR (Conservar)',
                     type: 'confirm'
                 });
                 if (ok) {
@@ -1383,12 +1949,46 @@
                 }
             });
 
-            // Append in order: delete | info | actions
+            // Crear checkbox para modo multiselección
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `checkbox-${sessionKey}`;
+            checkbox.className = 'session-checkbox';
+            checkbox.style.width = '24px';
+            checkbox.style.height = '24px';
+            checkbox.style.cursor = 'pointer';
+            checkbox.style.marginRight = '10px';
+            checkbox.style.display = isMultiSelectMode ? 'block' : 'none';
+            checkbox.checked = selectedSessions.has(sessionKey);
+            checkbox.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleSessionSelection(sessionKey);
+            });
+            
+            // En modo multiselección, el click en el sessionItem también toggle el checkbox
+            if (isMultiSelectMode) {
+                sessionItem.style.cursor = 'pointer';
+                sessionItem.addEventListener('click', (e) => {
+                    // Solo si no se hizo click en un botón
+                    if (!e.target.closest('button') && !e.target.closest('input')) {
+                        toggleSessionSelection(sessionKey);
+                    }
+                });
+                // Ocultar botones de acción en modo multiselección
+                deleteBtn.style.display = 'none';
+                buttonsContainer.style.display = 'none';
+            } else {
+                sessionItem.style.cursor = 'default';
+            }
+
+            // Append in order: checkbox | delete | info | actions
+            sessionItem.appendChild(checkbox);
             sessionItem.appendChild(deleteBtn);
             sessionItem.appendChild(infoCol);
             sessionItem.appendChild(buttonsContainer);
             sessionsList.appendChild(sessionItem);
         });
+        console.debug('[DEBUG] renderSessions completed');
     };
 
     const viewSession = (sessionKey) => {
@@ -1419,7 +2019,7 @@
             }
         } catch {}
         if (!Array.isArray(savedLaps) || savedLaps.length === 0) {
-            showModal({ title: 'Sessió buida', message: 'Aquesta sessió no conté voltes.', type: 'alert', okText: 'Tancar' });
+            showModal({ id: 'modal-empty-session', title: 'Sessió buida', message: 'Aquesta sessió no conté voltes.', type: 'alert', okText: 'Tancar' });
             return;
         }
         if (savedLaps) {
@@ -1448,18 +2048,20 @@
             topBar.style.top = appTitleHeight + 'px';
             topBar.style.left = '0';
             topBar.style.width = '100%';
-            topBar.style.padding = '8px'; // Reduced padding for more height
+            topBar.style.padding = '8px';
             topBar.style.backgroundColor = '#333';
             topBar.style.zIndex = '1000';
             topBar.style.display = 'flex';
             topBar.style.justifyContent = 'space-between';
-            topBar.style.alignItems = 'stretch'; // Ensure full height usage
+            topBar.style.alignItems = 'flex-start'; // Alinear al inicio
             topBar.style.boxSizing = 'border-box';
-            topBar.style.height = '56px'; // Increased height for better button appearance
+            topBar.style.minHeight = '52px'; // Altura mínima en lugar de fija
+            topBar.style.transition = 'min-height 0.3s ease'; // Transición suave
 
             // Crear botón propio para editar/validar en vista de sesión
             const sessionEditBtn = document.createElement('button');
             sessionEditBtn.className = 'session-edit-btn';
+            sessionEditBtn.id = 'session-edit-btn';
             sessionEditBtn.style.margin = '0';
             sessionEditBtn.style.flex = '1';
             sessionEditBtn.style.height = '36px';
@@ -1477,15 +2079,19 @@
 
             // Action buttons (Delete, Share, Share CSV) same as sessions list
             const actions = document.createElement('div');
+            actions.id = 'session-top-bar-actions';
             actions.style.display = 'flex';
             actions.style.flexDirection = 'column'; // Stack buttons vertically
             actions.style.gap = '5px'; // Gap between button rows
-            actions.style.flex = '1'; // Take up remaining space
-            actions.style.justifyContent = 'space-between'; // Distribute rows evenly
+            actions.style.justifyContent = 'flex-start'; // Alinear al inicio para colapsar espacio
             actions.style.alignItems = 'stretch'; // Use full height
+            actions.style.flex = '1 1 auto'; // Flexible pero colapsa cuando no hay contenido
 
             const viewDeleteBtn = document.createElement('button');
             viewDeleteBtn.type = 'button';
+            viewDeleteBtn.id = 'session-view-delete-btn';
+            viewDeleteBtn.setAttribute('aria-label', 'ELIMINAR SESSIÓ');
+            viewDeleteBtn.title = 'Eliminar';
             // Create larger trash icon for better visibility
             const largeTrashIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>`;
             viewDeleteBtn.innerHTML = `${largeTrashIcon} ELIMINAR`;
@@ -1516,6 +2122,7 @@
             });
 
             const viewShareBtn = document.createElement('button');
+            viewShareBtn.id = 'session-view-share-btn';
             // Create larger share icon for better visibility
             const largeShareIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 1 1 0-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 1 1 5.367-2.684 3 3 0 0 1-5.367 2.684zm0 9.316a3 3 0 1 1 5.367 2.684 3 3 0 0 1-5.367-2.684z"/></svg>`;
             viewShareBtn.innerHTML = `${largeShareIcon} COMPARTIR`;
@@ -1537,6 +2144,7 @@
             viewShareBtn.addEventListener('click', () => shareSession(sessionKey));
 
             const viewShareCsvBtn = document.createElement('button');
+            viewShareCsvBtn.id = 'session-view-share-csv-btn';
             // Create larger share icon for better visibility
             const largeShareIcon2 = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 1 1 0-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 1 1 5.367-2.684 3 3 0 0 1-5.367 2.684zm0 9.316a3 3 0 1 1 5.367 2.684 3 3 0 0 1-5.367-2.684z"/></svg>`;
             viewShareCsvBtn.innerHTML = `${largeShareIcon2} CSV ( ; )`;
@@ -1558,6 +2166,7 @@
             viewShareCsvBtn.addEventListener('click', () => shareSessionCSV(sessionKey));
 
             const viewShareCsvCommaBtn = document.createElement('button');
+            viewShareCsvCommaBtn.id = 'session-view-share-csv-comma-btn';
             // Create larger share icon for better visibility
             const largeShareIcon3 = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 1 1 0-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 1 1 5.367-2.684 3 3 0 0 1-5.367 2.684zm0 9.316a3 3 0 1 1 5.367 2.684 3 3 0 0 1-5.367-2.684z"/></svg>`;
             viewShareCsvCommaBtn.innerHTML = `${largeShareIcon3} CSV ( , )`;
@@ -1578,22 +2187,53 @@
             viewShareCsvCommaBtn.style.textTransform = 'uppercase';
             viewShareCsvCommaBtn.addEventListener('click', () => shareSessionCSVComma(sessionKey));
 
-            // Create top row with Delete and Close buttons
+            // Crear botón toggle para mostrar/ocultar opciones de compartir
+            const toggleShareBtn = document.createElement('button');
+            toggleShareBtn.id = 'session-toggle-share-btn';
+            toggleShareBtn.type = 'button';
+            toggleShareBtn.setAttribute('aria-label', 'MOSTRAR OPCIONS DE COMPARTIR');
+            toggleShareBtn.title = 'Mostrar opcions de compartir';
+            const shareIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 1 1 0-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 1 1 5.367-2.684 3 3 0 0 1-5.367 2.684zm0 9.316a3 3 0 1 1 5.367 2.684 3 3 0 0 1-5.367-2.684z"/></svg>`;
+            toggleShareBtn.innerHTML = `${shareIcon} COMPARTIR`;
+            toggleShareBtn.style.display = 'flex';
+            toggleShareBtn.style.alignItems = 'center';
+            toggleShareBtn.style.justifyContent = 'center';
+            toggleShareBtn.style.gap = '6px';
+            toggleShareBtn.style.flex = '1';
+            toggleShareBtn.style.height = '36px';
+            toggleShareBtn.style.borderRadius = '8px';
+            toggleShareBtn.style.border = '1px solid #0d6efd';
+            toggleShareBtn.style.backgroundColor = '#0d6efd';
+            toggleShareBtn.style.color = '#fff';
+            toggleShareBtn.style.fontWeight = '700';
+            toggleShareBtn.style.fontSize = '0.9rem';
+            toggleShareBtn.style.cursor = 'pointer';
+            toggleShareBtn.style.transition = 'all 0.2s';
+            toggleShareBtn.style.textTransform = 'uppercase';
+
+            // Create top row with Delete, Share Toggle and Edit buttons
             const topRow = document.createElement('div');
+            topRow.id = 'session-top-row';
             topRow.style.display = 'flex';
             topRow.style.gap = '5px';
-            topRow.style.flex = '1';
             topRow.style.alignItems = 'stretch';
+            topRow.style.height = '36px'; // Altura fija para el top row
             
-            // Create bottom row with Share buttons
+            // Create bottom row with Share buttons (inicialmente oculto)
             const bottomRow = document.createElement('div');
-            bottomRow.style.display = 'flex';
+            bottomRow.id = 'session-bottom-row';
+            bottomRow.style.display = 'none'; // Oculto por defecto
             bottomRow.style.gap = '5px';
-            bottomRow.style.flex = '1';
             bottomRow.style.alignItems = 'stretch';
+            bottomRow.style.height = '36px'; // Altura fija para el bottom row
+            
+            // Toggle functionality para mostrar/ocultar opciones de compartir
+            // (Se configurará después de insertar el topBar en el DOM)
+            let shareOptionsVisible = false;
             
             // Add buttons to their respective rows
             topRow.appendChild(viewDeleteBtn);
+            topRow.appendChild(toggleShareBtn);
             topRow.appendChild(sessionEditBtn);
             bottomRow.appendChild(viewShareBtn);
             bottomRow.appendChild(viewShareCsvBtn);
@@ -1615,6 +2255,10 @@
                     
                     // Ocultar botones de compartir
                     bottomRow.style.display = 'none';
+                    shareOptionsVisible = false;
+                    
+                    // Actualizar margen después de ocultar bottomRow
+                    setTimeout(updateRegistrationMargin, 50);
                     
                     // Habilitar edición de nombre de sesión
                     const nameLabel = document.querySelector('#session-name-row .nameLabel');
@@ -1642,8 +2286,13 @@
                     finalizeBtn.innerHTML = `${editIcon} EDITAR`;
                     viewDeleteBtn.innerHTML = `${largeTrashIcon} ELIMINAR`;
                     
-                    // Mostrar botones de compartir
-                    bottomRow.style.display = 'flex';
+                    // No mostrar automáticamente los botones de compartir al salir del modo edición
+                    // El usuario debe usar el toggle si los quiere ver
+                    bottomRow.style.display = 'none';
+                    shareOptionsVisible = false;
+                    
+                    // Actualizar margen después de ajustar bottomRow
+                    setTimeout(updateRegistrationMargin, 50);
                     
                     // Deshabilitar edición de nombre de sesión
                     const nameLabel = document.querySelector('#session-name-row .nameLabel');
@@ -1693,8 +2342,17 @@
                 try {
                     // Guardar cambios en localStorage
                     if (pendingRename && pendingRename.trim() !== '') {
-                        const { timestamp } = parseSessionKey(currentSessionKey);
-                        const newFileName = `${timestamp}_${pendingRename}.txt`;
+                        const parsedInfo = parseSessionKey(currentSessionKey);
+
+                        // Si la sesión original tiene timestamp, mantenerlo para el nuevo nombre
+                        // Si no tiene timestamp (nombre personalizado), no añadir timestamp
+                        let newFileName;
+                        if (parsedInfo.timestamp) {
+                            newFileName = `${parsedInfo.timestamp}_${pendingRename}.txt`;
+                        } else {
+                            newFileName = `${pendingRename}.txt`;
+                        }
+
                         const newKey = sessionPrefix + newFileName;
                         localStorage.setItem(newKey, JSON.stringify(laps));
                         if (newKey !== currentSessionKey) {
@@ -1714,7 +2372,7 @@
                     
                 } catch (e) {
                     console.error('Error guardando cambios:', e);
-                    await showModal({ title: 'Error', message: 'Error en guardar los cambios.', type: 'alert', okText: 'Tancar' });
+                    await showModal({ id: 'modal-validate-edit-error', title: 'Error', message: 'Error en guardar los cambios.', type: 'alert', okText: 'Tancar' });
                 }
             };
 
@@ -1724,17 +2382,38 @@
             topBar.appendChild(actions);
             document.body.insertBefore(topBar, document.body.firstChild);
 
+            // Función para actualizar el margen del registrationView según la altura del topBar
+            const updateRegistrationMargin = () => {
+                try {
+                    // Calcular la altura total: appTitle + topBar - 45px
+                    const appTitleHeight = appTitleEl ? appTitleEl.offsetHeight : 44;
+                    const topBarHeight = topBar.offsetHeight;
+                    const totalMargin = appTitleHeight + topBarHeight - 45; // Reducir 45px
+                    registrationView.style.marginTop = `${totalMargin}px`;
+                } catch {}
+            };
+
+            // Configurar el toggle para ajustar el margen cuando cambia la visibilidad
+            toggleShareBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                shareOptionsVisible = !shareOptionsVisible;
+                bottomRow.style.display = shareOptionsVisible ? 'flex' : 'none';
+                toggleShareBtn.setAttribute('aria-label', shareOptionsVisible ? 'OCULTAR OPCIONS DE COMPARTIR' : 'MOSTRAR OPCIONS DE COMPARTIR');
+                toggleShareBtn.title = shareOptionsVisible ? 'Ocultar opcions de compartir' : 'Mostrar opcions de compartir';
+                
+                // Actualizar margen después de que el DOM se actualice
+                setTimeout(updateRegistrationMargin, 50);
+            });
+
             // Ocultar controls-container en vista de sesión guardada
             try {
                 const controlsContainerEl = document.getElementById('controls-container');
                 if (controlsContainerEl) controlsContainerEl.style.display = 'none';
             } catch {}
 
-            // Add margin to registration view to account for both bars
-            try {
-                // Set fixed margin-top for registration view in session mode
-                registrationView.style.marginTop = '90px';
-            } catch {}
+            // Calcular margen inicial después de que el DOM se actualice
+            setTimeout(updateRegistrationMargin, 100);
             
             // Hide only the clock text to keep laps list visible
             try { clockElement.style.display = 'none'; } catch {}
@@ -1757,12 +2436,14 @@
             
             const sessionDate = laps.length > 0 ? new Date(laps[0].time) : new Date();
             const dateText = document.createElement('div');
+            dateText.id = 'session-info-date';
             dateText.textContent = formatDate(sessionDate);
             dateText.style.fontSize = '1.2em';
             dateText.style.marginBottom = '10px';
             dateText.style.color = '#000000'; // Texto negro
             
             const timeText = document.createElement('div');
+            timeText.id = 'session-info-time';
             const sessionTime = laps.length > 0 ? new Date(laps[0].time) : new Date();
             timeText.innerHTML = `Hora d'inici: ${formatTime(sessionTime)}`;
             timeText.style.fontSize = '1.1em';
@@ -1786,6 +2467,7 @@
             nameRow.style.boxSizing = 'border-box';
 
             const namePrefix = document.createElement('span');
+            namePrefix.id = 'session-name-prefix';
             namePrefix.textContent = 'SESSIÓ:';
             namePrefix.style.fontWeight = '400';
             namePrefix.style.opacity = '0.9';
@@ -1793,6 +2475,7 @@
             namePrefix.style.textAlign = 'left';
 
             const nameLabel = document.createElement('span');
+            nameLabel.id = 'session-name-label';
             const parsedNow = parseSessionKey(currentSessionKey || sessionKey);
             nameLabel.textContent = parsedNow.name || 'Sessió';
             nameLabel.style.fontSize = '1.3em';
@@ -1810,12 +2493,14 @@
             });
 
             const actionsRight = document.createElement('div');
+            actionsRight.id = 'session-name-actions';
             actionsRight.style.display = 'flex';
             actionsRight.style.gap = '8px';
             actionsRight.style.alignItems = 'center';
             actionsRight.style.flex = '0 0 auto';
 
             const editBtn = document.createElement('button');
+            editBtn.id = 'session-name-edit-btn';
             editBtn.setAttribute('aria-label', 'Editar nom de la sessió');
             editBtn.title = 'Editar nom';
             editBtn.style.display = 'none'; // Inicialmente oculto
@@ -1833,7 +2518,7 @@
                 </svg>`;
             editBtn.addEventListener('click', async () => {
                 const currentInfo = parseSessionKey(currentSessionKey || sessionKey);
-                const newName = await showModal({ title: 'Editar nom', type: 'prompt', defaultValue: currentInfo.name || 'Sessió', okText: 'Desar', cancelText: 'Cancel·lar' });
+                const newName = await showModal({ id: 'modal-edit-session-name', title: 'Editar nom', type: 'prompt', defaultValue: currentInfo.name || 'Sessió', okText: 'Desar', cancelText: 'Cancel·lar' });
                 if (!newName) return;
                 pendingRename = newName;
                 nameLabel.textContent = newName;
@@ -1871,12 +2556,21 @@
     const closeSessionView = async (skipPrompt = false) => {
         try {
             if (!skipPrompt && sessionDirty && currentSessionKey) {
-                const ok = await showModal({ title: 'Desar canvis?', message: 'Vols desar els canvis?', okText: 'Desar', cancelText: 'No desar', type: 'confirm' });
+                const ok = await showModal({ id: 'modal-save-changes-confirm', title: 'Desar canvis?', message: 'Vols desar els canvis?', okText: 'DESAR', cancelText: 'NO DESAR', type: 'confirm', buttonLayout: 'horizontal', reverseButtons: false, okButtonStyle: 'background: #4CAF50; color: white; border: 1px solid #4CAF50;', cancelButtonStyle: 'background: #f44336; color: white; border: 1px solid #f44336;' });
                 if (ok) {
                     // Guardar cambios (rename + tipos)
                     if (pendingRename && pendingRename.trim() !== '') {
-                        const { timestamp } = parseSessionKey(currentSessionKey);
-                        const newFileName = `${timestamp}_${pendingRename}.txt`;
+                        const parsedInfo = parseSessionKey(currentSessionKey);
+
+                        // Si la sesión original tiene timestamp, mantenerlo para el nuevo nombre
+                        // Si no tiene timestamp (nombre personalizado), no añadir timestamp
+                        let newFileName;
+                        if (parsedInfo.timestamp) {
+                            newFileName = `${parsedInfo.timestamp}_${pendingRename}.txt`;
+                        } else {
+                            newFileName = `${pendingRename}.txt`;
+                        }
+
                         const newKey = sessionPrefix + newFileName;
                         localStorage.setItem(newKey, JSON.stringify(laps));
                         if (newKey !== currentSessionKey) {
@@ -1890,7 +2584,7 @@
             }
         } catch (e) {
             console.error('Error en tancar la vista de sessió', e);
-            await showModal({ title: 'Error', message: 'Error en desar els canvis.', type: 'alert', okText: 'Tancar' });
+            await showModal({ id: 'modal-close-session-error', title: 'Error', message: 'Error en desar els canvis.', type: 'alert', okText: 'Tancar' });
         } finally {
             sessionDirty = false;
             pendingRename = null;
@@ -1960,7 +2654,15 @@
 
     const deleteSession = async (sessionKey) => {
         console.debug('[DEBUG] deleteSession invoked', { sessionKey, isViewingSession, currentSessionKey });
-        const ok = await showModal({ title: 'Eliminar sessió', message: `Segur que vols eliminar aquesta sessió?`, okText: 'Eliminar', cancelText: 'Cancel·lar', type: 'confirm' });
+        const sessionName = sessionKey.replace(sessionPrefix, '');
+        const ok = await showModal({
+        id: 'modal-delete-session-confirm',
+        title: 'ELIMINAR SESSIÓ',
+        message: `Segur que vols eliminar la sessió:<br>"${sessionName}"?`,
+        okText: 'CONFIRMAR (Eliminar)',
+        cancelText: 'CANCEL.LAR (Conservar)',
+        type: 'confirm'
+    });
         console.debug('[DEBUG] deleteSession confirm result', { ok });
         if (ok) {
             localStorage.removeItem(sessionKey);
@@ -2015,7 +2717,8 @@
     const shareSession = (sessionKey) => {
         const savedLaps = JSON.parse(localStorage.getItem(sessionKey));
         if (savedLaps) {
-            const sessionName = sessionKey.replace(sessionPrefix, '');
+            const info = parseSessionKey(sessionKey);
+            const sessionName = info.name; // Usar solo el nombre limpio
             const startDate = new Date(savedLaps[0].time);
             const startDateStr = `${String(startDate.getFullYear())}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
             const startTimeStr = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(startDate.getSeconds()).padStart(2, '0')}.${String(startDate.getMilliseconds()).padStart(3, '0')}`;
@@ -2062,7 +2765,8 @@
     const shareSessionCSV = (sessionKey) => {
         const savedLaps = JSON.parse(localStorage.getItem(sessionKey));
         if (!savedLaps) return;
-        const sessionName = sessionKey.replace(sessionPrefix, '');
+        const info = parseSessionKey(sessionKey);
+        const sessionName = info.name; // Usar solo el nombre limpio
         const startDate = new Date(savedLaps[0].time);
         const startDateStr = `${String(startDate.getFullYear())}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
         const startTimeStr = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(startDate.getSeconds()).padStart(2, '0')}.${String(startDate.getMilliseconds()).padStart(3, '0')}`;
@@ -2106,7 +2810,8 @@
     const shareSessionCSVComma = (sessionKey) => {
         const savedLaps = JSON.parse(localStorage.getItem(sessionKey));
         if (!savedLaps) return;
-        const sessionName = sessionKey.replace(sessionPrefix, '');
+        const info = parseSessionKey(sessionKey);
+        const sessionName = info.name; // Usar solo el nombre limpio
         const startDate = new Date(savedLaps[0].time);
         const startDateStr = `${String(startDate.getFullYear())}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
         const startTimeStr = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(startDate.getSeconds()).padStart(2, '0')}.${String(startDate.getMilliseconds()).padStart(3, '0')}`;
@@ -2155,23 +2860,45 @@
                     navigator.serviceWorker.register('sw.js', { scope: './' })
                         .then((reg) => {
                             console.debug('[DEBUG] SW registrado');
-                            // Detectar updates del SW
+                            
+                            // Actualización automática silenciosa
+                            // Si hay un SW esperando, activarlo inmediatamente
                             if (reg.waiting) {
-                                showUpdateToast(reg.waiting);
+                                console.debug('[DEBUG] SW esperando, activando automáticamente...');
+                                reg.waiting.postMessage({ type: 'SKIP_WAITING' });
                             }
+                            
+                            // Detectar cuando se encuentra una nueva versión
                             reg.addEventListener('updatefound', () => {
                                 const newWorker = reg.installing;
                                 if (!newWorker) return;
+                                
+                                console.debug('[DEBUG] Nueva versión detectada, instalando...');
+                                
                                 newWorker.addEventListener('statechange', () => {
                                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                        showUpdateToast(newWorker);
+                                        // Nueva versión instalada, activar automáticamente
+                                        console.debug('[DEBUG] Nueva versión instalada, activando automáticamente...');
+                                        newWorker.postMessage({ type: 'SKIP_WAITING' });
                                     }
                                 });
                             });
+                            
+                            // Cuando el nuevo SW toma control, recargar automáticamente
                             navigator.serviceWorker.addEventListener('controllerchange', () => {
-                                // Recargar cuando el nuevo SW tome control
+                                console.debug('[DEBUG] Nuevo SW activo, recargando página...');
                                 window.location.reload();
                             });
+                            
+                            // Verificar actualizaciones cada vez que se inicia la app
+                            console.debug('[DEBUG] Verificando actualizaciones...');
+                            reg.update().catch((e) => console.debug('[DEBUG] Error verificando actualizaciones', e));
+                            
+                            // Verificar actualizaciones periódicamente (cada 30 segundos)
+                            setInterval(() => {
+                                console.debug('[DEBUG] Verificación periódica de actualizaciones...');
+                                reg.update().catch(() => {});
+                            }, 30000);
                         })
                         .catch((e) => console.debug('[DEBUG] SW error', e));
                 });
@@ -2200,18 +2927,59 @@
 
         // Force install button logic
         try {
+            // Flag para evitar re-mostrar instrucciones hasta recarga
+            let installInstructionsDismissed = false;
             const forceInstallBtn = document.getElementById('force-install-btn');
-            
-            // Check if app is already installed
-            const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
-            if (isInstalled && forceInstallBtn) {
-                forceInstallBtn.style.display = 'none';
-            } else if (forceInstallBtn) {
-                forceInstallBtn.style.display = 'block';
-            }
+            const installBtn = document.getElementById('install-btn');
+
+            // Helper to update visibility based on install state
+            const updateInstallButtonsVisibility = () => {
+                try {
+                    const isInstalled = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+                    if (isInstalled) {
+                        if (forceInstallBtn) forceInstallBtn.style.display = 'none';
+                        if (installBtn) installBtn.style.display = 'none';
+                    } else {
+                        if (forceInstallBtn) forceInstallBtn.style.display = 'block';
+                        // installBtn solo se muestra cuando hay deferredPrompt (ya gestionado arriba)
+                    }
+                } catch {}
+            };
+
+            // Initial visibility
+            updateInstallButtonsVisibility();
+
+            // React to appinstalled event
+            window.addEventListener('appinstalled', () => {
+                try {
+                    deferredPrompt = null;
+                } catch {}
+                updateInstallButtonsVisibility();
+            });
+
+            // React to display-mode changes
+            try {
+                const mql = window.matchMedia('(display-mode: standalone)');
+                if (typeof mql.addEventListener === 'function') {
+                    mql.addEventListener('change', updateInstallButtonsVisibility);
+                } else if (typeof mql.addListener === 'function') {
+                    mql.addListener(updateInstallButtonsVisibility);
+                }
+            } catch {}
 
             if (forceInstallBtn) {
                 forceInstallBtn.addEventListener('click', async () => {
+                    // If already installed, inform user
+                    try {
+                        const alreadyInstalled = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+                        if (alreadyInstalled) {
+                            showToast('La app ya está instalada', [
+                                { label: 'Cerrar', onClick: () => { try { document.getElementById('pwa-toast')?.remove(); } catch {} }, variant: 'secondary' }
+                            ]);
+                            return;
+                        }
+                    } catch {}
+
                     if (deferredPrompt) {
                         // Chrome/Android - use deferred prompt
                         forceInstallBtn.disabled = true;
@@ -2227,9 +2995,14 @@
                         forceInstallBtn.disabled = false;
                     } else {
                         // iOS/Safari - show instructions
-                        showToast('Para instalar: Pulsa el botón compartir → "Añadir a pantalla de inicio"', [
-                            { label: 'Cerrar', onClick: () => {}, variant: 'secondary' }
-                        ]);
+                        if (!installInstructionsDismissed) {
+                            showToast('Para instalar: Pulsa el botón compartir → "Añadir a pantalla de inicio"', [
+                                { label: 'Cerrar', onClick: () => { 
+                                    try { document.getElementById('pwa-toast')?.remove(); } catch {}
+                                    installInstructionsDismissed = true; 
+                                }, variant: 'secondary' }
+                            ]);
+                        }
                     }
                 });
             }
@@ -2271,24 +3044,22 @@
                 btn.style.padding = '4px 8px';
                 btn.style.borderRadius = '6px';
                 btn.style.cursor = 'pointer';
-                btn.addEventListener('click', () => { try { onClick && onClick(); } catch {} });
+                btn.addEventListener('click', () => { 
+                    try { 
+                        if (onClick) {
+                            onClick(); 
+                        } else {
+                            // Si no hay onClick definido, cerrar el toast
+                            toast.remove();
+                        }
+                    } catch {} 
+                });
                 toast.appendChild(btn);
             });
             setTimeout(() => { try { toast.remove(); } catch {} }, 8000);
         } catch {}
     }
 
-    function showUpdateToast(worker) {
-        showToast('Nueva versión disponible', [
-            { label: 'Actualizar', onClick: () => { try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch {} } },
-            { label: 'Cerrar', onClick: () => {}, variant: 'secondary' }
-        ]);
-        try {
-            navigator.serviceWorker.addEventListener('message', (e) => {
-                // No-op; controllerchange recargará
-            });
-        } catch {}
-    }
 
     // --- Inicialització ---
     // Create app title if it doesn't exist
@@ -2322,9 +3093,107 @@
             addLap();
         }
     });
-    finalizeBtn.addEventListener('click', finalizeSession);
+    finalizeBtn.addEventListener('click', async () => {
+        console.debug('[DEBUG] Finalize button clicked');
+        console.debug('[DEBUG] Current state:', {
+            isRecording,
+            lapsCount: laps?.length || 0,
+            finalizeBtnText: finalizeBtn.textContent
+        });
+        await finalizeSession();
+    });
     startClock();
     renderSessions();
+
+    // --- Inicialización modo multiselección ---
+    (function initMultiSelectMode() {
+        const multiselectToggleBtn = document.getElementById('multiselect-toggle-btn');
+        const multiselectActionsBar = document.getElementById('multiselect-actions-bar');
+        
+        if (!multiselectToggleBtn || !multiselectActionsBar) return;
+        
+        // Añadir icono al botón toggle
+        const checkSquareIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>`;
+        multiselectToggleBtn.innerHTML = checkSquareIcon;
+        multiselectToggleBtn.style.color = '#888';
+        
+        // Añadir evento click
+        multiselectToggleBtn.addEventListener('click', toggleMultiSelectMode);
+        
+        // Crear contenido de la barra de acciones
+        multiselectActionsBar.style.display = 'none';
+        multiselectActionsBar.style.flexDirection = 'row';
+        multiselectActionsBar.style.gap = '10px';
+        multiselectActionsBar.style.marginBottom = '16px';
+        multiselectActionsBar.style.padding = '12px';
+        multiselectActionsBar.style.backgroundColor = 'rgba(51, 51, 51, 0.5)';
+        multiselectActionsBar.style.borderRadius = '8px';
+        multiselectActionsBar.style.alignItems = 'center';
+        multiselectActionsBar.style.justifyContent = 'space-between';
+        
+        // Botón CANCEL.LAR
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.textContent = 'CANCEL.LAR';
+        cancelBtn.style.flex = '1';
+        cancelBtn.style.padding = '12px 16px';
+        cancelBtn.style.backgroundColor = '#666';
+        cancelBtn.style.color = '#fff';
+        cancelBtn.style.border = '2px solid #666';
+        cancelBtn.style.borderRadius = '8px';
+        cancelBtn.style.fontSize = '1rem';
+        cancelBtn.style.fontWeight = '700';
+        cancelBtn.style.cursor = 'pointer';
+        cancelBtn.style.textTransform = 'uppercase';
+        cancelBtn.style.transition = 'all 0.2s';
+        cancelBtn.addEventListener('mouseover', () => {
+            cancelBtn.style.backgroundColor = '#777';
+            cancelBtn.style.borderColor = '#777';
+        });
+        cancelBtn.addEventListener('mouseout', () => {
+            cancelBtn.style.backgroundColor = '#666';
+            cancelBtn.style.borderColor = '#666';
+        });
+        cancelBtn.addEventListener('click', cancelMultiSelect);
+        
+        // Span para contador
+        const countSpan = document.createElement('span');
+        countSpan.id = 'multiselect-count';
+        countSpan.style.color = '#fff';
+        countSpan.style.fontSize = '1rem';
+        countSpan.style.fontWeight = '600';
+        countSpan.textContent = '';
+        
+        // Botón ELIMINAR TOTS
+        const deleteAllBtn = document.createElement('button');
+        deleteAllBtn.type = 'button';
+        deleteAllBtn.textContent = 'ELIMINAR SELECCIONATS';
+        deleteAllBtn.style.flex = '1';
+        deleteAllBtn.style.padding = '12px 16px';
+        deleteAllBtn.style.backgroundColor = '#dc3545';
+        deleteAllBtn.style.color = '#fff';
+        deleteAllBtn.style.border = '2px solid #dc3545';
+        deleteAllBtn.style.borderRadius = '8px';
+        deleteAllBtn.style.fontSize = '1rem';
+        deleteAllBtn.style.fontWeight = '700';
+        deleteAllBtn.style.cursor = 'pointer';
+        deleteAllBtn.style.textTransform = 'uppercase';
+        deleteAllBtn.style.transition = 'all 0.2s';
+        deleteAllBtn.addEventListener('mouseover', () => {
+            deleteAllBtn.style.backgroundColor = '#c82333';
+            deleteAllBtn.style.borderColor = '#c82333';
+        });
+        deleteAllBtn.addEventListener('mouseout', () => {
+            deleteAllBtn.style.backgroundColor = '#dc3545';
+            deleteAllBtn.style.borderColor = '#dc3545';
+        });
+        deleteAllBtn.addEventListener('click', deleteSelectedSessions);
+        
+        // Añadir botones a la barra
+        multiselectActionsBar.appendChild(cancelBtn);
+        multiselectActionsBar.appendChild(countSpan);
+        multiselectActionsBar.appendChild(deleteAllBtn);
+    })();
 
     // --- Wake Lock Integration ---
     const wakeLockManager = new WakeLockManager();
@@ -2343,13 +3212,13 @@
             wakeIndicator.style.background = '#0d6efd';
             toggle.style.transform = 'translateX(14px)';
             toggle.style.background = '#fff';
-            if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} BLOQ.`;
+            if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} ON`;
         } else {
             wakeToggle.setAttribute('aria-checked', 'false');
             wakeIndicator.style.background = '#666';
             toggle.style.transform = 'translateX(0)';
             toggle.style.background = '#bbb';
-            if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} LIBRE`;
+            if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} OFF`;
         }
     }
 
@@ -2474,9 +3343,9 @@
     // In the initialization section, modify summary container texts
     const summaryContainer = document.getElementById('summary-container');
     const summaryLabels = [
-        { icon: workIcon, text: 'Treball' },
-        { icon: restIcon, text: 'Descans' },
-        { icon: totalIcon, text: 'Total' }
+        { icon: workIcon, text: 'TREBALL' },
+        { icon: restIcon, text: 'DESCANS' },
+        { icon: totalIcon, text: 'TOTAL' }
     ];
     
     summaryLabels.forEach((label, index) => {
@@ -2500,4 +3369,200 @@
     clockContainer.style.maxWidth = '100%';  // Add max-width
     clockContainer.style.width = '100%';     // Add width
     clockContainer.style.boxSizing = 'border-box'; // Ensure padding is included in width
+
+    // Add custom styles for delete session confirm modal
+    const deleteSessionConfirmModalStyles = document.createElement('style');
+    deleteSessionConfirmModalStyles.textContent = `
+        /* Custom styles for delete session confirm modal */
+        .modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons {
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 12px !important;
+            justify-content: center !important;
+        }
+
+        .modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons button {
+            flex: 1 !important;
+            max-width: 120px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            font-size: 1rem !important;
+            padding: 12px 16px !important;
+            border-radius: 6px !important;
+            border: 2px solid !important;
+        }
+
+        .modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons button:first-child {
+            background: #f44336 !important;
+            color: white !important;
+            border-color: #f44336 !important;
+        }
+
+        .modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons button:last-child {
+            background: #4CAF50 !important;
+            color: white !important;
+            border-color: #4CAF50 !important;
+        }
+    `;
+    document.head.appendChild(deleteSessionConfirmModalStyles);
+
+    // Add custom styles for delete lap confirm modal
+    const deleteLapConfirmModalStyles = document.createElement('style');
+    deleteLapConfirmModalStyles.textContent = `
+        /* Custom styles for delete lap confirm modal */
+        .modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons {
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 12px !important;
+            justify-content: center !important;
+        }
+
+        .modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons button {
+            flex: 1 !important;
+            max-width: 120px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            font-size: 1rem !important;
+            padding: 12px 16px !important;
+            border-radius: 6px !important;
+            border: 2px solid transparent !important;
+        }
+
+        .modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons button:first-child {
+            background: #f44336 !important;
+            color: white !important;
+            border-color: #f44336 !important;
+        }
+
+        .modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons button:last-child {
+            background: #4CAF50 !important;
+            color: white !important;
+            border-color: #4CAF50 !important;
+        }
+    `;
+    document.head.appendChild(deleteLapConfirmModalStyles);
+
+    // Add custom styles for improved modal appearance
+    const modalStyles = document.createElement('style');
+    modalStyles.textContent = `
+        /* Modal improvements */
+        .modal-overlay {
+            padding: max(20px, 5vw) !important;
+            box-sizing: border-box !important;
+        }
+
+        .modal {
+            max-width: min(500px, 95vw) !important;
+            width: 95vw !important;
+            padding: 24px !important;
+            gap: 20px !important;
+            font-size: 1.1rem !important;
+            box-sizing: border-box !important;
+            margin: 0 auto !important;
+        }
+
+        /* Modal input improvements */
+        .modal input[type="text"] {
+            background-color: #fff !important;
+            border: 3px solid #333 !important;
+            color: #000 !important;
+            font-size: 1.6rem !important;
+            font-weight: 600 !important;
+            padding: 18px 20px !important;
+            border-radius: 8px !important;
+            transition: all 0.2s ease !important;
+            text-shadow: none !important;
+        }
+
+        .modal input[type="text"]:focus {
+            background-color: #f8f9fa !important;
+            border-color: #000 !important;
+            outline: none !important;
+            transform: scale(1.02) !important;
+        }
+
+        .modal input[type="text"]::placeholder {
+            color: #666 !important;
+            font-weight: 500 !important;
+        }
+
+        /* Modal buttons improvements */
+        .modal button {
+            font-size: 1.2rem !important;
+            padding: 16px 20px !important;
+            min-height: 60px !important;
+            border-radius: 8px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            position: relative !important;
+            z-index: 10 !important;
+            cursor: pointer !important;
+        }
+
+        .modal button:active {
+            transform: scale(0.98) !important;
+            opacity: 0.9 !important;
+        }
+
+        .modal button:focus {
+            outline: 3px solid rgba(255, 255, 255, 0.3) !important;
+            outline-offset: 2px !important;
+        }
+
+        .modal button svg {
+            width: 32px !important;
+            height: 32px !important;
+            flex-shrink: 0 !important;
+        }
+
+        .modal button[style*="flex-direction: column"] div {
+            font-size: 0.9rem !important;
+            opacity: 0.9 !important;
+            margin-top: 4px !important;
+        }
+
+        /* Modal title and message improvements */
+        .modal span[style*="font-size: 1.8rem"] {
+            font-size: 1.8rem !important;
+            margin-bottom: 12px !important;
+        }
+
+        .modal span[style*="font-size: 1.2rem"] {
+            font-size: 1.2rem !important;
+            line-height: 1.6 !important;
+        }
+
+        /* Responsive modal improvements for mobile */
+        @media (max-width: 480px) {
+            .modal {
+                padding: 20px !important;
+                width: 90vw !important;
+                max-width: 90vw !important;
+            }
+
+            .modal input[type="text"] {
+                font-size: 1.4rem !important;
+                padding: 16px 18px !important;
+                border: 2px solid #333 !important;
+            }
+
+            .modal button {
+                font-size: 1.1rem !important;
+                padding: 14px 18px !important;
+                min-height: 56px !important;
+            }
+
+            .modal button svg {
+                width: 28px !important;
+                height: 28px !important;
+            }
+        }
+
+        /* Modal button container improvements */
+        .modal > div[style*="flex-direction: column"] {
+            gap: 16px !important;
+        }
+    `;
+    document.head.appendChild(modalStyles);
 });

@@ -3,6 +3,8 @@ html, body {
     margin: 0;
     padding: 0;
     width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
 }
 
 /* Clases para milisegundos */
@@ -251,7 +253,8 @@ button:focus-visible,
 
 .summary-item span {
     font-size: 1.05rem;
-    color: var(--secondary-color);
+    color: #fff;
+    font-weight: 700;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -262,6 +265,32 @@ button:focus-visible,
     width: 1.2em;
     height: 1.2em;
     flex-shrink: 0;
+}
+
+/* Iconos con colores específicos */
+.summary-item:first-child span svg {
+    color: #28a745; /* Verde para trabajo */
+}
+
+.summary-item:nth-child(2) span svg {
+    color: #ffc107; /* Amarillo para descanso */
+}
+
+.summary-item:last-child span svg {
+    color: #fff; /* Blanco para total */
+}
+
+/* Bordes con colores específicos */
+.summary-item:first-child {
+    border-color: #28a745; /* Verde para trabajo */
+}
+
+.summary-item:nth-child(2) {
+    border-color: #ffc107; /* Amarillo para descanso */
+}
+
+.summary-item:last-child {
+    border-color: #fff; /* Blanco para total */
 }
 
 .summary-item strong {
@@ -299,7 +328,7 @@ button:focus-visible,
     font-weight: 600;
     color: var(--secondary-color);
     min-width: 1.5em;
-    text-align: right;
+    text-align: center;
 }
 
 .lap-item.work {
@@ -412,6 +441,22 @@ button:focus-visible,
 #controls-container {
     width: 100%;
     height: 64px;
+}
+
+/* Force install button - fixed at bottom */
+#force-install-btn {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    z-index: 1000;
+    margin: 0;
+    border-radius: 0;
+    padding: 12px 20px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.3);
 }
 
 .control-btn {

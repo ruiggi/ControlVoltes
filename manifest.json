@@ -1,6 +1,7 @@
 {
   "name": "Control de Voltes",
   "short_name": "Voltes",
+  "version": "1.0.0",
   "start_url": "/ControlVoltes/index.html",
   "scope": "/ControlVoltes/",
   "display": "standalone",
