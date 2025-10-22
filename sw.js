@@ -1,4 +1,4 @@
-const CACHE_NAME = 'control-voltes-cache-v6';
+const CACHE_NAME = 'control-voltes-cache-v1.0.9';
 const URLS_TO_CACHE = [
   '/ControlVoltes/',
   '/ControlVoltes/index.html',

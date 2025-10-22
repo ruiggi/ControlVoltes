@@ -2939,7 +2939,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('sw.js', { scope: './' })
+                    navigator.serviceWorker.register('/ControlVoltes/sw.js', { scope: '/ControlVoltes/' })
                         .then((reg) => {
                             console.debug('[DEBUG] SW registrado');
                             
@@ -3372,7 +3372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (appTitleText) {
         appTitleText.style.cursor = 'pointer';
         appTitleText.addEventListener('click', async () => {
-            const appVersion = '1.0.1'; // Versión desde manifest.json
+            const appVersion = '1.0.9'; // Versión desde manifest.json
             
             // Crear contenedor del modal con opciones
             const modalContent = document.createElement('div');
@@ -3502,7 +3502,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Inicializar Wake Lock
     // Establecer texto inicial por defecto
-    if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} LIBRE`;
+    if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} ON`;
     loadWakeLockPreference();
 
     // Ocultar vista de sessions a l'inici
