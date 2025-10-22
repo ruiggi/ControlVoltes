@@ -122,8 +122,9 @@ button:focus-visible,
 }
 
 .title-left svg {
-    width: 24px;
-    height: 24px;
+    width: auto;
+    height: calc(1.4rem + 8px);
+    max-height: 36px;
 }
 
 /* Header buttons */
@@ -523,7 +524,11 @@ button:focus-visible,
         padding-right: max(12px, env(safe-area-inset-right));
     }
     /* Slightly smaller icons on narrow widths */
-    .title-left svg,
+    .title-left svg {
+        width: auto;
+        height: calc(1.4rem + 6px);
+        max-height: 32px;
+    }
     #toggle-view-btn svg {
         width: 22px;
         height: 22px;

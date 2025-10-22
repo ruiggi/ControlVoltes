@@ -1,13 +1,11 @@
-const CACHE_NAME = 'control-voltes-cache-v5';
+const CACHE_NAME = 'control-voltes-cache-v6';
 const URLS_TO_CACHE = [
   '/ControlVoltes/',
   '/ControlVoltes/index.html',
   '/ControlVoltes/styles.css',
   '/ControlVoltes/scripts.js',
   '/ControlVoltes/manifest.json',
-  '/ControlVoltes/icons/icon-192.svg',
-  '/ControlVoltes/icons/icon-512.svg',
-  '/ControlVoltes/icons/maskable.svg'
+  '/ControlVoltes/icons/crono-512.png'
 ];
 
 self.addEventListener('install', (event) => {

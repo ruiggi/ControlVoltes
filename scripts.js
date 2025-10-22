@@ -100,6 +100,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const disketteIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" stroke-width="1.5" stroke="black" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" /><path d="M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M14 4l0 4l-6 0l0 -4" /></svg>`;
     const stopwatchIcon = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 7V12H17M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    
+    const stopwatchIconColor = `<svg width="32" height="32" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+        <!-- Botón superior -->
+        <circle cx="256" cy="60" r="40" fill="#e0e0e0" stroke="#999" stroke-width="8"/>
+        <rect x="236" y="60" width="40" height="80" fill="#5f7684" rx="8"/>
+        
+        <!-- Botones laterales -->
+        <path d="M 120 180 L 80 140 L 140 120 L 160 180 Z" fill="#5f7684"/>
+        <path d="M 392 180 L 432 140 L 372 120 L 352 180 Z" fill="#5f7684"/>
+        
+        <!-- Cuerpo del cronómetro -->
+        <circle cx="256" cy="300" r="180" fill="#5f7684" stroke="#3d4f5c" stroke-width="12"/>
+        <circle cx="256" cy="300" r="150" fill="#f0f0f0" stroke="#ddd" stroke-width="8"/>
+        
+        <!-- Marcas de hora -->
+        <rect x="250" y="160" width="12" height="30" fill="#2c3e50"/>
+        <rect x="380" y="294" width="30" height="12" fill="#2c3e50"/>
+        <rect x="250" y="410" width="12" height="30" fill="#2c3e50"/>
+        <rect x="138" y="294" width="30" height="12" fill="#2c3e50"/>
+        
+        <!-- Marcas secundarias -->
+        <rect x="325" y="195" width="8" height="20" fill="#2c3e50" transform="rotate(45 329 205)"/>
+        <rect x="355" y="225" width="8" height="20" fill="#2c3e50" transform="rotate(65 359 235)"/>
+        <rect x="355" y="365" width="8" height="20" fill="#2c3e50" transform="rotate(-65 359 375)"/>
+        <rect x="325" y="395" width="8" height="20" fill="#2c3e50" transform="rotate(-45 329 405)"/>
+        <rect x="179" y="195" width="8" height="20" fill="#2c3e50" transform="rotate(-45 183 205)"/>
+        <rect x="149" y="225" width="8" height="20" fill="#2c3e50" transform="rotate(-65 153 235)"/>
+        <rect x="149" y="365" width="8" height="20" fill="#2c3e50" transform="rotate(65 153 375)"/>
+        <rect x="179" y="395" width="8" height="20" fill="#2c3e50" transform="rotate(45 183 405)"/>
+        
+        <!-- Sector rojo (cuarto de círculo) -->
+        <path d="M 256 300 L 256 150 A 150 150 0 0 1 406 300 Z" fill="#ff6b6b" opacity="0.8"/>
+        
+        <!-- Manecillas -->
+        <line x1="256" y1="300" x2="256" y2="180" stroke="#2c3e50" stroke-width="8" stroke-linecap="round"/>
+        <line x1="256" y1="300" x2="340" y2="360" stroke="#2c3e50" stroke-width="10" stroke-linecap="round"/>
+        
+        <!-- Centro -->
+        <circle cx="256" cy="300" r="20" fill="#2c3e50"/>
+    </svg>`;
     const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" stroke-width="3" stroke="#f0f0f0" fill="none">
         <path d="M7 4v16l13 -8z" />
         </svg>`;
@@ -129,7 +169,45 @@ document.addEventListener('DOMContentLoaded', () => {
         </svg>`;
     const searchIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`;
     const trashIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>`;
-    const clockIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12"></polyline><polyline points="12 12 16 14"></polyline></svg>`;
+    const clockIcon = `<svg width="28" height="28" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+        <!-- Botón superior -->
+        <circle cx="256" cy="60" r="40" fill="#e0e0e0" stroke="#999" stroke-width="8"/>
+        <rect x="236" y="60" width="40" height="80" fill="#5f7684" rx="8"/>
+        
+        <!-- Botones laterales -->
+        <path d="M 120 180 L 80 140 L 140 120 L 160 180 Z" fill="#5f7684"/>
+        <path d="M 392 180 L 432 140 L 372 120 L 352 180 Z" fill="#5f7684"/>
+        
+        <!-- Cuerpo del cronómetro -->
+        <circle cx="256" cy="300" r="180" fill="#5f7684" stroke="#3d4f5c" stroke-width="12"/>
+        <circle cx="256" cy="300" r="150" fill="#f0f0f0" stroke="#ddd" stroke-width="8"/>
+        
+        <!-- Marcas de hora -->
+        <rect x="250" y="160" width="12" height="30" fill="#2c3e50"/>
+        <rect x="380" y="294" width="30" height="12" fill="#2c3e50"/>
+        <rect x="250" y="410" width="12" height="30" fill="#2c3e50"/>
+        <rect x="138" y="294" width="30" height="12" fill="#2c3e50"/>
+        
+        <!-- Marcas secundarias -->
+        <rect x="325" y="195" width="8" height="20" fill="#2c3e50" transform="rotate(45 329 205)"/>
+        <rect x="355" y="225" width="8" height="20" fill="#2c3e50" transform="rotate(65 359 235)"/>
+        <rect x="355" y="365" width="8" height="20" fill="#2c3e50" transform="rotate(-65 359 375)"/>
+        <rect x="325" y="395" width="8" height="20" fill="#2c3e50" transform="rotate(-45 329 405)"/>
+        <rect x="179" y="195" width="8" height="20" fill="#2c3e50" transform="rotate(-45 183 205)"/>
+        <rect x="149" y="225" width="8" height="20" fill="#2c3e50" transform="rotate(-65 153 235)"/>
+        <rect x="149" y="365" width="8" height="20" fill="#2c3e50" transform="rotate(65 153 375)"/>
+        <rect x="179" y="395" width="8" height="20" fill="#2c3e50" transform="rotate(45 183 405)"/>
+        
+        <!-- Sector rojo (cuarto de círculo) -->
+        <path d="M 256 300 L 256 150 A 150 150 0 0 1 406 300 Z" fill="#ff6b6b" opacity="0.8"/>
+        
+        <!-- Manecillas -->
+        <line x1="256" y1="300" x2="256" y2="180" stroke="#2c3e50" stroke-width="8" stroke-linecap="round"/>
+        <line x1="256" y1="300" x2="340" y2="360" stroke="#2c3e50" stroke-width="10" stroke-linecap="round"/>
+        
+        <!-- Centro -->
+        <circle cx="256" cy="300" r="20" fill="#2c3e50"/>
+    </svg>`;
     const shareIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 1 1 0-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 1 1 5.367-2.684 3 3 0 0 1-5.367 2.684zm0 9.316a3 3 0 1 1 5.367 2.684 3 3 0 0 1-5.367-2.684z"/></svg>`;
     const editIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
     const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
@@ -3304,11 +3382,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const infoText = document.createElement('div');
             infoText.innerHTML = `
                 <div style="text-align: center; margin-bottom: 20px;">
-                    <strong style="font-size: 1.4rem;">VOLTES</strong><br>
-                    <span style="opacity: 0.8;">Versió ${appVersion}</span>
+                    <strong style="font-size: 1.4rem;">CONTROL DE VOLTES</strong><br>
+                    <span style="opacity: 0.8;">Versió: ${appVersion}</span>
                 </div>
                 <div style="margin-bottom: 15px; line-height: 1.6;">
-                    <strong>© 2025 Albert Ruiz Pujol</strong><br>
+                    <strong>© 2025 - Albert Ruiz Pujol</strong><br>
                     <a href="mailto:ruiggi@gmail.com" style="color:rgb(255, 255, 255); text-decoration: none;">ruiggi@gmail.com</a><br>
                     <a href="https://ruiggi.github.io/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://ruiggi.github.io/ControlVoltes/</a>
                 </div>
@@ -3324,7 +3402,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Botón Forzar instalación
             const forceInstallBtn = document.createElement('button');
-            forceInstallBtn.textContent = '📲 Forzar instal·lació';
+            forceInstallBtn.textContent = '📲 Forçar instal·lació';
             forceInstallBtn.style.padding = '12px';
             forceInstallBtn.style.backgroundColor = '#0d6efd';
             forceInstallBtn.style.color = '#fff';
