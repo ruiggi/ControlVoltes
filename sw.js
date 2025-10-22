@@ -1,11 +1,16 @@
-const CACHE_NAME = 'control-voltes-cache-v1.0.9';
+const CACHE_NAME = 'control-voltes-cache-v1.1.0';
+
+// Detectar si estamos en GitHub Pages o local
+const isGitHubPages = self.location.hostname.includes('github.io');
+const basePath = isGitHubPages ? '/ControlVoltes' : '';
+
 const URLS_TO_CACHE = [
-  '/ControlVoltes/',
-  '/ControlVoltes/index.html',
-  '/ControlVoltes/styles.css',
-  '/ControlVoltes/scripts.js',
-  '/ControlVoltes/manifest.json',
-  '/ControlVoltes/icons/crono-512.png'
+  `${basePath}/`,
+  `${basePath}/index.html`,
+  `${basePath}/styles.css`,
+  `${basePath}/scripts.js`,
+  `${basePath}/manifest.json`,
+  `${basePath}/icons/crono-512.png`
 ];
 
 self.addEventListener('install', (event) => {

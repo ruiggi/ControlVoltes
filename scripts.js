@@ -60,8 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 appState.dom.finalizeBtn.style.height = '64px';
             }
         } catch {}
-        
-        console.debug('[DOM] Cache inicializado');
     }
     
     // Inicializar caché DOM
@@ -232,21 +230,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         async request() {
             if (!this.isSupported) {
-                console.warn('[WakeLock] No soportado en este navegador');
                 return false;
             }
 
             try {
                 this.wakeLock = await navigator.wakeLock.request('screen');
-                console.debug('[WakeLock] Activado');
-                
-                this.wakeLock.addEventListener('release', () => {
-                    console.debug('[WakeLock] Liberado');
-                });
-                
                 return true;
             } catch (err) {
-                console.error('[WakeLock] Error al activar:', err);
                 this.wakeLock = null;
                 return false;
             }
@@ -257,10 +247,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     await this.wakeLock.release();
                     this.wakeLock = null;
-                    console.debug('[WakeLock] Liberado manualmente');
                     return true;
                 } catch (err) {
-                    console.error('[WakeLock] Error al liberar:', err);
                     return false;
                 }
             }
@@ -458,7 +446,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             variant: 'success',
                             size: 'large',
                             onClick: () => {
-                                console.debug('[DEBUG] OK button clicked, input value:', inputEl?.value);
                                 cleanup();
                                 resolve(type === 'prompt' ? inputEl?.value : true);
                             }
@@ -566,13 +553,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const onKey = (e) => {
                     if (e.key === 'Escape') {
                         e.preventDefault();
-                        console.debug('[DEBUG] Escape pressed, canceling modal');
                         cleanup();
                         resolve(type === 'prompt' ? null : false);
                     }
                     if (e.key === 'Enter' && type === 'prompt' && inputEl) {
                         e.preventDefault();
-                        console.debug('[DEBUG] Enter pressed, clicking OK button');
                         okBtn.click();
                     }
                 };
@@ -596,7 +581,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
             } catch (err) {
-                console.error('Modal error:', err);
                 // Fallback to browser dialogs
                 if (type === 'alert') {
                     alert(message || title || 'Confirmar?');
@@ -981,7 +965,6 @@ document.addEventListener('DOMContentLoaded', () => {
         startClock();
 
         // Renderizar elementos actualizados
-        console.debug('[App] Estado reiniciado completamente');
     };
 
     const parseSessionKey = (fullKey) => {
@@ -1047,7 +1030,6 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.removeItem(oldKey);
             return newKey;
         } catch (e) {
-            console.error('Error reanomenant la sessió', e);
             // Use modal for error
             showModal({ title: 'Error', message: 'Error en reanomenar la sessió.', type: 'alert', okText: 'Tancar' });
             return null;
@@ -1057,7 +1039,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Lògica de vistes ---
 
     const toggleView = async () => {
-        console.debug('[DEBUG] toggleView invoked', { isRecording, isReadOnly, isViewingSession });
         if (isRecording && !isReadOnly) {
             await showModal({ title: 'ATENCIÓ', message: 'Finalitza la sessió actual abans de veure les sessions desades.', type: 'alert', okText: 'D’acord' });
             return;
@@ -1084,7 +1065,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     return disp !== 'none';
                 } catch { return sessionsView.style.display === 'block'; }
             })();
-            console.debug('[DEBUG] toggleView state', { isSessionsView });
             if (isSessionsView) {
                 sessionsView.style.display = 'none';
                 registrationView.style.display = 'block';
@@ -1150,14 +1130,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isSessionsVisible) {
                 toggleViewBtn.innerHTML = `${stopwatchIcon} <span class=\"toggle-label\">REGISTRAR</span>`;
                 toggleViewBtn.setAttribute('aria-label', 'Canviar a vista de registre');
-                console.debug('[DEBUG] updateToggleViewBtnLabel -> REGISTRAR');
             } else {
                 toggleViewBtn.innerHTML = `${disketteIcon} <span class=\"toggle-label\">LLISTAT</span>`;
                 toggleViewBtn.setAttribute('aria-label', 'Canviar a vista de sessions');
-                console.debug('[DEBUG] updateToggleViewBtnLabel -> LLISTAT');
             }
         } catch (e) {
-            console.debug('[DEBUG] updateToggleViewBtnLabel error', e);
         }
     };
 
@@ -1523,7 +1500,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 100); // Actualizar cada 100ms (suficiente para mostrar cambios)
         
-        console.debug('[Laps] Actualización incremental iniciada');
     }
     
     // Detener actualización de última vuelta
@@ -1531,7 +1507,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (lastLapUpdateId) {
             clearInterval(lastLapUpdateId);
             lastLapUpdateId = null;
-            console.debug('[Laps] Actualización incremental detenida');
         }
     }
 
@@ -1566,19 +1541,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const startClock = () => {
         if (rafId) return; // Ya está corriendo
         rafId = requestAnimationFrame(updateClock);
-        console.debug('[Clock] Iniciado con requestAnimationFrame');
     };
     
     const stopClock = () => {
         if (rafId) {
             cancelAnimationFrame(rafId);
             rafId = null;
-            console.debug('[Clock] Detenido');
         }
     };
 
     const finalizeSession = async () => {
-        console.debug('[DEBUG] finalizeSession started');
         // Safety: ensure view-mode finalize handler is detached
         try {
             if (finalizeViewHandler) {
@@ -1588,21 +1560,18 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch {}
         // If currently recording, mark a lap as if the user tapped the clock
         if (isRecording && typeof clockContainer !== 'undefined' && clockContainer) {
-            console.debug('[DEBUG] Adding final lap');
             try { clockContainer.click(); } catch {}
             // Allow the click handler (addLap) to run before proceeding
             await new Promise(r => setTimeout(r, 25));
         }
         // If still no laps, inform the user and abort finalize
         if (laps.length === 0) {
-            console.debug('[DEBUG] No laps, showing info modal');
             try {
                 await showModal({ id: 'modal-no-laps-info', title: 'Informació', message: 'Prem sobre el Rellotge superior per inicial el reigstres de voltes.', type: 'alert', okText: 'D’acord' });
             } catch {}
             return;
         }
 
-        console.debug('[DEBUG] Laps available, showing save modal');
 
         // Pedir nombre de la sesión antes de guardar
         const sessionNameInput = await showModal({
@@ -1615,7 +1584,6 @@ document.addEventListener('DOMContentLoaded', () => {
             cancelText: 'CANCEL.LAR'
         });
 
-        console.debug('[DEBUG] Modal result:', sessionNameInput);
         
         // Manejar respuesta del modal (puede ser string o objeto)
         let action = null;
@@ -1632,14 +1600,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Si el usuario cancela, elige continuar grabación o iniciar nueva, no guardar
         if (action === null || action === undefined || action === '__CONTINUE_RECORDING__' || action === '__NEW_RECORDING__') {
-            console.debug('[Session] Guardado cancelado por el usuario');
             
             // Reanudar grabación si aplica
             if (action === '__CONTINUE_RECORDING__') {
                 // Actualizar el nombre de la sesión si se modificó
                 if (newName && newName.trim() !== '' && newName !== 'SessióSenseNom') {
                     recordingName = newName.trim();
-                    console.debug('[Session] Nombre de sesión actualizado:', recordingName);
                     // Actualizar la fila del nombre si existe
                     updateRecordingNameRow();
                 }
@@ -1648,13 +1614,11 @@ document.addEventListener('DOMContentLoaded', () => {
             } 
             // Cancelación simple - reiniciar completamente la aplicación
             else if (action === null || action === undefined) {
-                console.debug('[Session] Cancelación simple');
                 resetAppState();
             }
             
             // Iniciar nueva grabación si se eligió cancelar
             if (action === '__NEW_RECORDING__') {
-                console.debug('[Session] Iniciando nueva grabación');
                 resetAppState();
                 return;
             }
@@ -1662,7 +1626,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        console.debug('[DEBUG] User provided session name, proceeding with save');
         // Aplicar regla: la última vuelta debe llamarse "-FINAL-" solo cuando se va a guardar realmente
         enforceFinalLapName();
 
@@ -1694,7 +1657,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         try {
             localStorage.setItem(sessionPrefix + fullSessionName, JSON.stringify(laps));
-            console.debug('[DEBUG] Session saved successfully to localStorage');
             
             // Detener actualización incremental
             stopLastLapUpdate();
@@ -1719,11 +1681,8 @@ document.addEventListener('DOMContentLoaded', () => {
             sessionsView.style.display = 'block';
             registrationView.style.display = 'none';
             toggleViewBtn.innerHTML = `${stopwatchIcon} <span class=\"toggle-label\">REGISTRAR</span>`;
-            console.debug('[DEBUG] Session save completed, switched to sessions view');
         } catch (e) {
-            console.error('[DEBUG] Error saving session:', e);
             await showModal({ id: 'modal-save-session-error', title: 'Error', message: "Error en desar la sessió. L'emmagatzematge pot estar ple.", type: 'alert', okText: 'Tancar' });
-            console.error(e);
         }
     };
 
@@ -1848,12 +1807,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renderSessions = () => {
-        console.debug('[DEBUG] renderSessions started');
         // Asegurar que no quede la barra superior de sesión colgada
         try {
             const danglingTopBar = document.getElementById('session-top-bar');
             if (danglingTopBar) {
-                console.debug('[DEBUG] renderSessions removing dangling session-top-bar');
                 danglingTopBar.remove();
             }
         } catch {}
@@ -1930,7 +1887,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } catch {}
-            console.debug('[DEBUG] formatDurationCompact available:', typeof formatDurationCompact === 'function');
             const totalStr = lapsCount > 0 ? `  |  ${formatDurationCompact(totalSeconds)}  |  ${lapsCount} voltes` : '';
 
             // Mostrar fecha y hora correctamente según el tipo de sesión
@@ -2066,7 +2022,6 @@ document.addEventListener('DOMContentLoaded', () => {
             sessionItem.appendChild(buttonsContainer);
             sessionsList.appendChild(sessionItem);
         });
-        console.debug('[DEBUG] renderSessions completed');
     };
 
     const viewSession = (sessionKey) => {
@@ -2191,7 +2146,6 @@ document.addEventListener('DOMContentLoaded', () => {
             viewDeleteBtn.addEventListener('click', (e) => { 
                 e.preventDefault(); 
                 e.stopPropagation(); 
-                console.debug('[DEBUG] viewDeleteBtn click', { from: 'session-view@registration-view', isEditMode, isViewingSession, currentSessionKey, sessionKey });
                 if (isEditMode) {
                     cancelEdit();
                 } else {
@@ -2453,7 +2407,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     toggleEditMode();
                     
                 } catch (e) {
-                    console.error('Error guardando cambios:', e);
                     await showModal({ id: 'modal-validate-edit-error', title: 'Error', message: 'Error en guardar los cambios.', type: 'alert', okText: 'Tancar' });
                 }
             };
@@ -2615,8 +2568,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Update display
             try { stopClock(); } catch {}
-            try { renderLaps(); } catch (e) { console.error('renderLaps error', e); }
-            try { updateSummary(); } catch (e) { console.error('updateSummary error', e); }
+            try { renderLaps(); } catch (e) { }
+            try { updateSummary(); } catch (e) { }
             try { lapsContainer.style.display = 'flex'; } catch {}
             // Fallback: if nothing rendered but there are laps, render minimal rows
             try {
@@ -2665,7 +2618,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } catch (e) {
-            console.error('Error en tancar la vista de sessió', e);
             await showModal({ id: 'modal-close-session-error', title: 'Error', message: 'Error en desar els canvis.', type: 'alert', okText: 'Tancar' });
         } finally {
             sessionDirty = false;
@@ -2735,7 +2687,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const deleteSession = async (sessionKey) => {
-        console.debug('[DEBUG] deleteSession invoked', { sessionKey, isViewingSession, currentSessionKey });
         const sessionName = sessionKey.replace(sessionPrefix, '');
         const ok = await showModal({
         id: 'modal-delete-session-confirm',
@@ -2745,19 +2696,16 @@ document.addEventListener('DOMContentLoaded', () => {
         cancelText: 'CANCEL.LAR (Conservar)',
         type: 'confirm'
     });
-        console.debug('[DEBUG] deleteSession confirm result', { ok });
         if (ok) {
             localStorage.removeItem(sessionKey);
-            console.debug('[DEBUG] deleteSession removed from localStorage', { sessionKey });
             
             // Si estamos viendo esta sesión (incluida la vista embebida en registration-view), cerrarla y mostrar solo sessions-view
             if (isViewingSession && currentSessionKey === sessionKey) {
-                console.debug('[DEBUG] deleteSession closing session view and switching to sessions-view');
-                try { await closeSessionView(true); } catch (e) { console.debug('[DEBUG] closeSessionView failed', e); }
+                try { await closeSessionView(true); } catch (e) { }
                 // Remover explícitamente la top bar si quedó montada
                 try {
                     const tb = document.getElementById('session-top-bar');
-                    if (tb) { console.debug('[DEBUG] deleteSession removing session-top-bar'); tb.remove(); }
+                    if (tb) { tb.remove(); }
                 } catch {}
                 try { sessionsView.style.display = 'block'; } catch {}
                 try { registrationView.style.display = 'none'; } catch {}
@@ -2772,13 +2720,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Asegurar: si estamos en registration-view sin isViewingSession pero con la vista de sesión todavía montada
             // forzar también la vista de sesiones (caso reportado por el usuario)
             if (!isViewingSession) {
-                console.debug('[DEBUG] deleteSession ensuring sessions-view visible when not isViewingSession');
                 // Cerrar vista de sesión si hubiera estado abierta en modo solo lectura
-                try { await closeSessionView(true); } catch (e) { console.debug('[DEBUG] closeSessionView (not viewing) failed', e); }
+                try { await closeSessionView(true); } catch (e) { }
                 // Remover explícitamente la top bar si quedó montada
                 try {
                     const tb = document.getElementById('session-top-bar');
-                    if (tb) { console.debug('[DEBUG] deleteSession removing session-top-bar (not viewing)'); tb.remove(); }
+                    if (tb) { tb.remove(); }
                 } catch {}
                 try { sessionsView.style.display = 'block'; } catch {}
                 try { registrationView.style.display = 'none'; } catch {}
@@ -2939,14 +2886,17 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('/ControlVoltes/sw.js', { scope: '/ControlVoltes/' })
+                    // Detectar si estamos en GitHub Pages o en local
+                    const isGitHubPages = window.location.hostname.includes('github.io');
+                    const swPath = isGitHubPages ? '/ControlVoltes/sw.js' : 'sw.js';
+                    const swScope = isGitHubPages ? '/ControlVoltes/' : './';
+                    
+                    navigator.serviceWorker.register(swPath, { scope: swScope })
                         .then((reg) => {
-                            console.debug('[DEBUG] SW registrado');
                             
                             // Actualización automática silenciosa
                             // Si hay un SW esperando, activarlo inmediatamente
                             if (reg.waiting) {
-                                console.debug('[DEBUG] SW esperando, activando automáticamente...');
                                 reg.waiting.postMessage({ type: 'SKIP_WAITING' });
                             }
                             
@@ -2955,12 +2905,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 const newWorker = reg.installing;
                                 if (!newWorker) return;
                                 
-                                console.debug('[DEBUG] Nueva versión detectada, instalando...');
                                 
                                 newWorker.addEventListener('statechange', () => {
                                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                                         // Nueva versión instalada, activar automáticamente
-                                        console.debug('[DEBUG] Nueva versión instalada, activando automáticamente...');
                                         newWorker.postMessage({ type: 'SKIP_WAITING' });
                                     }
                                 });
@@ -2968,21 +2916,18 @@ document.addEventListener('DOMContentLoaded', () => {
                             
                             // Cuando el nuevo SW toma control, recargar automáticamente
                             navigator.serviceWorker.addEventListener('controllerchange', () => {
-                                console.debug('[DEBUG] Nuevo SW activo, recargando página...');
                                 window.location.reload();
                             });
                             
                             // Verificar actualizaciones cada vez que se inicia la app
-                            console.debug('[DEBUG] Verificando actualizaciones...');
-                            reg.update().catch((e) => console.debug('[DEBUG] Error verificando actualizaciones', e));
+                            reg.update().catch((e) => {});
                             
                             // Verificar actualizaciones periódicamente (cada 30 segundos)
                             setInterval(() => {
-                                console.debug('[DEBUG] Verificación periódica de actualizaciones...');
                                 reg.update().catch(() => {});
                             }, 30000);
                         })
-                        .catch((e) => console.debug('[DEBUG] SW error', e));
+                        .catch((e) => {});
                 });
             }
         } catch {}
@@ -3011,7 +2956,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 installBtn.disabled = true;
                 try {
                     const result = await deferredPrompt.prompt();
-                    console.debug('[DEBUG] A2HS', result.outcome);
                 } catch {}
                 installBtn.style.display = 'none';
                 deferredPrompt = null;
@@ -3078,12 +3022,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         forceInstallBtn.disabled = true;
                         try {
                             const result = await deferredPrompt.prompt();
-                            console.debug('[DEBUG] Force install', result.outcome);
                             if (result.outcome === 'accepted') {
                                 forceInstallBtn.style.display = 'none';
                             }
                         } catch (e) {
-                            console.debug('[DEBUG] Force install error', e);
                         }
                         forceInstallBtn.disabled = false;
                     } else {
@@ -3187,12 +3129,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     finalizeBtn.addEventListener('click', async () => {
-        console.debug('[DEBUG] Finalize button clicked');
-        console.debug('[DEBUG] Current state:', {
-            isRecording,
-            lapsCount: laps?.length || 0,
-            finalizeBtnText: finalizeBtn.textContent
-        });
         await finalizeSession();
     });
     startClock();
@@ -3324,14 +3260,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateWakeLockUI(success);
             }
         } catch (err) {
-            console.error('[WakeLock] Error cargando preferencia:', err);
         }
     }
 
     // Toggle Wake Lock
     async function toggleWakeLock() {
         if (!wakeLockManager.isSupported) {
-            console.warn('[WakeLock] No soportado');
             return;
         }
 
@@ -3346,7 +3280,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateWakeLockUI(success);
             }
         } catch (err) {
-            console.error('[WakeLock] Error en toggle:', err);
             updateWakeLockUI(false);
         }
     }
