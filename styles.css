@@ -3,7 +3,8 @@ html, body {
     margin: 0;
     padding: 0;
     width: 100%;
-    overflow-x: hidden;
+    height: 100%;
+    overflow: hidden;
     box-sizing: border-box;
 }
 
@@ -64,15 +65,20 @@ button:focus-visible,
 
 /* Layout */
 #main-container {
-    position: relative;
+    position: fixed;
+    top: 49px;
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     max-width: 500px;
-    margin: 49px auto 0;
+    margin: 0 auto;
     width: 100%;
-    padding: 10px;
+    padding: 5px;
     box-sizing: border-box;
+    overflow: hidden;
 }
 
 #registration-view,
@@ -80,8 +86,12 @@ button:focus-visible,
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
     padding-top: 1px;
+    flex: 1 1 auto; /* Ocupar todo el espacio disponible del contenedor padre */
+    min-height: 0 !important; /* Permitir que el flex funcione correctamente */
+    max-height: 100%; /* No exceder el contenedor padre */
+    overflow: hidden; /* Evitar scroll en el contenedor principal */
 }
 
 /* Header */
@@ -196,14 +206,15 @@ button:focus-visible,
 /* Clock */
 #clock-container {
     width: 100%;
-    padding: 5px !important;
+    padding: 1px !important;
     background: #2E7D32;
     border-radius: 25px;
     cursor: pointer;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
     transition: background-color .2s;
-    border: 1px solid #3a3a3a;
+    border: 3px solid #ffff00;
+    flex: 0 0 auto; /* No crecer ni encoger */
 }
 
 #clock-container:active {
@@ -212,9 +223,9 @@ button:focus-visible,
 
 #clock {
     font-family: Arial Black, sans-serif;
-    font-size: 5rem;
+    font-size: 3rem;
     font-weight: 600;
-    text-align: center;
+    text-align: left;
     letter-spacing: 2px;
     color: #fff;
 }
@@ -233,12 +244,13 @@ button:focus-visible,
     align-items: center;
     width: 100%;
     max-width: 100%;
+    flex: 0 0 auto; /* No crecer ni encoger */
     margin: 0 auto; /* Centrado horizontal */
     background: #242a2f;
-    padding: 5px !important;
+    padding: 3px !important;
     border-radius: 15px;
     border: 1px solid #3a3a3a;
-    gap: 5px;
+    gap: 3px;
     box-sizing: border-box; /* Incluir padding en el ancho */
 }
 
@@ -251,8 +263,8 @@ button:focus-visible,
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    padding: 3px;
+    gap: 2px;
+    padding: 2px;
     box-sizing: border-box; /* Incluir padding en el ancho */
     overflow: hidden; /* Evitar desbordamiento */
     border: 1px solid #3a3a3a;
@@ -316,14 +328,23 @@ button:focus-visible,
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 5px !important;
+    gap: 5px;
+    padding: 2px !important;
+    flex: 1 1 auto; /* Ocupar el espacio restante */
+    overflow-y: auto !important; /* Forzar scroll vertical con !important */
+    overflow-x: hidden; /* Evitar scroll horizontal */
+    min-height: 0 !important; /* Permitir que el flex funcione correctamente */
+    max-height: calc(100vh - 300px); /* Altura máxima calculada: viewport menos otros elementos */
+    -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
+    touch-action: pan-y !important; /* Permitir scroll vertical en pantallas táctiles */
+    position: relative; /* Establecer contexto de posicionamiento */
+    will-change: scroll-position; /* Optimizar el scroll */
 }
 
 .lap-item {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 2px;
     padding: 3px;
     background: var(--card-bg-color);
     border-radius: 10px;
@@ -334,7 +355,7 @@ button:focus-visible,
 
 .lap-index {
     font-weight: 600;
-    color: var(--secondary-color);
+    color: var(--primary-color);
     min-width: 1.5em;
     text-align: center;
 }
@@ -356,7 +377,7 @@ button:focus-visible,
 
 .lap-duration {
     font-size: clamp(.85rem, 3.2vw, 1rem);
-    color: var(--secondary-color);
+    color:  var(--primary-color);
     white-space: nowrap;
     flex: 0 0 auto;
 }
@@ -371,6 +392,8 @@ button:focus-visible,
     padding: 3px;
     border-radius: 3px;
     width: 100%;
+    pointer-events: none;
+    cursor: default;
 }
 
 .lap-name::placeholder {
@@ -429,7 +452,7 @@ button:focus-visible,
     display: flex;
     justify-content: center;
     box-sizing: border-box;
-    margin: 0 4px;
+    margin: 0;
     text-transform: uppercase;
 }
 
@@ -448,7 +471,8 @@ button:focus-visible,
 /* Controls */
 #controls-container {
     width: 100%;
-    height: 64px;
+    height: auto;
+    flex: 0 0 auto; /* No crecer ni encoger */
 }
 
 /* Force install button - fixed at bottom */
@@ -469,8 +493,8 @@ button:focus-visible,
 
 .control-btn {
     width: 100%;
-    padding: 5px;
-    font-size: 1.2rem;
+    padding: 8px;
+    font-size: 1rem;
     font-weight: 500;
     border-radius: 10px;
     border: none;
@@ -485,10 +509,25 @@ button:focus-visible,
 }
 
 /* Sessions */
+#sessions-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
 #sessions-list {
     display: flex;
     flex-direction: column;
     gap: 5px;
+    flex: 1 1 auto !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 100px !important;
+    height: auto !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
 }
 
 /* Disposición más compacta en pantallas muy estrechas */
@@ -600,8 +639,1195 @@ button:focus-visible,
     color: var(--secondary-color);
 }
 
-#sessions-container h2 {
-    font-size: 1.3rem;
-    margin: 5px 0 10px;
-    color: var(--primary-color);
+/* ========================================
+   CONTROL DE VOLTES - STYLES.CSS
+   Estilos adicionales extraídos desde scripts.js
+   ======================================== */
+
+/* ========================================
+   MODALES Y OVERLAYS
+   ======================================== */
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  box-sizing: border-box;
+  backdrop-filter: blur(4px);
+}
+
+/* Modal Base */
+.modal {
+  background: var(--card-bg-color);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 95vw;
+  border: 1px solid var(--accent-color);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  text-align: center;
+  max-width: min(500px, 95vw);
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  transform: scale(0.96);
+  opacity: 0;
+  transition: transform 120ms ease-out, opacity 120ms ease-out;
+  font-size: 1.1rem;
+  box-sizing: border-box;
+  margin: 0 auto;
+}
+
+/* Modal Title */
+.modal h2 {
+  margin: 0;
+  color: var(--primary-color);
+  font-size: 1.8rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Modal Message */
+.modal .message {
+  color: #fff;
+  line-height: 1.3;
+  margin-bottom: 0;
+  font-size: 1rem;
+}
+
+/* Modal Input */
+.modal input[type="text"] {
+  font-size: 1.6rem;
+  font-weight: 600;
+  padding: 18px 20px;
+  width: 100%;
+  box-sizing: border-box;
+  border: 3px solid #333;
+  background-color: #fff;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  color: #000;
+  font-weight: 600;
+  text-shadow: none;
+  transition: all 0.2s ease;
+}
+
+.modal input[type="text"]:focus {
+  background-color: #f8f9fa;
+  border-color: #000;
+  outline: none;
+  transform: scale(1.02);
+}
+
+.modal input[type="text"]::placeholder {
+  color: #666;
+  font-weight: 500;
+}
+
+/* Modal Buttons */
+.modal button {
+  font-size: 1.2rem;
+  padding: 16px 20px;
+  min-height: 60px;
+  border-radius: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: relative;
+  z-index: 10;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.modal button:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+.modal button:focus {
+  outline: 3px solid rgba(255, 255, 255, 0.3);
+  outline-offset: 2px;
+}
+
+.modal button svg {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+/* Modal Button Variants */
+.modal button[data-variant="success"] {
+  background: #4CAF50;
+  color: white;
+  border: 1px solid #4CAF50;
+}
+
+.modal button[data-variant="danger"] {
+  background: #f44336;
+  color: white;
+  border: 1px solid #f44336;
+}
+
+.modal button[data-variant="info"] {
+  background: #0d6efd;
+  color: white;
+  border: 1px solid #0d6efd;
+}
+
+.modal button[data-variant="primary"] {
+  background: var(--accent-color);
+  color: white;
+  border: 1px solid var(--accent-color);
+}
+
+/* Modal Buttons Container */
+.modal-buttons {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+.modal-buttons button {
+  flex: 1;
+  font-size: 1.05rem;
+  padding: 8px 16px;
+  position: relative;
+  z-index: 10;
+  cursor: pointer;
+}
+
+/* Modal Subtitle */
+.modal-cancel-subtitle {
+  font-size: 0.75rem;
+  opacity: 0.85;
+  font-weight: 600;
+  line-height: 1.1;
+  margin-top: 2px;
+  text-align: center;
+}
+
+/* ========================================
+   SPINWHEELS (EDIT TIME MODAL)
+   ======================================== */
+
+.spinwheel-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.spinwheel-label {
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.spinwheel-container {
+  position: relative;
+  width: 100%;
+  height: 150px;
+  overflow: hidden;
+  border: 2px solid var(--accent-color);
+  border-radius: 8px;
+  background: #1a1a1a;
+}
+
+.spinwheel-indicator {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 50px;
+  transform: translateY(-50%);
+  background: rgba(0, 170, 255, 0.2);
+  border-top: 2px solid var(--accent-color);
+  border-bottom: 2px solid var(--accent-color);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.spinwheel-items {
+  position: absolute;
+  width: 100%;
+  transition: transform 0.3s ease;
+}
+
+.spinwheel-item {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary-color);
+  font-size: 1.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.spinwheel-item.selected {
+  color: white;
+  font-size: 2rem;
+}
+
+.spinwheel-separator {
+  color: white;
+  font-size: 3rem;
+  font-weight: 700;
+  padding-top: 35px;
+}
+
+/* Spinwheels Container */
+.spinwheels-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* ========================================
+   VALIDATION MESSAGES
+   ======================================== */
+
+.validation-message {
+  display: none;
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.1);
+  border: 2px solid #f44336;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 15px;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* ========================================
+   CURRENT TIME CONTAINER
+   ======================================== */
+
+.current-time-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px;
+  background: rgba(0, 170, 255, 0.1);
+  border-radius: 8px;
+  border: 1px solid var(--accent-color);
+}
+
+.current-time-label {
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.current-time-display {
+  font-size: 2.5rem;
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+/* ========================================
+   REFERENCE CONTAINER
+   ======================================== */
+
+.reference-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(0, 170, 255, 0.1);
+  border-radius: 8px;
+  border: 1px solid var(--accent-color);
+}
+
+.reference-time-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.reference-label {
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.reference-time-display {
+  font-size: 1.5rem;
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+/* ========================================
+   SESSION VIEW STYLES
+   ======================================== */
+
+.session-top-bar {
+  position: fixed;
+  top: 44px;
+  left: 0;
+  width: 100%;
+  padding: 8px;
+  background-color: #333;
+  z-index: 1000;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  box-sizing: border-box;
+  min-height: 52px;
+  transition: min-height 0.3s ease;
+}
+
+.session-top-bar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  justify-content: flex-start;
+  align-items: stretch;
+  flex: 1 1 auto;
+}
+
+.session-top-row,
+.session-bottom-row {
+  display: flex;
+  gap: 5px;
+  align-items: stretch;
+  height: 36px;
+}
+
+.session-top-row button,
+.session-bottom-row button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  height: 36px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.session-edit-btn {
+  margin: 0;
+  flex: 1;
+  height: 36px;
+  border: 1px solid var(--accent-color);
+  background-color: fffvar(--accent-color);
+  color: #fff;
+}
+
+.session-edit-btn:hover {
+  filter: brightness(1.1);
+}
+
+.session-view-delete-btn {
+  border: 1px solid var(--danger-color);
+  background-color: var(--danger-color);
+  color: #fff;
+}
+
+.session-view-delete-btn:hover {
+  background-color: #c82333;
+  border-color: #c82333;
+}
+
+.session-view-share-btn,
+.session-view-share-csv-btn,
+.session-view-share-csv-comma-btn,
+.session-view-clipboard-btn {
+  border: 1px solid var(--accent-color);
+  background-color: var(--accent-color);
+  color: #fff;
+}
+
+.session-view-share-btn:hover,
+.session-view-share-csv-btn:hover,
+.session-view-share-csv-comma-btn:hover,
+.session-view-clipboard-btn:hover {
+  filter: brightness(1.1);
+}
+
+.session-toggle-share-btn {
+  border: 1px solid #0d6efd;
+  background-color: #0d6efd;
+  color: #fff;
+}
+
+.session-toggle-share-btn:hover {
+  filter: brightness(1.1);
+}
+
+/* Session Info */
+.session-info {
+  text-align: center;
+  margin-bottom: 5px;
+  background-color: #d3d3d3;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.session-info-date {
+  font-size: 1.8em;
+  margin-bottom: 10px;
+  color: #000000;
+}
+
+.session-info-time {
+  font-size: 1.5em;
+  color: #000000;
+}
+
+/* Session Name Row */
+.session-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 5px 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.session-name-prefix {
+  font-weight: 400;
+  opacity: 0.9;
+  flex: 0 0 auto;
+  text-align: left;
+}
+
+.session-name-label {
+  font-size: 1.3em;
+  font-weight: 600;
+  flex: 1 1 auto;
+  text-align: left;
+  border: 1px solid #808080;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.session-name-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.session-name-edit-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--secondary-color);
+  background: transparent;
+  color: var(--secondary-color);
+}
+
+.session-name-edit-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Recording Name Row */
+.recording-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.recording-name-label {
+  opacity: 0.9;
+}
+
+.recording-name-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid #3a3a3a;
+  background: transparent;
+  color: #f0f0f0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.recording-name-edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--secondary-color);
+  background: transparent;
+  color: var(--secondary-color);
+}
+
+.recording-name-edit-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ========================================
+   MULTISELECT MODE
+   ======================================== */
+
+.multiselect-actions-bar {
+  display: none;
+  flex-direction: row;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: rgba(51, 51, 51, 0.5);
+  border-radius: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.multiselect-count {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.multiselect-cancel-btn {
+  flex: 1;
+  padding: 12px 16px;
+  background-color: #666;
+  color: #fff;
+  border: 2px solid #666;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+
+.multiselect-cancel-btn:hover {
+  background-color: #777;
+  border-color: #777;
+}
+
+.multiselect-delete-btn {
+  flex: 1;
+  padding: 12px 16px;
+  background-color: #dc3545;
+  color: #fff;
+  border: 2px solid #dc3545;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+
+.multiselect-delete-btn:hover {
+  background-color: #c82333;
+  border-color: #c82333;
+}
+
+/* Session Checkbox */
+.session-checkbox {
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+/* ========================================
+   ORDER SWITCH (LAP ORDER)
+   ======================================== */
+
+.order-switch-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  margin-top: 20px;
+  border-radius: 8px;
+  background-color: rgba(128, 128, 128, 0.1);
+  border: 1px solid var(--accent-color);
+}
+
+.order-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--primary-color);
+  white-space: nowrap;
+}
+
+.order-switch {
+  role: switch;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.order-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.order-state-text {
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--primary-color);
+  opacity: 0.9;
+  text-align: right;
+}
+
+/* ========================================
+   ADD LAP AFTER BUTTON
+   ======================================== */
+
+.add-lap-after-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin-left: 0;
+  background: white;
+  color: #000000;
+  border: 2px solid #FFC107;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.add-lap-after-btn:hover {
+  background: #FFF9E6;
+  transform: scale(1.1);
+}
+
+/* Edit Time Button */
+.edit-time-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 4px;
+  border: 1px solid var(--accent-color);
+  background: transparent;
+  color: var(--accent-color);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+/* Edit Name Button */
+.edit-name-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  border: 1px solid var(--accent-color);
+  background: transparent;
+  color: var(--accent-color);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+/* ========================================
+   PWA INSTALL BUTTONS
+   ======================================== */
+
+.install-btn {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  padding: 12px 24px;
+  font-size: 1.1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-color);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.force-install-btn {
+  display: block;
+}
+
+/* ========================================
+   PWA TOAST
+   ======================================== */
+
+.pwa-toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #222;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  z-index: 2000;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pwa-toast button {
+  border: 1px solid #0d6efd;
+  background: transparent;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.pwa-toast button:not(.secondary) {
+  background: #0d6efd;
+}
+
+/* ========================================
+   INFO MODAL
+   ======================================== */
+
+.info-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.75);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.info-modal {
+  background-color: var(--card-bg-color);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 95vw;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--accent-color);
+}
+
+.info-title {
+  text-align: center;
+  margin-bottom: 15px;
+  font-size: 1.9rem;
+  border: 3px solid black;
+  padding: 8px 16px;
+  display: block;
+  border-radius: 6px;
+  background-color: yellow;
+  color: black;
+}
+
+.info-version {
+  text-align: center;
+  margin-bottom: 15px;
+  line-height: 1.6;
+  opacity: 0.8;
+}
+
+.info-contact {
+  text-align: center;
+  margin-bottom: 15px;
+  line-height: 1.6;
+}
+
+.info-contact a {
+  color: rgb(255, 255, 255);
+  text-decoration: none;
+}
+
+.info-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.info-btn {
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.info-btn-install {
+  background-color: #0d6efd;
+  color: #fff;
+}
+
+.info-btn-update {
+  background-color: #0d6efd;
+  color: #fff;
+}
+
+/* ========================================
+   FOCUS STATES Y ACCESIBILIDAD
+   ======================================== */
+
+button:focus,
+input:focus,
+select:focus,
+textarea:focus,
+[tabindex]:focus {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.lap-item:focus-within {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.session-item:focus-within {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* ========================================
+   ANIMACIONES Y TRANSICIONES
+   ======================================== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* ========================================
+   ESTILOS ESPECÍFICOS PARA MODALES DE CONFIRMACIÓN
+   ======================================== */
+
+/* Delete Session Confirm Modal */
+.modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 12px !important;
+  justify-content: center !important;
+}
+
+.modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons button {
+  flex: 1 !important;
+  max-width: 120px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  font-size: 1rem !important;
+  padding: 12px 16px !important;
+  border-radius: 6px !important;
+  border: 2px solid !important;
+}
+
+.modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons button:first-child {
+  background: #f44336 !important;
+  color: white !important;
+  border-color: #f44336 !important;
+}
+
+.modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons button:last-child {
+  background: #4CAF50 !important;
+  color: white !important;
+  border-color: #4CAF50 !important;
+}
+
+/* Delete Lap Confirm Modal */
+.modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 12px !important;
+  justify-content: center !important;
+}
+
+.modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons button {
+  flex: 1 !important;
+  max-width: 120px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  font-size: 1rem !important;
+  padding: 12px 16px !important;
+  border-radius: 6px !important;
+  border: 2px solid transparent !important;
+}
+
+.modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons button:first-child {
+  background: #f44336 !important;
+  color: white !important;
+  border-color: #f44336 !important;
+}
+
+.modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons button:last-child {
+  background: #4CAF50 !important;
+  color: white !important;
+  border-color: #4CAF50 !important;
+}
+
+/* ========================================
+   ESTILOS CSS DINÁMICOS DEL FINAL DE SCRIPTS.JS
+   (líneas 5078-5269 del archivo JavaScript)
+   ======================================== */
+
+/* ========================================
+   CLOCK CONTAINER STYLES (línea 5070+)
+   ======================================== */
+
+/* Estilos eliminados - ya están definidos arriba en la línea 206 */
+
+/* ========================================
+   ESTILOS ESPECÍFICOS PARA MODALES DE CONFIRMACIÓN
+   ======================================== */
+
+/* Delete Session Confirm Modal */
+.modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 12px !important;
+  justify-content: center !important;
+}
+
+.modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons button {
+  flex: 1 !important;
+  max-width: 120px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  font-size: 1rem !important;
+  padding: 12px 16px !important;
+  border-radius: 6px !important;
+  border: 2px solid !important;
+}
+
+.modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons button:first-child {
+  background: #f44336 !important;
+  color: white !important;
+  border-color: #f44336 !important;
+}
+
+.modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons button:last-child {
+  background: #4CAF50 !important;
+  color: white !important;
+  border-color: #4CAF50 !important;
+}
+
+/* Delete Lap Confirm Modal */
+.modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 12px !important;
+  justify-content: center !important;
+}
+
+.modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons button {
+  flex: 1 !important;
+  max-width: 120px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  font-size: 1rem !important;
+  padding: 12px 16px !important;
+  border-radius: 6px !important;
+  border: 2px solid transparent !important;
+}
+
+.modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons button:first-child {
+  background: #f44336 !important;
+  color: white !important;
+  border-color: #f44336 !important;
+}
+
+.modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons button:last-child {
+  background: #4CAF50 !important;
+  color: white !important;
+  border-color: #4CAF50 !important;
+}
+
+/* ========================================
+   MEJORAS GENERALES PARA MODALES
+   ======================================== */
+
+/* Modal improvements */
+.modal-overlay {
+  padding: max(20px, 5vw) !important;
+  box-sizing: border-box !important;
+}
+
+.modal {
+  max-width: min(500px, 95vw) !important;
+  width: 95vw !important;
+  padding: 24px !important;
+  gap: 20px !important;
+  font-size: 1.1rem !important;
+  box-sizing: border-box !important;
+  margin: 0 auto !important;
+}
+
+/* Modal input improvements */
+.modal input[type="text"] {
+  background-color: #fff !important;
+  border: 3px solid #333 !important;
+  color: #000 !important;
+  font-size: 1.6rem !important;
+  font-weight: 600 !important;
+  padding: 18px 20px !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+  text-shadow: none !important;
+}
+
+.modal input[type="text"]:focus {
+  background-color: #f8f9fa !important;
+  border-color: #000 !important;
+  outline: none !important;
+  transform: scale(1.02) !important;
+}
+
+.modal input[type="text"]::placeholder {
+  color: #666 !important;
+  font-weight: 500 !important;
+}
+
+/* Modal buttons improvements */
+.modal button {
+  font-size: 1.2rem !important;
+  padding: 16px 20px !important;
+  min-height: 60px !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  position: relative !important;
+  z-index: 10 !important;
+  cursor: pointer !important;
+}
+
+.modal button:active {
+  transform: scale(0.98) !important;
+  opacity: 0.9 !important;
+}
+
+.modal button:focus {
+  outline: 3px solid rgba(255, 255, 255, 0.3) !important;
+  outline-offset: 2px !important;
+}
+
+.modal button svg {
+  width: 32px !important;
+  height: 32px !important;
+  flex-shrink: 0 !important;
+}
+
+.modal button[style*="flex-direction: column"] div {
+  font-size: 0.9rem !important;
+  opacity: 0.9 !important;
+  margin-top: 4px !important;
+}
+
+/* Modal title and message improvements */
+.modal span[style*="font-size: 1.8rem"] {
+  font-size: 1.8rem !important;
+  margin-bottom: 12px !important;
+}
+
+.modal span[style*="font-size: 1.2rem"] {
+  font-size: 1.2rem !important;
+  line-height: 1.6 !important;
+}
+
+/* Modal button container improvements */
+.modal > div[style*="flex-direction: column"] {
+  gap: 16px !important;
+}
+
+/* ========================================
+   RESPONSIVE MODAL IMPROVEMENTS
+   ======================================== */
+
+@media (max-width: 480px) {
+  .modal {
+    padding: 20px !important;
+    width: 90vw !important;
+    max-width: 90vw !important;
+  }
+
+  .modal input[type="text"] {
+    font-size: 1.4rem !important;
+    padding: 16px 18px !important;
+    border: 2px solid #333 !important;
+  }
+
+  .modal button {
+    font-size: 1.1rem !important;
+    padding: 14px 18px !important;
+    min-height: 56px !important;
+  }
+
+  .modal button svg {
+    width: 28px !important;
+    height: 28px !important;
+  }
 }

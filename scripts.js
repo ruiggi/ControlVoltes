@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionDirty: false,
         pendingRename: null,
         recordingName: 'SessióSenseNom',
+        lapsOrderDescending: true, // true = descendente (más nueva arriba), false = ascendente
         
         // Intervalos
         clockInterval: null,
@@ -57,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Aplicar estilo inicial al botón finalizar
         try { 
             if (appState.dom.finalizeBtn) {
-                appState.dom.finalizeBtn.style.height = '64px';
+                appState.dom.finalizeBtn.style.height = 'auto';
             }
         } catch {}
     }
@@ -89,7 +90,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let sessionDirty = appState.sessionDirty;
     let pendingRename = appState.pendingRename;
     let recordingName = appState.recordingName;
+    let lapsOrderDescending = appState.lapsOrderDescending;
     const sessionPrefix = appState.SESSION_PREFIX;
+    
+    // Debug temporal: verificar dimensiones del contenedor de vueltas
+    setTimeout(() => {
+        if (lapsContainer) {
+            const rect = lapsContainer.getBoundingClientRect();
+            const styles = window.getComputedStyle(lapsContainer);
+        }
+    }, 1000);
     
     // Estado para modo multiselección
     let isMultiSelectMode = false;
@@ -208,8 +218,10 @@ document.addEventListener('DOMContentLoaded', () => {
     </svg>`;
     const shareIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 1 1 0-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 1 1 5.367-2.684 3 3 0 0 1-5.367 2.684zm0 9.316a3 3 0 1 1 5.367 2.684 3 3 0 0 1-5.367-2.684z"/></svg>`;
     const editIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
+    const editTimeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
     const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
     const xIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+    const plusIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
     const screenIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`;
 
     // --- WakeLockManager Class ---
@@ -261,14 +273,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Modal util ---
-    const showModal = ({ id = '', title = '', message = '', okText = 'Aceptar', cancelText = 'Cancelar', type = 'confirm', defaultValue = '' } = {}) => {
+    const showModal = ({ id = '', title = '', message = '', okText = 'Aceptar', cancelText = 'Cancelar', type = 'confirm', defaultValue = '', okButtonStyle = '', cancelButtonStyle = '', buttonLayout = 'column', reverseButtons = false } = {}) => {
         return new Promise((resolve) => {
             try {
                 // Create modal overlay
                 const overlay = createContainer({
                     className: 'modal-overlay',
                     direction: 'column',
-                    justify: 'center',
+                    justify: 'flex-start',
                     align: 'center',
                     backgroundColor: 'rgba(0,0,0,0.75)', // Más oscuro para mejor visibilidad
                     padding: '20px'
@@ -282,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     height: '100vh',
                     zIndex: '9999',
                     backdropFilter: 'blur(4px)', // Más blur para mejor efecto
-                    padding: 'max(20px, 5vw)', // Padding responsive
+                    padding: '60px 20px 20px 20px', // Padding con margen superior
                     boxSizing: 'border-box'
                 });
 
@@ -294,8 +306,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     align: 'center',
                     backgroundColor: 'var(--card-bg-color)',
                     borderRadius: '12px',
-                    padding: '24px', // Aumentar padding
-                    gap: '20px' // Aumentar gap entre elementos
+                    padding: '16px', // Padding más reducido
+                    gap: '8px' // Gap más reducido entre elementos
                 });
 
                 Object.assign(modal.style, {
@@ -305,6 +317,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     maxWidth: '500px', // Aumentar el ancho máximo
                     width: '95vw', // Ajustar al ancho de la pantalla
                     maxWidth: 'min(500px, 95vw)', // Máximo 500px pero no más del 95% del viewport
+                    maxHeight: 'calc(100vh - 140px)', // Altura máxima para evitar que ocupe toda la pantalla
+                    overflowY: 'auto', // Scroll si el contenido es muy largo
                     transform: 'scale(0.96)',
                     opacity: '0',
                     transition: 'transform 120ms ease-out, opacity 120ms ease-out',
@@ -326,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (title) {
                     const titleEl = createTextSpan({
                         text: title,
-                        fontSize: '1.8rem', // Aumentar tamaño del título
+                        fontSize: '1.3rem', // Tamaño del título más reducido
                         fontWeight: '700'
                     });
                     titleEl.id = `${id}-title`;
@@ -337,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (message) {
                     const messageEl = createTextSpan({
                         text: message,
-                        fontSize: '1.2rem' // Aumentar tamaño del mensaje
+                        fontSize: '1rem' // Tamaño del mensaje más reducido
                     });
                     messageEl.id = `${id}-message`;
                     // Si el mensaje contiene HTML (como <br>), usar innerHTML en lugar de textContent
@@ -346,8 +360,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     Object.assign(messageEl.style, {
                         color: '#fff',
-                        lineHeight: '1.6',
-                        marginBottom: '5px' // Espacio reducido a 5px
+                        lineHeight: '1.3',
+                        marginBottom: '0px' // Sin espacio
                     });
                     modal.appendChild(messageEl);
                 }
@@ -362,14 +376,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     inputEl.id = `${id}-input`;
                     // High contrast input: white background, black text, larger font
-                    inputEl.style.fontSize = '1.6rem'; // Tamaño de texto mayor
-                    inputEl.style.padding = '18px 20px'; // Padding aumentado
+                    inputEl.style.fontSize = '1.2rem'; // Tamaño de texto más reducido
+                    inputEl.style.padding = '8px 12px'; // Padding más reducido
                     inputEl.style.width = '100%';
                     inputEl.style.boxSizing = 'border-box';
-                    inputEl.style.border = '3px solid #333'; // Borde oscuro para contraste
+                    inputEl.style.border = '2px solid #333'; // Borde más fino
                     inputEl.style.backgroundColor = '#fff'; // Fondo blanco
-                    inputEl.style.borderRadius = '8px';
-                    inputEl.style.marginBottom = '20px';
+                    inputEl.style.borderRadius = '6px';
+                    inputEl.style.marginBottom = '4px'; // Margin más reducido
                     inputEl.style.color = '#000'; // Texto negro
                     inputEl.style.fontWeight = '600'; // Texto grueso
                     inputEl.style.textShadow = 'none'; // Sin sombra de texto
@@ -380,13 +394,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Detectar si es el modal de GUARDAR SESSIÓ o un modal de confirmación simple
                 const normalizedTitle = String(title || '').toUpperCase();
                 const isSaveSessionModal = /GUARDAR\s+SESSI(Ó|O)/.test(normalizedTitle);
-                const isDeleteSessionModal = id === 'modal-delete-session-confirm';
+                const isDeleteSessionModal = id === 'modal-delete-session-confirm' || id === 'modal-delete-lap-confirm';
+                const isHorizontalLayout = buttonLayout === 'horizontal' || isDeleteSessionModal;
 
                 // Create buttons container - columna para GUARDAR SESSIÓ, fila para otros
                 const buttonsContainer = createContainer({
-                    direction: isDeleteSessionModal ? 'row' : 'column',
+                    direction: isHorizontalLayout ? 'row' : 'column',
                     justify: 'center',
-                    gap: '16px' // Aumentar gap entre botones
+                    gap: '6px' // Gap entre botones
                 });
                 buttonsContainer.id = `${id}-buttons-container`;
                 buttonsContainer.className = 'modal-buttons';
@@ -395,8 +410,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Create buttons for non-alert types
                 let okBtn = null;
                 if (type !== 'alert') {
-                    if (isDeleteSessionModal) {
-                        // Para modal de eliminar sesión: orden CANCEL.LAR (rojo, izq) - CONFIRMAR (verde, der)
+                    if (isHorizontalLayout) {
+                        // Para modal horizontal: orden según reverseButtons
+                        // Por defecto: CANCEL.LAR (izq) - CONFIRMAR (der)
+                        // reverseButtons: CONFIRMAR (izq) - CANCEL.LAR (der)
+                        
                         const cancelBtn = createButton({
                             text: cancelText,
                             icon: xIcon,
@@ -404,19 +422,22 @@ document.addEventListener('DOMContentLoaded', () => {
                             size: 'large',
                             onClick: () => {
                                 cleanup();
-                                resolve(false);
+                                resolve(type === 'prompt' ? null : false);
                             }
                         });
                         cancelBtn.id = `${id}-cancel-btn`;
                         cancelBtn.className = 'modal-delete-session-cancel-btn';
                         cancelBtn.style.fontSize = '1.2rem';
-                        cancelBtn.style.padding = '16px 20px';
+                        cancelBtn.style.padding = '5px 5px';
                         cancelBtn.style.flex = '1';
                         if (cancelBtn.querySelector('svg')) {
                             cancelBtn.querySelector('svg').style.width = '24px';
-                            cancelBtn.querySelector('svg').style.height = '24px';
+                            cancelBtn.querySelector('svg').style.height = '12px';
                         }
-                        buttonsContainer.appendChild(cancelBtn);
+                        // Aplicar estilo personalizado si se proporciona
+                        if (cancelButtonStyle) {
+                            cancelBtn.style.cssText += cancelButtonStyle;
+                        }
 
                         okBtn = createButton({
                             text: okText,
@@ -425,23 +446,35 @@ document.addEventListener('DOMContentLoaded', () => {
                             size: 'large',
                             onClick: () => {
                                 cleanup();
-                                resolve(true);
+                                resolve(type === 'prompt' ? inputEl?.value : true);
                             }
                         });
                         okBtn.id = `${id}-ok-btn`;
                         okBtn.className = 'modal-delete-session-ok-btn';
                         okBtn.style.fontSize = '1.2rem';
-                        okBtn.style.padding = '16px 20px';
+                        okBtn.style.padding = '5px 5px';
                         okBtn.style.flex = '1';
                         if (okBtn.querySelector('svg')) {
                             okBtn.querySelector('svg').style.width = '24px';
                             okBtn.querySelector('svg').style.height = '24px';
                         }
-                        buttonsContainer.appendChild(okBtn);
+                        // Aplicar estilo personalizado si se proporciona
+                        if (okButtonStyle) {
+                            okBtn.style.cssText += okButtonStyle;
+                        }
+                        
+                        // Añadir botones en el orden correcto
+                        if (reverseButtons) {
+                            buttonsContainer.appendChild(okBtn);
+                            buttonsContainer.appendChild(cancelBtn);
+                        } else {
+                            buttonsContainer.appendChild(cancelBtn);
+                            buttonsContainer.appendChild(okBtn);
+                        }
                     } else {
                         // Para modal de guardar sesión: orden vertical OK - CONTINUAR - CANCEL
                         okBtn = createButton({
-                            text: isSaveSessionModal ? 'GUARDAR SESSIÓ' : okText,
+                            text: isSaveSessionModal ? ' \nGUARDAR SESSIÓ' : okText,
                             icon: checkIcon,
                             variant: 'success',
                             size: 'large',
@@ -452,21 +485,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                         okBtn.id = `${id}-ok-btn`;
                         okBtn.style.width = '100%';
-                        okBtn.style.fontSize = '1.2rem';
-                        okBtn.style.padding = '16px 20px';
+                        okBtn.style.fontSize = '1.05rem';
+                        okBtn.style.padding = '8px 16px';
                         okBtn.style.position = 'relative';
                         okBtn.style.zIndex = '10';
                         okBtn.style.cursor = 'pointer';
                         if (okBtn.querySelector('svg')) {
-                            okBtn.querySelector('svg').style.width = '32px';
-                            okBtn.querySelector('svg').style.height = '32px';
+                            okBtn.querySelector('svg').style.width = '20px';
+                            okBtn.querySelector('svg').style.height = '20px';
                         }
                         buttonsContainer.appendChild(okBtn);
 
                         // Continue button (middle) - only for GUARDAR SESSIÓ modal
                         if (isSaveSessionModal) {
                             const continueBtn = createButton({
-                                text: 'CONTINUAR GRABACIÓN',
+                                text: ' \nCONTINUAR GRAVACIÓ',
                                 icon: clockIcon,
                                 variant: 'info',
                                 size: 'large',
@@ -481,11 +514,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             });
                             continueBtn.id = `${id}-continue-btn`;
                             continueBtn.style.width = '100%';
-                            continueBtn.style.fontSize = '1.2rem';
-                            continueBtn.style.padding = '16px 20px';
+                            continueBtn.style.fontSize = '1.05rem';
+                            continueBtn.style.padding = '8px 16px';
                             if (continueBtn.querySelector('svg')) {
-                                continueBtn.querySelector('svg').style.width = '32px';
-                                continueBtn.querySelector('svg').style.height = '32px';
+                                continueBtn.querySelector('svg').style.width = '20px';
+                                continueBtn.querySelector('svg').style.height = '20px';
                             }
                             buttonsContainer.appendChild(continueBtn);
                         }
@@ -503,25 +536,26 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                         cancelBtn.id = `${id}-cancel-btn`;
                         cancelBtn.style.width = '100%';
-                        cancelBtn.style.fontSize = '1.2rem';
-                        cancelBtn.style.padding = '16px 20px';
+                        cancelBtn.style.fontSize = '1.05rem';
+                        cancelBtn.style.padding = '8px 16px';
                         if (cancelBtn.querySelector('svg')) {
-                            cancelBtn.querySelector('svg').style.width = '32px';
-                            cancelBtn.querySelector('svg').style.height = '32px';
+                            cancelBtn.querySelector('svg').style.width = '20px';
+                            cancelBtn.querySelector('svg').style.height = '20px';
                         }
                         // subtitle under cancel - only for GUARDAR SESSIÓ modal
                         if (isSaveSessionModal) {
                             try {
                                 const subtitle = document.createElement('div');
                                 subtitle.id = `${id}-cancel-subtitle`;
-                                subtitle.textContent = '(CANCELAR Y EMPEZAR NUEVA GRABACIÓN)';
-                                subtitle.style.fontSize = '0.9rem';
-                                subtitle.style.opacity = '.9';
+                                subtitle.textContent = '(CANCEL.LAR LA GRAVACIÓ ACTUAL)';
+                                subtitle.style.fontSize = '0.75rem';
+                                subtitle.style.opacity = '.85';
                                 subtitle.style.fontWeight = '600';
-                                subtitle.style.lineHeight = '1.2';
-                                subtitle.style.marginTop = '-2px';
+                                subtitle.style.lineHeight = '1.1';
+                                subtitle.style.marginTop = '2px';
                                 subtitle.style.textAlign = 'center';
                                 cancelBtn.style.flexDirection = 'column';
+                                cancelBtn.style.gap = '2px';
                                 cancelBtn.appendChild(subtitle);
                             } catch {}
                         }
@@ -596,6 +630,1020 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // Función para mostrar modal de edición de tiempo con spinwheels
+    const showEditTimeModal = (currentTime, lapIndex, allLaps) => {
+        return new Promise((resolve) => {
+            try {
+                // Parsear el tiempo actual
+                const hours = currentTime.getHours();
+                const minutes = currentTime.getMinutes();
+                const seconds = currentTime.getSeconds();
+                const milliseconds = currentTime.getMilliseconds();
+                
+                // Obtener tiempos de vueltas anterior y posterior para validación
+                const previousLapTime = lapIndex > 0 ? allLaps[lapIndex - 1].time : null;
+                const nextLapTime = lapIndex < allLaps.length - 1 ? allLaps[lapIndex + 1].time : null;
+
+                // Crear overlay
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    background: rgba(0,0,0,0.75);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 9999;
+                    padding: 20px;
+                    box-sizing: border-box;
+                    backdrop-filter: blur(4px);
+                `;
+
+                // Crear modal
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    background: var(--card-bg-color);
+                    border-radius: 12px;
+                    padding: 24px;
+                    max-width: 500px;
+                    width: 95vw;
+                    border: 1px solid var(--accent-color);
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                `;
+
+                // Título
+                const title = document.createElement('h2');
+                title.textContent = 'EDITAR TEMPS';
+                title.style.cssText = `
+                    margin: 0;
+                    color: var(--primary-color);
+                    font-size: 1.8rem;
+                    font-weight: 700;
+                    text-align: center;
+                `;
+
+                // Mostrar tiempo actual formateado
+                const currentTimeContainer = document.createElement('div');
+                currentTimeContainer.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 12px;
+                    padding: 10px;
+                    background: rgba(0,170,255,0.1);
+                    border-radius: 8px;
+                    border: 1px solid var(--accent-color);
+                `;
+                
+                const currentTimeLabel = document.createElement('div');
+                currentTimeLabel.textContent = 'VALOR ACTUAL:';
+                currentTimeLabel.style.cssText = `
+                    color: white;
+                    font-size: 1.2rem;
+                    font-weight: 700;
+                `;
+                
+                const currentTimeDisplay = document.createElement('div');
+                currentTimeDisplay.style.cssText = `
+                    font-size: 2.5rem;
+                    color: var(--accent-color);
+                    font-weight: 600;
+                `;
+                // Formatear el tiempo manualmente para evitar HTML escapado
+                const h = String(hours).padStart(2, '0');
+                const m = String(minutes).padStart(2, '0');
+                const s = String(seconds).padStart(2, '0');
+                const ms = String(milliseconds).padStart(3, '0');
+                currentTimeDisplay.textContent = `${h}:${m}:${s}.${ms}`;
+                
+                currentTimeContainer.appendChild(currentTimeLabel);
+                currentTimeContainer.appendChild(currentTimeDisplay);
+
+                // Variable para callback de validación
+                let validationCallback = null;
+
+                // Crear función para crear spinwheel
+                const createSpinwheel = (label, value, max, digits = 2) => {
+                    const container = document.createElement('div');
+                    container.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        gap: 8px;
+                        flex: 1;
+                    `;
+
+                    const labelEl = document.createElement('label');
+                    labelEl.textContent = label;
+                    labelEl.style.cssText = `
+                        color: white;
+                        font-size: 1.2rem;
+                        font-weight: 700;
+                    `;
+
+                    const spinContainer = document.createElement('div');
+                    spinContainer.style.cssText = `
+                        position: relative;
+                        width: 100%;
+                        height: 150px;
+                        overflow: hidden;
+                        border: 2px solid var(--accent-color);
+                        border-radius: 8px;
+                        background: #1a1a1a;
+                    `;
+
+                    // Indicador central
+                    const indicator = document.createElement('div');
+                    indicator.style.cssText = `
+                        position: absolute;
+                        top: 50%;
+                        left: 0;
+                        right: 0;
+                        height: 50px;
+                        transform: translateY(-50%);
+                        background: rgba(0,170,255,0.2);
+                        border-top: 2px solid var(--accent-color);
+                        border-bottom: 2px solid var(--accent-color);
+                        pointer-events: none;
+                        z-index: 1;
+                    `;
+
+                    const itemsContainer = document.createElement('div');
+                    itemsContainer.style.cssText = `
+                        position: absolute;
+                        width: 100%;
+                        transition: transform 0.3s ease;
+                    `;
+
+                    // Crear opciones (añadir opciones antes y después para efecto circular)
+                    const items = [];
+                    for (let i = 0; i <= max; i++) {
+                        const item = document.createElement('div');
+                        item.textContent = String(i).padStart(digits, '0');
+                        item.dataset.value = i;
+                        item.style.cssText = `
+                            height: 50px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: var(--secondary-color);
+                            font-size: 1.8rem;
+                            font-weight: 600;
+                            cursor: pointer;
+                            user-select: none;
+                        `;
+                        items.push(item);
+                        itemsContainer.appendChild(item);
+                    }
+
+                    let currentValue = value;
+                    let startY = 0;
+                    let startTransform = 0;
+
+                    const updatePosition = (value) => {
+                        currentValue = Math.max(0, Math.min(max, value));
+                        const translateY = 50 - (currentValue * 50);
+                        itemsContainer.style.transform = `translateY(${translateY}px)`;
+                        
+                        // Actualizar estilos de items
+                        items.forEach((item, idx) => {
+                            if (idx === currentValue) {
+                                item.style.color = 'white';
+                                item.style.fontSize = '2rem';
+                            } else {
+                                item.style.color = 'var(--secondary-color)';
+                                item.style.fontSize = '1.8rem';
+                            }
+                        });
+                        
+                        // Llamar al callback de validación si existe
+                        if (validationCallback) {
+                            validationCallback();
+                        }
+                    };
+
+                    // Touch events
+                    spinContainer.addEventListener('touchstart', (e) => {
+                        startY = e.touches[0].clientY;
+                        const transform = itemsContainer.style.transform;
+                        startTransform = transform ? parseInt(transform.match(/-?\d+/)[0]) : 0;
+                        itemsContainer.style.transition = 'none';
+                    });
+
+                    spinContainer.addEventListener('touchmove', (e) => {
+                        e.preventDefault();
+                        const deltaY = e.touches[0].clientY - startY;
+                        const newTransform = startTransform + deltaY;
+                        itemsContainer.style.transform = `translateY(${newTransform}px)`;
+                    });
+
+                    spinContainer.addEventListener('touchend', (e) => {
+                        itemsContainer.style.transition = 'transform 0.3s ease';
+                        const transform = itemsContainer.style.transform;
+                        const currentTransform = transform ? parseInt(transform.match(/-?\d+/)[0]) : 0;
+                        const newValue = Math.round((50 - currentTransform) / 50);
+                        updatePosition(newValue);
+                    });
+
+                    // Mouse events
+                    let isDragging = false;
+                    spinContainer.addEventListener('mousedown', (e) => {
+                        isDragging = true;
+                        startY = e.clientY;
+                        const transform = itemsContainer.style.transform;
+                        startTransform = transform ? parseInt(transform.match(/-?\d+/)[0]) : 0;
+                        itemsContainer.style.transition = 'none';
+                    });
+
+                    document.addEventListener('mousemove', (e) => {
+                        if (!isDragging) return;
+                        e.preventDefault();
+                        const deltaY = e.clientY - startY;
+                        const newTransform = startTransform + deltaY;
+                        itemsContainer.style.transform = `translateY(${newTransform}px)`;
+                    });
+
+                    document.addEventListener('mouseup', () => {
+                        if (!isDragging) return;
+                        isDragging = false;
+                        itemsContainer.style.transition = 'transform 0.3s ease';
+                        const transform = itemsContainer.style.transform;
+                        const currentTransform = transform ? parseInt(transform.match(/-?\d+/)[0]) : 0;
+                        const newValue = Math.round((50 - currentTransform) / 50);
+                        updatePosition(newValue);
+                    });
+
+                    // Click en items
+                    items.forEach((item, idx) => {
+                        item.addEventListener('click', () => {
+                            updatePosition(idx);
+                        });
+                    });
+
+                    updatePosition(value);
+
+                    spinContainer.appendChild(indicator);
+                    spinContainer.appendChild(itemsContainer);
+                    container.appendChild(labelEl);
+                    container.appendChild(spinContainer);
+
+                    return { container, getValue: () => currentValue };
+                };
+
+                // Crear spinwheels
+                const spinwheelsContainer = document.createElement('div');
+                spinwheelsContainer.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
+                `;
+
+                const hourSpinner = createSpinwheel('HH', hours, 23, 2);
+                const minuteSpinner = createSpinwheel('MM', minutes, 59, 2);
+                const secondSpinner = createSpinwheel('SS', seconds, 59, 2);
+                
+                // Declarar validateBtn aquí para que sea accesible en validateTime
+                let validateBtn;
+
+                // Función para crear separador ":"
+                const createSeparator = () => {
+                    const sep = document.createElement('div');
+                    sep.textContent = ':';
+                    sep.style.cssText = `
+                        color: white;
+                        font-size: 3rem;
+                        font-weight: 700;
+                        padding-top: 35px;
+                    `;
+                    return sep;
+                };
+
+                spinwheelsContainer.appendChild(hourSpinner.container);
+                spinwheelsContainer.appendChild(createSeparator());
+                spinwheelsContainer.appendChild(minuteSpinner.container);
+                spinwheelsContainer.appendChild(createSeparator());
+                spinwheelsContainer.appendChild(secondSpinner.container);
+
+                // Mensaje de validación (inicialmente oculto)
+                const validationMessage = document.createElement('div');
+                validationMessage.style.cssText = `
+                    display: none;
+                    color: #f44336;
+                    background: rgba(244, 67, 54, 0.1);
+                    border: 2px solid #f44336;
+                    border-radius: 8px;
+                    padding: 12px;
+                    margin-top: 15px;
+                    text-align: center;
+                    font-size: 1.1rem;
+                    font-weight: 700;
+                `;
+
+                // Función de validación
+                const validateTime = () => {
+                    const selectedTime = new Date(currentTime);
+                    selectedTime.setHours(hourSpinner.getValue());
+                    selectedTime.setMinutes(minuteSpinner.getValue());
+                    selectedTime.setSeconds(secondSpinner.getValue());
+                    selectedTime.setMilliseconds(0);
+
+                    let isValid = true;
+                    let errorMsg = '';
+
+                    // Verificar con vuelta anterior
+                    if (previousLapTime) {
+                        const prevTime = (previousLapTime instanceof Date) ? previousLapTime : new Date(previousLapTime);
+                        if (selectedTime <= prevTime) {
+                            isValid = false;
+                            errorMsg = 'SELECCIÓ INVÀLIDA, es solapa amb la volta anterior';
+                        }
+                    }
+
+                    // Verificar con vuelta posterior
+                    if (isValid && nextLapTime) {
+                        const nextTime = (nextLapTime instanceof Date) ? nextLapTime : new Date(nextLapTime);
+                        if (selectedTime >= nextTime) {
+                            isValid = false;
+                            errorMsg = 'SELECCIÓ INVÀLIDA, es solapa amb la volta posterior';
+                        }
+                    }
+
+                    // Actualizar UI según validación
+                    if (isValid) {
+                        validationMessage.style.display = 'none';
+                        if (validateBtn) {
+                            validateBtn.disabled = false;
+                            validateBtn.style.opacity = '1';
+                            validateBtn.style.cursor = 'pointer';
+                        }
+                    } else {
+                        validationMessage.textContent = errorMsg;
+                        validationMessage.style.display = 'block';
+                        if (validateBtn) {
+                            validateBtn.disabled = true;
+                            validateBtn.style.opacity = '0.5';
+                            validateBtn.style.cursor = 'not-allowed';
+                        }
+                    }
+
+                    return isValid;
+                };
+                
+                // Asignar callback de validación
+                validationCallback = validateTime;
+
+                // Botones
+                const buttonsContainer = document.createElement('div');
+                buttonsContainer.style.cssText = `
+                    display: flex;
+                    gap: 16px;
+                    margin-top: 10px;
+                `;
+
+                // Botón CANCELAR (izquierda, rojo, X)
+                const cancelBtn = document.createElement('button');
+                cancelBtn.innerHTML = `${xIcon} CANCELAR`;
+                cancelBtn.style.cssText = `
+                    flex: 1;
+                    padding: 16px 20px;
+                    font-size: 1.2rem;
+                    font-weight: 700;
+                    border-radius: 8px;
+                    border: 1px solid #f44336;
+                    background: #f44336;
+                    color: white;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    transition: all 0.2s;
+                `;
+                cancelBtn.addEventListener('mouseover', () => {
+                    cancelBtn.style.background = '#d32f2f';
+                });
+                cancelBtn.addEventListener('mouseout', () => {
+                    cancelBtn.style.background = '#f44336';
+                });
+                cancelBtn.addEventListener('click', () => {
+                    cleanup();
+                    resolve(null);
+                });
+
+                // Botón VALIDAR (derecha, verde, CHECK)
+                validateBtn = document.createElement('button');
+                validateBtn.innerHTML = `${checkIcon} VALIDAR`;
+                validateBtn.style.cssText = `
+                    flex: 1;
+                    padding: 16px 20px;
+                    font-size: 1.2rem;
+                    font-weight: 700;
+                    border-radius: 8px;
+                    border: 1px solid #4CAF50;
+                    background: #4CAF50;
+                    color: white;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    transition: all 0.2s;
+                `;
+                validateBtn.addEventListener('mouseover', () => {
+                    if (!validateBtn.disabled) {
+                        validateBtn.style.background = '#45a049';
+                    }
+                });
+                validateBtn.addEventListener('mouseout', () => {
+                    if (!validateBtn.disabled) {
+                        validateBtn.style.background = '#4CAF50';
+                    }
+                });
+                validateBtn.addEventListener('click', () => {
+                    if (validateTime()) {
+                        const newTime = new Date(currentTime);
+                        newTime.setHours(hourSpinner.getValue());
+                        newTime.setMinutes(minuteSpinner.getValue());
+                        newTime.setSeconds(secondSpinner.getValue());
+                        newTime.setMilliseconds(0); // Siempre poner milisegundos a 000
+                        cleanup();
+                        resolve(newTime);
+                    }
+                });
+
+                buttonsContainer.appendChild(cancelBtn);
+                buttonsContainer.appendChild(validateBtn);
+
+                // Ensamblar modal
+                modal.appendChild(title);
+                modal.appendChild(currentTimeContainer);
+                modal.appendChild(spinwheelsContainer);
+                modal.appendChild(validationMessage);
+                modal.appendChild(buttonsContainer);
+                overlay.appendChild(modal);
+                
+                // Realizar validación inicial
+                validateTime();
+
+                // Manejar ESC
+                const onKey = (e) => {
+                    if (e.key === 'Escape') {
+                        cleanup();
+                        resolve(null);
+                    }
+                };
+                
+                // Función de limpieza
+                const cleanup = () => {
+                    document.removeEventListener('keydown', onKey);
+                    overlay.remove();
+                    document.body.style.overflow = originalOverflow;
+                };
+
+                document.addEventListener('keydown', onKey);
+                
+                const originalOverflow = document.body.style.overflow;
+                document.body.style.overflow = 'hidden';
+                document.body.appendChild(overlay);
+
+            } catch (err) {
+                resolve(null);
+            }
+        });
+    };
+
+    // Función para mostrar modal de añadir vuelta entre dos existentes
+    const showAddLapBetweenModal = (previousLapTime, nextLapTime, isLastLap = false) => {
+        return new Promise((resolve) => {
+            try {
+                // Calcular un tiempo inicial en el medio de las dos vueltas
+                const prevTime = (previousLapTime instanceof Date) ? previousLapTime : new Date(previousLapTime);
+                const nextTime = (nextLapTime instanceof Date) ? nextLapTime : new Date(nextLapTime);
+                
+                // Si es la última vuelta, usar la misma hora que la anterior como inicial
+                const middleTime = isLastLap ? new Date(prevTime.getTime()) : new Date((prevTime.getTime() + nextTime.getTime()) / 2);
+                
+                const hours = middleTime.getHours();
+                const minutes = middleTime.getMinutes();
+                const seconds = middleTime.getSeconds();
+
+                // Crear overlay
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    background: rgba(0,0,0,0.75);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 9999;
+                    padding: 20px;
+                    box-sizing: border-box;
+                    backdrop-filter: blur(4px);
+                `;
+
+                // Crear modal
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    background: var(--card-bg-color);
+                    border-radius: 12px;
+                    padding: 24px;
+                    max-width: 500px;
+                    width: 95vw;
+                    border: 1px solid var(--accent-color);
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                `;
+
+                // Título
+                const title = document.createElement('h2');
+                title.textContent = 'AFEGIR VOLTA';
+                title.style.cssText = `
+                    margin: 0;
+                    color: var(--primary-color);
+                    font-size: 1.8rem;
+                    font-weight: 700;
+                    text-align: center;
+                `;
+
+                // Mostrar tiempos de referencia
+                const referenceContainer = document.createElement('div');
+                referenceContainer.style.cssText = `
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                    padding: 10px;
+                    background: rgba(0,170,255,0.1);
+                    border-radius: 8px;
+                    border: 1px solid var(--accent-color);
+                `;
+
+                const prevTimeContainer = document.createElement('div');
+                prevTimeContainer.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                `;
+                
+                const prevLabel = document.createElement('div');
+                prevLabel.textContent = 'VOLTA ANTERIOR:';
+                prevLabel.style.cssText = `
+                    color: white;
+                    font-size: 1.1rem;
+                    font-weight: 700;
+                `;
+                
+                const prevTimeDisplay = document.createElement('div');
+                prevTimeDisplay.style.cssText = `
+                    font-size: 1.5rem;
+                    color: var(--accent-color);
+                    font-weight: 600;
+                `;
+                const prevH = String(prevTime.getHours()).padStart(2, '0');
+                const prevM = String(prevTime.getMinutes()).padStart(2, '0');
+                const prevS = String(prevTime.getSeconds()).padStart(2, '0');
+                const prevMs = String(prevTime.getMilliseconds()).padStart(3, '0');
+                prevTimeDisplay.textContent = `${prevH}:${prevM}:${prevS}.${prevMs}`;
+                
+                prevTimeContainer.appendChild(prevLabel);
+                prevTimeContainer.appendChild(prevTimeDisplay);
+
+                referenceContainer.appendChild(prevTimeContainer);
+                
+                // Solo mostrar la volta posterior si NO es la última vuelta
+                if (!isLastLap) {
+                    const nextTimeContainer = document.createElement('div');
+                    nextTimeContainer.style.cssText = `
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                    `;
+                    
+                    const nextLabel = document.createElement('div');
+                    nextLabel.textContent = 'VOLTA POSTERIOR:';
+                    nextLabel.style.cssText = `
+                        color: white;
+                        font-size: 1.1rem;
+                        font-weight: 700;
+                    `;
+                    
+                    const nextTimeDisplay = document.createElement('div');
+                    nextTimeDisplay.style.cssText = `
+                        font-size: 1.5rem;
+                        color: var(--accent-color);
+                        font-weight: 600;
+                    `;
+                    const nextH = String(nextTime.getHours()).padStart(2, '0');
+                    const nextM = String(nextTime.getMinutes()).padStart(2, '0');
+                    const nextS = String(nextTime.getSeconds()).padStart(2, '0');
+                    const nextMs = String(nextTime.getMilliseconds()).padStart(3, '0');
+                    nextTimeDisplay.textContent = `${nextH}:${nextM}:${nextS}.${nextMs}`;
+                    
+                    nextTimeContainer.appendChild(nextLabel);
+                    nextTimeContainer.appendChild(nextTimeDisplay);
+                    
+                    referenceContainer.appendChild(nextTimeContainer);
+                }
+
+                // Variable para callback de validación
+                let validationCallback = null;
+
+                // Crear función para crear spinwheel (misma que en showEditTimeModal)
+                const createSpinwheel = (label, value, max, digits = 2) => {
+                    const container = document.createElement('div');
+                    container.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        gap: 8px;
+                        flex: 1;
+                    `;
+
+                    const labelEl = document.createElement('label');
+                    labelEl.textContent = label;
+                    labelEl.style.cssText = `
+                        color: white;
+                        font-size: 1.2rem;
+                        font-weight: 700;
+                    `;
+
+                    const spinContainer = document.createElement('div');
+                    spinContainer.style.cssText = `
+                        position: relative;
+                        width: 100%;
+                        height: 150px;
+                        overflow: hidden;
+                        border: 2px solid var(--accent-color);
+                        border-radius: 8px;
+                        background: #1a1a1a;
+                    `;
+
+                    // Indicador central
+                    const indicator = document.createElement('div');
+                    indicator.style.cssText = `
+                        position: absolute;
+                        top: 50%;
+                        left: 0;
+                        right: 0;
+                        height: 50px;
+                        transform: translateY(-50%);
+                        background: rgba(0,170,255,0.2);
+                        border-top: 2px solid var(--accent-color);
+                        border-bottom: 2px solid var(--accent-color);
+                        pointer-events: none;
+                        z-index: 1;
+                    `;
+
+                    const itemsContainer = document.createElement('div');
+                    itemsContainer.style.cssText = `
+                        position: absolute;
+                        width: 100%;
+                        transition: transform 0.3s ease;
+                    `;
+
+                    // Crear opciones
+                    const items = [];
+                    for (let i = 0; i <= max; i++) {
+                        const item = document.createElement('div');
+                        item.textContent = String(i).padStart(digits, '0');
+                        item.dataset.value = i;
+                        item.style.cssText = `
+                            height: 50px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: var(--secondary-color);
+                            font-size: 1.8rem;
+                            font-weight: 600;
+                            cursor: pointer;
+                            user-select: none;
+                        `;
+                        items.push(item);
+                        itemsContainer.appendChild(item);
+                    }
+
+                    let currentValue = value;
+                    let startY = 0;
+                    let startTransform = 0;
+
+                    const updatePosition = (value) => {
+                        currentValue = Math.max(0, Math.min(max, value));
+                        const translateY = 50 - (currentValue * 50);
+                        itemsContainer.style.transform = `translateY(${translateY}px)`;
+                        
+                        // Actualizar estilos de items
+                        items.forEach((item, idx) => {
+                            if (idx === currentValue) {
+                                item.style.color = 'white';
+                                item.style.fontSize = '2rem';
+                            } else {
+                                item.style.color = 'var(--secondary-color)';
+                                item.style.fontSize = '1.8rem';
+                            }
+                        });
+                        
+                        // Llamar al callback de validación si existe
+                        if (validationCallback) {
+                            validationCallback();
+                        }
+                    };
+
+                    // Touch events
+                    spinContainer.addEventListener('touchstart', (e) => {
+                        startY = e.touches[0].clientY;
+                        const transform = itemsContainer.style.transform;
+                        startTransform = transform ? parseInt(transform.match(/-?\d+/)[0]) : 0;
+                        itemsContainer.style.transition = 'none';
+                    });
+
+                    spinContainer.addEventListener('touchmove', (e) => {
+                        e.preventDefault();
+                        const deltaY = e.touches[0].clientY - startY;
+                        const newTransform = startTransform + deltaY;
+                        itemsContainer.style.transform = `translateY(${newTransform}px)`;
+                    });
+
+                    spinContainer.addEventListener('touchend', (e) => {
+                        itemsContainer.style.transition = 'transform 0.3s ease';
+                        const transform = itemsContainer.style.transform;
+                        const currentTransform = transform ? parseInt(transform.match(/-?\d+/)[0]) : 0;
+                        const newValue = Math.round((50 - currentTransform) / 50);
+                        updatePosition(newValue);
+                    });
+
+                    // Mouse events
+                    let isDragging = false;
+                    spinContainer.addEventListener('mousedown', (e) => {
+                        isDragging = true;
+                        startY = e.clientY;
+                        const transform = itemsContainer.style.transform;
+                        startTransform = transform ? parseInt(transform.match(/-?\d+/)[0]) : 0;
+                        itemsContainer.style.transition = 'none';
+                    });
+
+                    document.addEventListener('mousemove', (e) => {
+                        if (!isDragging) return;
+                        e.preventDefault();
+                        const deltaY = e.clientY - startY;
+                        const newTransform = startTransform + deltaY;
+                        itemsContainer.style.transform = `translateY(${newTransform}px)`;
+                    });
+
+                    document.addEventListener('mouseup', () => {
+                        if (!isDragging) return;
+                        isDragging = false;
+                        itemsContainer.style.transition = 'transform 0.3s ease';
+                        const transform = itemsContainer.style.transform;
+                        const currentTransform = transform ? parseInt(transform.match(/-?\d+/)[0]) : 0;
+                        const newValue = Math.round((50 - currentTransform) / 50);
+                        updatePosition(newValue);
+                    });
+
+                    // Click en items
+                    items.forEach((item, idx) => {
+                        item.addEventListener('click', () => {
+                            updatePosition(idx);
+                        });
+                    });
+
+                    updatePosition(value);
+
+                    spinContainer.appendChild(indicator);
+                    spinContainer.appendChild(itemsContainer);
+                    container.appendChild(labelEl);
+                    container.appendChild(spinContainer);
+
+                    return { container, getValue: () => currentValue };
+                };
+
+                // Crear spinwheels
+                const spinwheelsContainer = document.createElement('div');
+                spinwheelsContainer.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
+                `;
+
+                const hourSpinner = createSpinwheel('HH', hours, 23, 2);
+                const minuteSpinner = createSpinwheel('MM', minutes, 59, 2);
+                const secondSpinner = createSpinwheel('SS', seconds, 59, 2);
+                
+                // Declarar validateBtn aquí
+                let validateBtn;
+
+                // Función para crear separador ":"
+                const createSeparator = () => {
+                    const sep = document.createElement('div');
+                    sep.textContent = ':';
+                    sep.style.cssText = `
+                        color: white;
+                        font-size: 3rem;
+                        font-weight: 700;
+                        padding-top: 35px;
+                    `;
+                    return sep;
+                };
+
+                spinwheelsContainer.appendChild(hourSpinner.container);
+                spinwheelsContainer.appendChild(createSeparator());
+                spinwheelsContainer.appendChild(minuteSpinner.container);
+                spinwheelsContainer.appendChild(createSeparator());
+                spinwheelsContainer.appendChild(secondSpinner.container);
+
+                // Mensaje de validación
+                const validationMessage = document.createElement('div');
+                validationMessage.style.cssText = `
+                    display: none;
+                    color: #f44336;
+                    background: rgba(244, 67, 54, 0.1);
+                    border: 2px solid #f44336;
+                    border-radius: 8px;
+                    padding: 12px;
+                    margin-top: 15px;
+                    text-align: center;
+                    font-size: 1.1rem;
+                    font-weight: 700;
+                `;
+
+                // Función de validación
+                const validateTime = () => {
+                    const selectedTime = new Date(middleTime);
+                    selectedTime.setHours(hourSpinner.getValue());
+                    selectedTime.setMinutes(minuteSpinner.getValue());
+                    selectedTime.setSeconds(secondSpinner.getValue());
+                    selectedTime.setMilliseconds(0);
+
+                    let isValid = true;
+                    let errorMsg = '';
+
+                    // Verificar que sea posterior a la vuelta anterior
+                    if (selectedTime <= prevTime) {
+                        isValid = false;
+                        errorMsg = 'SELECCIÓ INVÀLIDA, ha de ser posterior a la volta anterior';
+                    } 
+                    // Solo verificar límite superior si NO es la última vuelta
+                    else if (!isLastLap && selectedTime >= nextTime) {
+                        isValid = false;
+                        errorMsg = 'SELECCIÓ INVÀLIDA, ha de ser anterior a la volta posterior';
+                    }
+
+                    // Actualizar UI según validación
+                    if (isValid) {
+                        validationMessage.style.display = 'none';
+                        if (validateBtn) {
+                            validateBtn.disabled = false;
+                            validateBtn.style.opacity = '1';
+                            validateBtn.style.cursor = 'pointer';
+                        }
+                    } else {
+                        validationMessage.textContent = errorMsg;
+                        validationMessage.style.display = 'block';
+                        if (validateBtn) {
+                            validateBtn.disabled = true;
+                            validateBtn.style.opacity = '0.5';
+                            validateBtn.style.cursor = 'not-allowed';
+                        }
+                    }
+
+                    return isValid;
+                };
+                
+                // Asignar callback de validación
+                validationCallback = validateTime;
+
+                // Botones
+                const buttonsContainer = document.createElement('div');
+                buttonsContainer.style.cssText = `
+                    display: flex;
+                    gap: 16px;
+                    margin-top: 10px;
+                `;
+
+                // Botón CANCELAR
+                const cancelBtn = document.createElement('button');
+                cancelBtn.innerHTML = `${xIcon} CANCELAR`;
+                cancelBtn.style.cssText = `
+                    flex: 1;
+                    padding: 16px 20px;
+                    font-size: 1.2rem;
+                    font-weight: 700;
+                    border-radius: 8px;
+                    border: 1px solid #f44336;
+                    background: #f44336;
+                    color: white;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    transition: all 0.2s;
+                `;
+                cancelBtn.addEventListener('mouseover', () => {
+                    cancelBtn.style.background = '#d32f2f';
+                });
+                cancelBtn.addEventListener('mouseout', () => {
+                    cancelBtn.style.background = '#f44336';
+                });
+                cancelBtn.addEventListener('click', () => {
+                    cleanup();
+                    resolve(null);
+                });
+
+                // Botón AFEGIR
+                validateBtn = document.createElement('button');
+                validateBtn.innerHTML = `${checkIcon} AFEGIR`;
+                validateBtn.style.cssText = `
+                    flex: 1;
+                    padding: 16px 20px;
+                    font-size: 1.2rem;
+                    font-weight: 700;
+                    border-radius: 8px;
+                    border: 1px solid #4CAF50;
+                    background: #4CAF50;
+                    color: white;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    transition: all 0.2s;
+                `;
+                validateBtn.addEventListener('mouseover', () => {
+                    if (!validateBtn.disabled) {
+                        validateBtn.style.background = '#45a049';
+                    }
+                });
+                validateBtn.addEventListener('mouseout', () => {
+                    if (!validateBtn.disabled) {
+                        validateBtn.style.background = '#4CAF50';
+                    }
+                });
+                validateBtn.addEventListener('click', () => {
+                    if (validateTime()) {
+                        const newTime = new Date(middleTime);
+                        newTime.setHours(hourSpinner.getValue());
+                        newTime.setMinutes(minuteSpinner.getValue());
+                        newTime.setSeconds(secondSpinner.getValue());
+                        newTime.setMilliseconds(0);
+                        cleanup();
+                        resolve(newTime);
+                    }
+                });
+
+                buttonsContainer.appendChild(cancelBtn);
+                buttonsContainer.appendChild(validateBtn);
+
+                // Ensamblar modal
+                modal.appendChild(title);
+                modal.appendChild(referenceContainer);
+                modal.appendChild(spinwheelsContainer);
+                modal.appendChild(validationMessage);
+                modal.appendChild(buttonsContainer);
+                overlay.appendChild(modal);
+                
+                // Realizar validación inicial
+                validateTime();
+
+                // Manejar ESC
+                const onKey = (e) => {
+                    if (e.key === 'Escape') {
+                        cleanup();
+                        resolve(null);
+                    }
+                };
+                
+                // Función de limpieza
+                const cleanup = () => {
+                    document.removeEventListener('keydown', onKey);
+                    overlay.remove();
+                    document.body.style.overflow = originalOverflow;
+                };
+
+                document.addEventListener('keydown', onKey);
+                
+                const originalOverflow = document.body.style.overflow;
+                document.body.style.overflow = 'hidden';
+                document.body.appendChild(overlay);
+
+            } catch (err) {
+                resolve(null);
+            }
+        });
+    };
+
     const formatDate = (date) => {
         const days = ['Diumenge', 'Dilluns', 'Dimarts', 'Dimecres', 'Dijous', 'Divendres', 'Dissabte'];
         const months = ['Gener', 'Febrer', 'Març', 'Abril', 'Maig', 'Juny', 'Juliol', 'Agost', 'Setembre', 'Octubre', 'Novembre', 'Desembre'];
@@ -625,10 +1673,10 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.type = 'button';
         btn.className = className;
 
-        // Set content with icon above text
+        // Set content with icon next to text (horizontal)
         if (icon && text) {
-            btn.innerHTML = `${icon}<br>${text}`;
-            btn.style.flexDirection = 'column';
+            btn.innerHTML = `${icon} ${text}`;
+            btn.style.flexDirection = 'row';
             btn.style.gap = '4px';
         } else if (icon) {
             btn.innerHTML = icon;
@@ -648,7 +1696,7 @@ document.addEventListener('DOMContentLoaded', () => {
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px',
+            gap: '4px',
             fontWeight: '700' // Más grueso para modales
         };
 
@@ -683,7 +1731,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sizeStyles = {
             small: { padding: '6px 10px', fontSize: '0.9rem' },
             medium: { padding: '8px 16px', fontSize: '1rem' },
-            large: { padding: '12px 24px', fontSize: '1.1rem' }
+            large: { padding: '8px 16px', fontSize: '1.05rem' }
         };
 
         Object.assign(btn.style, baseStyles, variantStyles[variant], sizeStyles[size]);
@@ -887,9 +1935,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetAppState = () => {
         // Limpiar estado de la aplicación
         laps = [];
+        appState.laps = laps; // Sincronizar con appState
         isRecording = false;
+        appState.isRecording = false; // Sincronizar con appState
         recordingName = 'SessióSenseNom';
+        appState.recordingName = recordingName; // Sincronizar con appState
         sessionDirty = false;
+        appState.sessionDirty = false; // Sincronizar con appState
         pendingRename = null;
 
         // Detener actualizaciones
@@ -935,7 +1987,7 @@ document.addEventListener('DOMContentLoaded', () => {
         finalizeBtn.style.display = '';
         finalizeBtn.style.alignItems = '';
         finalizeBtn.style.justifyContent = '';
-        finalizeBtn.style.height = '64px';
+        finalizeBtn.style.height = 'auto';
         finalizeBtn.style.borderRadius = '';
         finalizeBtn.style.border = '';
         finalizeBtn.style.backgroundColor = '';
@@ -1047,15 +2099,45 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isViewingSession) {
             // Si estamos viendo una sesión guardada, ir directamente al listado
             await closeSessionView(false);
-            sessionsView.style.display = 'block';
             registrationView.style.display = 'none';
+            // Forzar visibilidad y estilos flexbox correctos
+            sessionsView.style.setProperty('display', 'flex', 'important');
+            sessionsView.style.flexDirection = 'column';
+            sessionsView.style.flex = '1 1 auto';
+            sessionsView.style.minHeight = '0';
+            sessionsView.style.overflow = 'hidden';
+            sessionsContainer.style.display = 'flex';
+            sessionsContainer.style.flexDirection = 'column';
+            sessionsContainer.style.flex = '1 1 0';
+            sessionsContainer.style.minHeight = '0';
+            sessionsContainer.style.overflow = 'hidden';
+            sessionsList.style.display = 'flex';
+            sessionsList.style.flexDirection = 'column';
+            sessionsList.style.flex = '1 1 0';
+            sessionsList.style.minHeight = '0';
+            sessionsList.style.overflowY = 'auto';
             updateToggleViewBtnLabel();
             renderSessions();
         } else if (isReadOnly) {
             // En mode lectura, tancar vista de sessió amb confirmació i anar a sessions
             await closeSessionView(false);
-            sessionsView.style.display = 'block';
             registrationView.style.display = 'none';
+            // Forzar visibilidad y estilos flexbox correctos
+            sessionsView.style.setProperty('display', 'flex', 'important');
+            sessionsView.style.flexDirection = 'column';
+            sessionsView.style.flex = '1 1 auto';
+            sessionsView.style.minHeight = '0';
+            sessionsView.style.overflow = 'hidden';
+            sessionsContainer.style.display = 'flex';
+            sessionsContainer.style.flexDirection = 'column';
+            sessionsContainer.style.flex = '1 1 0';
+            sessionsContainer.style.minHeight = '0';
+            sessionsContainer.style.overflow = 'hidden';
+            sessionsList.style.display = 'flex';
+            sessionsList.style.flexDirection = 'column';
+            sessionsList.style.flex = '1 1 0';
+            sessionsList.style.minHeight = '0';
+            sessionsList.style.overflowY = 'auto';
             updateToggleViewBtnLabel();
             renderSessions();
         } else {
@@ -1076,9 +2158,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 startClock();
                 updateInstructionText();
             } else {
-                sessionsView.style.display = 'block';
                 registrationView.style.display = 'none';
+                // Forzar visibilidad y estilos flexbox correctos
+                sessionsView.style.setProperty('display', 'flex', 'important');
+                sessionsView.style.flexDirection = 'column';
+                sessionsView.style.flex = '1 1 auto';
+                sessionsView.style.minHeight = '0';
+                sessionsView.style.overflow = 'hidden';
+                sessionsContainer.style.display = 'flex';
+                sessionsContainer.style.flexDirection = 'column';
+                sessionsContainer.style.flex = '1 1 0';
+                sessionsContainer.style.minHeight = '0';
+                sessionsContainer.style.overflow = 'hidden';
+                sessionsList.style.display = 'flex';
+                sessionsList.style.flexDirection = 'column';
+                sessionsList.style.flex = '1 1 0';
+                sessionsList.style.minHeight = '0';
+                sessionsList.style.overflowY = 'auto';
                 updateToggleViewBtnLabel();
+                
+                // Renderizar DESPUÉS de aplicar estilos
+                renderSessions();
             }
         }
     };
@@ -1158,6 +2258,70 @@ document.addEventListener('DOMContentLoaded', () => {
             const t = (lap.time instanceof Date) ? lap.time : new Date(lap.time);
             lapTime.innerHTML = formatTime(t);
 
+            // Contenedor para el tiempo con botón de editar
+            const lapTimeContainer = document.createElement('div');
+            lapTimeContainer.style.display = 'flex';
+            lapTimeContainer.style.alignItems = 'center';
+            lapTimeContainer.style.gap = '4px';
+            lapTimeContainer.style.flex = '0 0 auto';
+
+            // Botón de editar tiempo
+            const editTimeBtn = document.createElement('button');
+            editTimeBtn.type = 'button';
+            editTimeBtn.id = `lap-edit-time-btn-${index}`;
+            editTimeBtn.title = 'Editar temps de la volta';
+            editTimeBtn.style.display = 'flex';
+            editTimeBtn.style.alignItems = 'center';
+            editTimeBtn.style.justifyContent = 'center';
+            editTimeBtn.style.padding = '2px';
+            editTimeBtn.style.borderRadius = '4px';
+            editTimeBtn.style.border = '1px solid var(--accent-color)';
+            editTimeBtn.style.background = 'transparent';
+            editTimeBtn.style.color = 'var(--accent-color)';
+            editTimeBtn.style.cursor = 'pointer';
+            editTimeBtn.style.flex = '0 0 auto';
+            editTimeBtn.innerHTML = editTimeIcon;
+            
+            editTimeBtn.addEventListener('click', async () => {
+                // Solo permitir edición en sesión activa o en modo edición
+                if (!isReadOnly || isViewingSession) {
+                    const currentTime = (lap.time instanceof Date) ? lap.time : new Date(lap.time);
+                    const newTime = await showEditTimeModal(currentTime, index, laps);
+                    if (newTime !== null) {
+                        laps[index].time = newTime;
+                        lapTime.innerHTML = formatTime(newTime);
+                        
+                        // Marcar como modificado si estamos viendo una sesión guardada
+                        if (isViewingSession) {
+                            sessionDirty = true;
+                            const saveBtnEnable = document.getElementById('session-save-btn');
+                            if (saveBtnEnable) saveBtnEnable.disabled = false;
+                        }
+                        
+                        // Actualizar vista
+                        renderLaps();
+                        updateSummary();
+                    }
+                }
+            });
+            
+            // Aplicar estilos según el modo
+            if (!isReadOnly || isViewingSession) {
+                // Sesión activa o modo edición: botón activo
+                editTimeBtn.style.cursor = 'pointer';
+                editTimeBtn.style.opacity = '1';
+                editTimeBtn.style.pointerEvents = 'auto';
+            } else {
+                // Modo vista de sesión guardada: botón deshabilitado visualmente
+                editTimeBtn.style.cursor = 'default';
+                editTimeBtn.style.opacity = '0.4';
+                editTimeBtn.style.pointerEvents = 'none';
+            }
+            
+            // Icono a la izquierda del tiempo
+            lapTimeContainer.appendChild(editTimeBtn);
+            lapTimeContainer.appendChild(lapTime);
+
             const lapNameContainer = document.createElement('div');
             lapNameContainer.style.display = 'flex';
             lapNameContainer.style.alignItems = 'center';
@@ -1169,7 +2333,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lapNameInput.type = 'text';
             lapNameInput.id = `lap-name-${index}`;
             lapNameInput.value = lap.name;
-            lapNameInput.style.textAlign = 'center'; // Centrar el texto
+            lapNameInput.style.textAlign = 'left'; // Alinear el texto a la izquierda
             lapNameInput.style.flex = '1'; // Tomar todo el espacio disponible
             lapNameInput.addEventListener('focus', (e) => e.target.select());
             lapNameInput.addEventListener('change', (e) => {
@@ -1181,45 +2345,71 @@ document.addEventListener('DOMContentLoaded', () => {
                 lapNameInput.readOnly = true;
             }
             
-            // Añadir icono de lápiz para editar nombre en modo edición
-            if (isViewingSession) {
-                const editNameBtn = document.createElement('button');
-                editNameBtn.type = 'button';
-                editNameBtn.id = `lap-edit-btn-${index}`;
-                editNameBtn.title = 'Editar nombre de la vuelta';
-                editNameBtn.style.display = 'flex';
-                editNameBtn.style.alignItems = 'center';
-                editNameBtn.style.justifyContent = 'center';
-                editNameBtn.style.padding = '4px';
-                editNameBtn.style.borderRadius = '4px';
-                editNameBtn.style.border = '1px solid var(--secondary-color)';
-                editNameBtn.style.background = 'transparent';
-                editNameBtn.style.color = 'var(--secondary-color)';
-                editNameBtn.style.cursor = 'pointer';
-                editNameBtn.style.flex = '0 0 auto';
-                editNameBtn.innerHTML = editIcon;
-                
-                editNameBtn.addEventListener('click', async () => {
+            // Botón de editar nombre (lápiz azul) - siempre visible
+            const editNameBtn = document.createElement('button');
+            editNameBtn.type = 'button';
+            editNameBtn.id = `lap-edit-name-btn-${index}`;
+            editNameBtn.title = 'Editar nombre de la volta';
+            editNameBtn.style.display = 'flex';
+            editNameBtn.style.alignItems = 'center';
+            editNameBtn.style.justifyContent = 'center';
+            editNameBtn.style.padding = '4px';
+            editNameBtn.style.borderRadius = '4px';
+            editNameBtn.style.border = '1px solid var(--accent-color)';
+            editNameBtn.style.background = 'transparent';
+            editNameBtn.style.color = 'var(--accent-color)';
+            editNameBtn.style.cursor = 'pointer';
+            editNameBtn.style.flex = '0 0 auto';
+            editNameBtn.innerHTML = editIcon;
+            
+            editNameBtn.addEventListener('click', async () => {
+                // Solo permitir edición en sesión activa o en modo edición
+                if (!isReadOnly || isViewingSession) {
                     const newName = await showModal({ 
                         id: 'modal-edit-lap-name',
                         title: 'Editar nombre de vuelta', 
                         type: 'prompt', 
                         defaultValue: lap.name || '', 
                         okText: 'Guardar', 
-                        cancelText: 'Cancelar' 
+                        cancelText: 'Cancelar',
+                        buttonLayout: 'horizontal'
                     });
                     if (newName !== null && newName.trim() !== '') {
+                        // Actualizar el array de laps
                         laps[index].name = newName.trim();
-                        lapNameInput.value = newName.trim();
-                        sessionDirty = true;
+                        // Sincronizar con appState
+                        appState.laps = laps;
+                        
+                        // Marcar como modificado si estamos en modo vista de sesión
+                        if (isViewingSession) {
+                            sessionDirty = true;
+                            const saveBtnEnable = document.getElementById('session-save-btn');
+                            if (saveBtnEnable) saveBtnEnable.disabled = false;
+                        }
+                        
+                        // Actualizar vista (renderLaps recreará el DOM con el nuevo nombre)
+                        renderLaps();
+                        updateSummary();
                     }
-                });
-                
-                lapNameContainer.appendChild(lapNameInput);
-                lapNameContainer.appendChild(editNameBtn);
+                }
+            });
+            
+            // Aplicar estilos según el modo
+            if (!isReadOnly || isViewingSession) {
+                // Sesión activa o modo edición: botón activo
+                editNameBtn.style.cursor = 'pointer';
+                editNameBtn.style.opacity = '1';
+                editNameBtn.style.pointerEvents = 'auto';
             } else {
-                lapNameContainer.appendChild(lapNameInput);
+                // Modo vista de sesión guardada: botón deshabilitado visualmente
+                editNameBtn.style.cursor = 'default';
+                editNameBtn.style.opacity = '0.4';
+                editNameBtn.style.pointerEvents = 'none';
             }
+            
+            // Botón a la izquierda del nombre
+            lapNameContainer.appendChild(editNameBtn);
+            lapNameContainer.appendChild(lapNameInput);
 
             const durationSpan = document.createElement('span');
             durationSpan.className = 'lap-time';
@@ -1240,7 +2430,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lapTypeToggle.className = `lap-type-toggle ${lap.type}`;
             lapTypeToggle.id = `lap-type-toggle-${index}`;
             const isWork = lap.type === 'work';
-            lapTypeToggle.innerHTML = `${isWork ? workIcon : restIcon} ${isWork ? 'Treball' : 'Descans'}`;
+            lapTypeToggle.innerHTML = `${isWork ? workIcon : restIcon}`;
             lapTypeToggle.style.display = 'flex';
             lapTypeToggle.style.alignItems = 'center';
             lapTypeToggle.style.gap = '5px';
@@ -1293,6 +2483,7 @@ document.addEventListener('DOMContentLoaded', () => {
             deleteBtn.id = `lap-delete-btn-${index}`;
             deleteBtn.title = 'Eliminar volta';
             deleteBtn.setAttribute('aria-label', 'Eliminar volta');
+            deleteBtn.style.color = '#f44336'; // Color rojo
             deleteBtn.innerHTML = `
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"/>
@@ -1302,7 +2493,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
               </svg>`;
             deleteBtn.addEventListener('click', async () => {
-                if (!isReadOnly) {
+                if (!isReadOnly || isViewingSession) {
                     const confirmDelete = await showModal({
                         id: 'modal-delete-lap-confirm',
                         title: 'Eliminar volta',
@@ -1317,27 +2508,170 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     if (confirmDelete) {
                         laps.splice(index, 1);
+                        
+                        // Marcar como modificado si estamos viendo una sesión guardada
+                        if (isViewingSession) {
+                            sessionDirty = true;
+                            const saveBtnEnable = document.getElementById('session-save-btn');
+                            if (saveBtnEnable) saveBtnEnable.disabled = false;
+                        }
+                        
                         renderLaps();
                         updateSummary();
                     }
                 }
             });
+            
+            // Aplicar estilos según el modo
+            if (!isReadOnly || isViewingSession) {
+                // Sesión activa o modo edición: botón activo
+                deleteBtn.style.cursor = 'pointer';
+                deleteBtn.style.opacity = '1';
+                deleteBtn.style.pointerEvents = 'auto';
+            } else {
+                // Modo vista de sesión guardada: botón deshabilitado visualmente
+                deleteBtn.style.cursor = 'default';
+                deleteBtn.style.opacity = '0.4';
+                deleteBtn.style.pointerEvents = 'none';
+            }
 
             // Place delete button first (leftmost) when editable
-            if (!isReadOnly) {
+            if (!isReadOnly || isViewingSession) {
                 lapItem.appendChild(deleteBtn);
             }
             lapItem.appendChild(lapIndex);
-            lapItem.appendChild(lapTime);
+            lapItem.appendChild(lapTimeContainer);
             lapItem.appendChild(lapNameContainer);
             lapItem.appendChild(durationSpan);
-            // En session-view, la vuelta "-FINAL-" no muestra icono de trabajo/descanso
+            // En session-view, la vuelta "-FINAL-" no muestra icono de Treball/descans
             const isSessionViewContext = (typeof currentSessionKey !== 'undefined' && currentSessionKey) || isViewingSession || isReadOnly;
             if (!(isSessionViewContext && lap.name === '-FINAL-')) {
                 lapItem.appendChild(lapTypeToggle);
             }
-            lapsContainer.prepend(lapItem);
+            
+            // Añadir botón "+" a la derecha de cada vuelta en modo edición o durante la grabación
+            if (isViewingSession || (isRecording && !isReadOnly)) {
+                const addLapAfterBtn = document.createElement('button');
+                addLapAfterBtn.className = 'add-lap-after-btn';
+                addLapAfterBtn.id = `add-lap-after-btn-${index}`;
+                addLapAfterBtn.innerHTML = plusIcon;
+                addLapAfterBtn.title = 'Afegir volta després d\'aquesta';
+                addLapAfterBtn.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 32px;
+                    height: 32px;
+                    padding: 0;
+                    margin-left: 8px;
+                    background: white;
+                    color: #000000;
+                    border: 2px solid #FFC107;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    flex-shrink: 0;
+                `;
+                
+                addLapAfterBtn.addEventListener('mouseover', () => {
+                    addLapAfterBtn.style.background = '#FFF9E6';
+                    addLapAfterBtn.style.transform = 'scale(1.1)';
+                });
+                
+                addLapAfterBtn.addEventListener('mouseout', () => {
+                    addLapAfterBtn.style.background = 'white';
+                    addLapAfterBtn.style.transform = 'scale(1)';
+                });
+                
+                addLapAfterBtn.addEventListener('click', async () => {
+                    // Determinar los tiempos límite
+                    const currentLapTime = laps[index].time;
+                    const isLastLap = index === laps.length - 1;
+                    let nextLapTime;
+                    let isLastLapDuringRecording = false;
+                    
+                    if (!isLastLap) {
+                        // No es la última vuelta: añadir entre esta y la siguiente
+                        nextLapTime = laps[index + 1].time;
+                    } else {
+                        // Es la última vuelta
+                        if (isRecording && !isReadOnly) {
+                            // Grabando: usar tiempo actual como límite superior
+                            nextLapTime = new Date();
+                            isLastLapDuringRecording = false; // Sí hay límite superior
+                        } else {
+                            // Editando sesión guardada: sin límite superior
+                            nextLapTime = currentLapTime;
+                            isLastLapDuringRecording = true; // No validar límite superior
+                        }
+                    }
+                    
+                    // Mostrar modal para seleccionar tiempo
+                    const newTime = await showAddLapBetweenModal(currentLapTime, nextLapTime, isLastLapDuringRecording);
+                    
+                    if (newTime !== null) {
+                        // Si era la última vuelta, cambiar su tipo a 'rest' y su nombre (ya no será la final)
+                        if (isLastLap) {
+                            laps[index].type = 'rest';
+                            // Cambiar el nombre de "-FINAL-" a un nombre normal para que muestre el icono
+                            if (laps[index].name === '-FINAL-') {
+                                laps[index].name = `Volta ${index + 1}`;
+                            }
+                        }
+                        
+                        // Crear nueva vuelta con tipo 'rest' por defecto
+                        const newLap = {
+                            time: newTime,
+                            name: `Volta ${index + 2}`,
+                            type: 'rest'
+                        };
+                        
+                        // Insertar la nueva vuelta después de la actual
+                        laps.splice(index + 1, 0, newLap);
+                        
+                        // Si se está grabando y se añadió después de la última vuelta,
+                        // reiniciar el seguimiento de la última vuelta
+                        if (isLastLap && isRecording && !isReadOnly) {
+                            stopLastLapUpdate();
+                            startLastLapUpdate();
+                        }
+                        
+                        // Marcar como modificado
+                        sessionDirty = true;
+                        const saveBtnEnable = document.getElementById('session-save-btn');
+                        if (saveBtnEnable) saveBtnEnable.disabled = false;
+                        
+                        // Actualizar vista
+                        renderLaps();
+                        updateSummary();
+                    }
+                });
+                
+                lapItem.appendChild(addLapAfterBtn);
+            }
+            
+            // Agregar al contenedor según preferencia de orden
+            if (lapsOrderDescending) {
+                lapsContainer.prepend(lapItem); // Descendente: más nueva arriba
+            } else {
+                lapsContainer.appendChild(lapItem); // Ascendente: más reciente al final
+            }
         });
+        
+        // Si el orden es ascendente, hacer scroll automático hacia las últimas vueltas (solo en el contenedor)
+        if (!lapsOrderDescending && lapsContainer.lastChild) {
+            // Usar doble requestAnimationFrame para asegurar que el DOM se haya actualizado y el layout recalculado
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    // Hacer scroll al final del contenedor para mostrar las últimas vueltas
+                    lapsContainer.scrollTo({
+                        top: lapsContainer.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                    
+                });
+            });
+        }
     };
 
     const updateInstructionText = () => {
@@ -1355,7 +2689,8 @@ document.addEventListener('DOMContentLoaded', () => {
         row.style.display = 'flex';
         row.style.alignItems = 'center';
         row.style.gap = '10px';
-        row.style.margin = '10px 0';
+        row.style.margin = '5px 0';
+        row.style.flex = '0 0 auto';
 
         const label = document.createElement('span');
         label.id = 'recording-name-label';
@@ -1373,8 +2708,8 @@ document.addEventListener('DOMContentLoaded', () => {
         input.style.background = 'transparent';
         input.style.color = '#f0f0f0';
         input.style.borderRadius = '6px';
-        input.style.padding = '6px 8px'; // menor margen interno
-        input.style.fontSize = '1.2rem'; // texto más grande
+        input.style.padding = '4px 6px'; // menor margen interno
+        input.style.fontSize = '1rem'; // texto más grande
         input.style.fontWeight = '700'; // negrita
         input.addEventListener('input', (e) => {
             recordingName = String(e.target.value ?? '').trimStart();
@@ -1457,7 +2792,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Actualizar solo la duración de la última vuelta (optimizado)
     const updateLastLapDuration = () => {
         if (isReadOnly || laps.length === 0) return;
-        const lastLapElement = lapsContainer.firstChild;
+        // Obtener el elemento correcto según el orden
+        const lastLapElement = lapsOrderDescending ? lapsContainer.firstChild : lapsContainer.lastChild;
         if (lastLapElement) {
             const durationSpan = lastLapElement.querySelector('.lap-time');
             if (durationSpan) {
@@ -1484,7 +2820,8 @@ document.addEventListener('DOMContentLoaded', () => {
         lastLapUpdateId = setInterval(() => {
             if (laps.length < 2) return;
             
-            const lastLapElement = lapsContainer.firstChild;
+            // Obtener el elemento correcto según el orden
+            const lastLapElement = lapsOrderDescending ? lapsContainer.firstChild : lapsContainer.lastChild;
             if (!lastLapElement) return;
             
             const durationSpan = lastLapElement.querySelector('.lap-time');
@@ -1558,16 +2895,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 finalizeViewHandler = null;
             }
         } catch {}
+        
+        // Guardar el número de vueltas antes de añadir la vuelta automática
+        const lapsCountBeforeFinalize = laps.length;
+        let autoLapAdded = false;
+        
         // If currently recording, mark a lap as if the user tapped the clock
         if (isRecording && typeof clockContainer !== 'undefined' && clockContainer) {
             try { clockContainer.click(); } catch {}
             // Allow the click handler (addLap) to run before proceeding
             await new Promise(r => setTimeout(r, 25));
+            // Verificar si se añadió una vuelta
+            if (laps.length > lapsCountBeforeFinalize) {
+                autoLapAdded = true;
+            }
         }
         // If still no laps, inform the user and abort finalize
         if (laps.length === 0) {
             try {
-                await showModal({ id: 'modal-no-laps-info', title: 'Informació', message: 'Prem sobre el Rellotge superior per inicial el reigstres de voltes.', type: 'alert', okText: 'D’acord' });
+                await showModal({ id: 'modal-no-laps-info', title: 'Informació', message: 'Prem sobre el Rellotge superior per inicial el reigstres de voltes.', type: 'alert', okText: 'D\'acord' });
             } catch {}
             return;
         }
@@ -1603,6 +2949,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Reanudar grabación si aplica
             if (action === '__CONTINUE_RECORDING__') {
+                // Eliminar la vuelta automática añadida
+                if (autoLapAdded && laps.length > lapsCountBeforeFinalize) {
+                    laps.pop(); // Eliminar la última vuelta
+                    renderLaps();
+                    updateSummary();
+                }
+                
                 // Actualizar el nombre de la sesión si se modificó
                 if (newName && newName.trim() !== '' && newName !== 'SessióSenseNom') {
                     recordingName = newName.trim();
@@ -1612,15 +2965,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 try { startClock(); } catch {}
                 isRecording = true;
             } 
-            // Cancelación simple - reiniciar completamente la aplicación
-            else if (action === null || action === undefined) {
-                resetAppState();
-            }
-            
-            // Iniciar nueva grabación si se eligió cancelar
-            if (action === '__NEW_RECORDING__') {
-                resetAppState();
-                return;
+            // Cancelación - pedir confirmación antes de cancelar
+            else if (action === '__NEW_RECORDING__' || action === null || action === undefined) {
+                // Pedir confirmación de cancelar
+                const confirmCancel = await showModal({
+                    id: 'modal-confirm-cancel-session',
+                    title: 'CONFIRMAR CANCEL.LACIÓ',
+                    message: 'Estàs segur que vols cancel·lar la sessió actual?\n Es perdran totes les dades registrades.',
+                    type: 'confirm',
+                    okText: 'SÍ\nCANCEL·LAR',
+                    cancelText: 'NO\nCONTINUAR',
+                    okButtonStyle: 'background: #f44336; color: white; border: 1px solid #f44336;',
+                    cancelButtonStyle: 'background: #4CAF50; color: white; border: 1px solid #4CAF50;',
+                    buttonLayout: 'horizontal',
+                    reverseButtons: false
+                });
+                
+                if (confirmCancel) {
+                    // Usuario confirmó: cancelar sesión (resetAppState limpiará todo)
+                    resetAppState();
+                } else {
+                    // Usuario decidió no cancelar: eliminar la vuelta automática y volver
+                    if (autoLapAdded && laps.length > lapsCountBeforeFinalize) {
+                        laps.pop(); // Eliminar la última vuelta
+                        renderLaps();
+                        updateSummary();
+                    }
+                    // Reactivar el reloj si estaba grabando
+                    if (isRecording) {
+                        try { startClock(); } catch {}
+                    }
+                    return;
+                }
             }
             
             return;
@@ -1647,23 +3023,24 @@ document.addEventListener('DOMContentLoaded', () => {
             // Usuario proporcionó un nombre: usar timestamp + nombre personalizado
             fullSessionName = `${timestamp}_${sessionNameInputTrimmed}.txt`;
         }
-
-        console.debug('[DEBUG] Saving session:', {
-            timestamp,
-            sessionNameInputTrimmed,
-            isEmptyOrDefault,
-            fullSessionName,
-            lapsCount: laps.length
-        });
         try {
-            localStorage.setItem(sessionPrefix + fullSessionName, JSON.stringify(laps));
+            const storageKey = sessionPrefix + fullSessionName;
+            const lapsJson = JSON.stringify(laps);
+            
+            localStorage.setItem(storageKey, lapsJson);
+            
+            // Verificar que se guardó
+            const saved = localStorage.getItem(storageKey);
             
             // Detener actualización incremental
             stopLastLapUpdate();
             
             laps = [];
+            appState.laps = laps; // Sincronizar con appState
             isRecording = false;
+            appState.isRecording = false; // Sincronizar con appState
             recordingName = 'SessióSenseNom';
+            appState.recordingName = recordingName; // Sincronizar con appState
             
             // Restaurar texto del botón
             finalizeBtn.textContent = 'PREM EL RELLOTGE PER COMENÇAR';
@@ -1677,9 +3054,40 @@ document.addEventListener('DOMContentLoaded', () => {
             renderLaps();
             updateSummary();
             // Mostrar directamente la vista de sesiones y refrescar lista
-            renderSessions();
-            sessionsView.style.display = 'block';
+            
+            // IMPORTANTE: Primero ocultar registration-view
             registrationView.style.display = 'none';
+            
+            // Forzar reflow para asegurar que el layout se recalcula
+            void registrationView.offsetHeight;
+            
+            // Luego mostrar sessions-view con estilos forzados
+            sessionsView.style.setProperty('display', 'flex', 'important');
+            sessionsView.style.flexDirection = 'column';
+            sessionsView.style.flex = '1 1 auto';
+            sessionsView.style.minHeight = '0';
+            sessionsView.style.overflow = 'hidden';
+            
+            // Asegurar que sessions-container también tenga los estilos correctos
+            sessionsContainer.style.display = 'flex';
+            sessionsContainer.style.flexDirection = 'column';
+            sessionsContainer.style.flex = '1 1 0';
+            sessionsContainer.style.minHeight = '0';
+            sessionsContainer.style.overflow = 'hidden';
+            
+            // Y sessions-list
+            sessionsList.style.display = 'flex';
+            sessionsList.style.flexDirection = 'column';
+            sessionsList.style.flex = '1 1 0';
+            sessionsList.style.minHeight = '0';
+            sessionsList.style.overflowY = 'auto';
+            
+            // Forzar reflow
+            void sessionsView.offsetHeight;
+            
+            // Ahora renderizar las sesiones con el layout correcto
+            renderSessions();
+            
             toggleViewBtn.innerHTML = `${stopwatchIcon} <span class=\"toggle-label\">REGISTRAR</span>`;
         } catch (e) {
             await showModal({ id: 'modal-save-session-error', title: 'Error', message: "Error en desar la sessió. L'emmagatzematge pot estar ple.", type: 'alert', okText: 'Tancar' });
@@ -1817,6 +3225,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Asegurar el estado correcto del botón toggle
         updateToggleViewBtnLabel();
         sessionsList.innerHTML = '';
+        
         const sessions = Object.keys(localStorage)
             .filter(key => key.startsWith(sessionPrefix))
             .sort((a, b) => {
@@ -1839,6 +3248,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Mantener visible el contenedor y el título aunque no haya sesiones
         sessionsContainer.parentElement.style.display = 'block';
+        
         
         // Rest of renderSessions remains the same
         // Mostrar mensaje vacío cuando no haya sesiones
@@ -2060,6 +3470,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isViewingSession = false; // Inicialmente en modo solo lectura
             currentSessionKey = sessionKey;
             laps = savedLaps.map(lap => ({...lap, time: new Date(lap.time)}));
+            appState.laps = laps; // Sincronizar con appState
             sessionDirty = false;
             pendingRename = null;
             
@@ -2157,7 +3568,7 @@ document.addEventListener('DOMContentLoaded', () => {
             viewShareBtn.id = 'session-view-share-btn';
             // Create larger share icon for better visibility
             const largeShareIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 1 1 0-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 1 1 5.367-2.684 3 3 0 0 1-5.367 2.684zm0 9.316a3 3 0 1 1 5.367 2.684 3 3 0 0 1-5.367-2.684z"/></svg>`;
-            viewShareBtn.innerHTML = `${largeShareIcon} COMPARTIR`;
+            viewShareBtn.innerHTML = `${largeShareIcon} TXT`;
             viewShareBtn.style.display = 'flex';
             viewShareBtn.style.alignItems = 'center';
             viewShareBtn.style.justifyContent = 'center';
@@ -2219,6 +3630,28 @@ document.addEventListener('DOMContentLoaded', () => {
             viewShareCsvCommaBtn.style.textTransform = 'uppercase';
             viewShareCsvCommaBtn.addEventListener('click', () => shareSessionCSVComma(sessionKey));
 
+            const viewClipboardBtn = document.createElement('button');
+            viewClipboardBtn.id = 'session-view-clipboard-btn';
+            // Create clipboard icon
+            const clipboardIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>`;
+            viewClipboardBtn.innerHTML = `${clipboardIcon} PORTAPAPERS`;
+            viewClipboardBtn.style.display = 'flex';
+            viewClipboardBtn.style.alignItems = 'center';
+            viewClipboardBtn.style.justifyContent = 'center';
+            viewClipboardBtn.style.gap = '6px';
+            viewClipboardBtn.style.flex = '1'; // Take equal portion of space
+            viewClipboardBtn.style.height = '36px'; // Fixed height for all buttons
+            viewClipboardBtn.style.borderRadius = '8px'; // Rounded corners like lap-type-toggle
+            viewClipboardBtn.style.border = `1px solid ${getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim()}`; // Blue border
+            viewClipboardBtn.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim(); // Blue background
+            viewClipboardBtn.style.color = '#fff'; // White text
+            viewClipboardBtn.style.fontWeight = '700'; // Bold text
+            viewClipboardBtn.style.fontSize = '0.9rem'; // Larger font size
+            viewClipboardBtn.style.cursor = 'pointer';
+            viewClipboardBtn.style.transition = 'all 0.2s';
+            viewClipboardBtn.style.textTransform = 'uppercase';
+            viewClipboardBtn.addEventListener('click', () => copySessionToClipboard(sessionKey));
+
             // Crear botón toggle para mostrar/ocultar opciones de compartir
             const toggleShareBtn = document.createElement('button');
             toggleShareBtn.id = 'session-toggle-share-btn';
@@ -2270,6 +3703,7 @@ document.addEventListener('DOMContentLoaded', () => {
             bottomRow.appendChild(viewShareBtn);
             bottomRow.appendChild(viewShareCsvBtn);
             bottomRow.appendChild(viewShareCsvCommaBtn);
+            bottomRow.appendChild(viewClipboardBtn);
             
             // Funciones para manejo de modo edición
             const toggleEditMode = () => {
@@ -2297,10 +3731,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const nameLabel = document.querySelector('#session-name-row .nameLabel');
                     if (nameLabel) {
                         nameLabel.contentEditable = 'true';
-                        nameLabel.style.border = '1px solid #00aaff';
+                        nameLabel.style.border = '1px solid #ffffff';
                         nameLabel.style.borderRadius = '4px';
                         nameLabel.style.padding = '4px';
                         nameLabel.style.backgroundColor = 'rgba(0, 170, 255, 0.1)';
+                        nameLabel.style.textAlign = 'left';
                     }
                     
                     // Mostrar botón "Editar nom"
@@ -2334,8 +3769,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const nameLabel = document.querySelector('#session-name-row .nameLabel');
                     if (nameLabel) {
                         nameLabel.contentEditable = 'false';
-                        nameLabel.style.border = 'none';
-                        nameLabel.style.padding = '0';
+                        nameLabel.style.border = '1px solid #808080';
+                        nameLabel.style.borderRadius = '4px';
+                        nameLabel.style.padding = '4px';
                         nameLabel.style.backgroundColor = 'transparent';
                     }
                     
@@ -2355,6 +3791,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Restaurar datos originales
                 if (originalLapsState) {
                     laps = JSON.parse(JSON.stringify(originalLapsState));
+                    appState.laps = laps; // Sincronizar con appState
                     renderLaps();
                     updateSummary();
                 }
@@ -2473,7 +3910,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateText = document.createElement('div');
             dateText.id = 'session-info-date';
             dateText.textContent = formatDate(sessionDate);
-            dateText.style.fontSize = '1.2em';
+            dateText.style.fontSize = '1.8em';
             dateText.style.marginBottom = '10px';
             dateText.style.color = '#000000'; // Texto negro
             
@@ -2481,7 +3918,7 @@ document.addEventListener('DOMContentLoaded', () => {
             timeText.id = 'session-info-time';
             const sessionTime = laps.length > 0 ? new Date(laps[0].time) : new Date();
             timeText.innerHTML = `Hora d'inici: ${formatTime(sessionTime)}`;
-            timeText.style.fontSize = '1.1em';
+            timeText.style.fontSize = '1.5em';
             timeText.style.color = '#000000'; // Texto negro
             
             sessionInfoContainer.appendChild(dateText);
@@ -2516,7 +3953,10 @@ document.addEventListener('DOMContentLoaded', () => {
             nameLabel.style.fontSize = '1.3em';
             nameLabel.style.fontWeight = '600';
             nameLabel.style.flex = '1 1 auto';
-            nameLabel.style.textAlign = 'center';
+            nameLabel.style.textAlign = 'left';
+            nameLabel.style.border = '1px solid #808080';
+            nameLabel.style.borderRadius = '4px';
+            nameLabel.style.padding = '4px';
             nameLabel.contentEditable = 'false'; // Inicialmente no editable
             
             // Event listener para cambios en el nombre de la sesión
@@ -2581,7 +4021,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         row.textContent = `#${i + 1} - ${new Date(lap.time).toLocaleTimeString()} - ${lap.name || ''}`;
                         frag.appendChild(row);
                     });
-                    lapsContainer.appendChild(frag);
+                    // Respetar orden de vueltas
+                    if (lapsOrderDescending) {
+                        // Insertar al principio invirtiendo el fragmento
+                        const children = Array.from(frag.children);
+                        children.reverse().forEach(child => lapsContainer.appendChild(child));
+                    } else {
+                        lapsContainer.appendChild(frag);
+                    }
                 }
             } catch {}
             try { lapsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
@@ -2624,9 +4071,13 @@ document.addEventListener('DOMContentLoaded', () => {
             pendingRename = null;
         }
         isReadOnly = false;
+        appState.isReadOnly = false; // Sincronizar con appState
         isViewingSession = false;
+        appState.isViewingSession = false; // Sincronizar con appState
         currentSessionKey = null;
+        appState.currentSessionKey = null; // Sincronizar con appState
         laps = [];
+        appState.laps = laps; // Sincronizar con appState
         
         // Remove top bar and reset margins
         const topBar = document.getElementById('session-top-bar');
@@ -2655,7 +4106,7 @@ document.addEventListener('DOMContentLoaded', () => {
         finalizeBtn.style.display = '';
         finalizeBtn.style.alignItems = '';
         finalizeBtn.style.justifyContent = '';
-        finalizeBtn.style.height = '64px';
+        finalizeBtn.style.height = 'auto';
         finalizeBtn.style.borderRadius = '';
         finalizeBtn.style.border = '';
         finalizeBtn.style.backgroundColor = '';
@@ -2712,9 +4163,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateToggleViewBtnLabel();
                 // Normalizar flags de vista
                 isReadOnly = false;
+                appState.isReadOnly = false;
                 isViewingSession = false;
+                appState.isViewingSession = false;
                 currentSessionKey = null;
-                try { laps = []; renderLaps(); updateSummary(); } catch {}
+                appState.currentSessionKey = null;
+                try { laps = []; appState.laps = laps; renderLaps(); updateSummary(); } catch {}
             }
             
             // Asegurar: si estamos en registration-view sin isViewingSession pero con la vista de sesión todavía montada
@@ -2732,9 +4186,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateToggleViewBtnLabel();
                 // Normalizar flags de vista
                 isReadOnly = false;
+                appState.isReadOnly = false;
                 isViewingSession = false;
+                appState.isViewingSession = false;
                 currentSessionKey = null;
-                try { laps = []; renderLaps(); updateSummary(); } catch {}
+                appState.currentSessionKey = null;
+                try { laps = []; appState.laps = laps; renderLaps(); updateSummary(); } catch {}
             }
             
             // Renderizar la lista actualizada
@@ -2756,27 +4213,33 @@ document.addEventListener('DOMContentLoaded', () => {
             let totalRestSeconds = 0;
 
             let shareText = `Sesión: ${sessionName}\nFecha: ${startDateStr}\nHora inicio: ${startTimeStr}\n\n`;
-            // Encabezado (tabulado)
-            shareText += `#\tHora\tTipo\tNombre\tDuración` + "\n";
+            // Encabezado (tabulado) - Orden: #, HORA, DURADA, TIPUS, NOM
+            shareText += `#\tHora\tDurada\tTipus\tNom` + "\n";
 
             savedLaps.forEach((lap, index) => {
                 const lapTime = new Date(lap.time);
                 const lapTimeStr = `${String(lapTime.getHours()).padStart(2, '0')}:${String(lapTime.getMinutes()).padStart(2, '0')}:${String(lapTime.getSeconds()).padStart(2, '0')}.${String(lapTime.getMilliseconds()).padStart(3, '0')}`;
-                const lapTypeLabel = lap.type === 'work' ? 'Trabajo' : 'Descanso';
-                let line = `${index + 1}\t${lapTimeStr}\t${lapTypeLabel}\t${lap.name}`;
+                const lapTypeLabel = lap.type === 'work' ? 'Treball' : 'Descans';
+                // Orden: #, HORA, DURADA, TIPUS, NOM
+                let line = `${index + 1}\t${lapTimeStr}`;
+                // Añadir duración
                 if (index < savedLaps.length - 1) {
                     const nextTime = new Date(savedLaps[index + 1].time);
                     const duration = (nextTime - lapTime) / 1000;
                     if (lap.type === 'work') totalWorkSeconds += duration; else totalRestSeconds += duration;
                     line += `\t${formatDurationPlain(duration)}`;
+                } else {
+                    line += `\t`;
                 }
+                // Añadir tipo y nombre
+                line += `\t${lapTypeLabel}\t${lap.name}`;
                 shareText += line + "\n";
             });
 
             const totalTimeSeconds = totalWorkSeconds + totalRestSeconds;
             shareText += `\nResumen:\n`;
-            shareText += `  Trabajo: ${formatDurationPlain(totalWorkSeconds)}\n`;
-            shareText += `  Descanso: ${formatDurationPlain(totalRestSeconds)}\n`;
+            shareText += `  Treball: ${formatDurationPlain(totalWorkSeconds)}\n`;
+            shareText += `  Descans: ${formatDurationPlain(totalRestSeconds)}\n`;
             shareText += `  Total: ${formatDurationPlain(totalTimeSeconds)}\n`;
 
             if (navigator.share) {
@@ -2809,7 +4272,7 @@ document.addEventListener('DOMContentLoaded', () => {
         savedLaps.forEach((lap, index) => {
             const lapTime = new Date(lap.time);
             const lapTimeStr = `${String(lapTime.getHours()).padStart(2, '0')}:${String(lapTime.getMinutes()).padStart(2, '0')}:${String(lapTime.getSeconds()).padStart(2, '0')}.${String(lapTime.getMilliseconds()).padStart(3, '0')}`;
-            const lapTypeLabel = lap.type === 'work' ? 'Trabajo' : 'Descanso';
+            const lapTypeLabel = lap.type === 'work' ? 'Treball' : 'Descans';
             let durationStr = '';
             if (index < savedLaps.length - 1) {
                 const nextTime = new Date(savedLaps[index + 1].time);
@@ -2823,8 +4286,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const totalTimeSeconds = totalWorkSeconds + totalRestSeconds;
-        csv += `\nResumen;Trabajo;${formatDurationPlain(totalWorkSeconds)}\n`;
-        csv += `Resumen;Descanso;${formatDurationPlain(totalRestSeconds)}\n`;
+        csv += `\nResumen;Treball;${formatDurationPlain(totalWorkSeconds)}\n`;
+        csv += `Resumen;Descans;${formatDurationPlain(totalRestSeconds)}\n`;
         csv += `Resumen;Total;${formatDurationPlain(totalTimeSeconds)}\n`;
 
         if (navigator.share && navigator.canShare && navigator.canShare({ text: csv })) {
@@ -2854,7 +4317,7 @@ document.addEventListener('DOMContentLoaded', () => {
         savedLaps.forEach((lap, index) => {
             const lapTime = new Date(lap.time);
             const lapTimeStr = `${String(lapTime.getHours()).padStart(2, '0')}:${String(lapTime.getMinutes()).padStart(2, '0')}:${String(lapTime.getSeconds()).padStart(2, '0')}.${String(lapTime.getMilliseconds()).padStart(3, '0')}`;
-            const lapTypeLabel = lap.type === 'work' ? 'Trabajo' : 'Descanso';
+            const lapTypeLabel = lap.type === 'work' ? 'Treball' : 'Descans';
             let durationStr = '';
             if (index < savedLaps.length - 1) {
                 const nextTime = new Date(savedLaps[index + 1].time);
@@ -2868,8 +4331,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const totalTimeSeconds = totalWorkSeconds + totalRestSeconds;
-        csv += `\nResumen,Trabajo,${formatDurationPlain(totalWorkSeconds)}\n`;
-        csv += `Resumen,Descanso,${formatDurationPlain(totalRestSeconds)}\n`;
+        csv += `\nResumen,Treball,${formatDurationPlain(totalWorkSeconds)}\n`;
+        csv += `Resumen,Descans,${formatDurationPlain(totalRestSeconds)}\n`;
         csv += `Resumen,Total,${formatDurationPlain(totalTimeSeconds)}\n`;
 
         if (navigator.share && navigator.canShare && navigator.canShare({ text: csv })) {
@@ -2878,6 +4341,77 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // Fallback: prompt para copiar
             prompt('Copia el CSV (Coma):', csv);
+        }
+    };
+
+    const copySessionToClipboard = (sessionKey) => {
+        const savedLaps = JSON.parse(localStorage.getItem(sessionKey));
+        if (!savedLaps) return;
+        
+        const info = parseSessionKey(sessionKey);
+        const sessionName = info.name; // Usar solo el nombre limpio
+        const startDate = new Date(savedLaps[0].time);
+        const startDateStr = `${String(startDate.getFullYear())}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+        const startTimeStr = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(startDate.getSeconds()).padStart(2, '0')}.${String(startDate.getMilliseconds()).padStart(3, '0')}`;
+
+        let totalWorkSeconds = 0;
+        let totalRestSeconds = 0;
+
+        let shareText = `Sesión: ${sessionName}\nFecha: ${startDateStr}\nHora inicio: ${startTimeStr}\n\n`;
+        // Encabezado (tabulado) - Orden: #, HORA, DURADA, TIPUS, NOM
+        shareText += `#\tHora\tDurada\tTipus\tNom` + "\n";
+
+        savedLaps.forEach((lap, index) => {
+            const lapTime = new Date(lap.time);
+            const lapTimeStr = `${String(lapTime.getHours()).padStart(2, '0')}:${String(lapTime.getMinutes()).padStart(2, '0')}:${String(lapTime.getSeconds()).padStart(2, '0')}.${String(lapTime.getMilliseconds()).padStart(3, '0')}`;
+            const lapTypeLabel = lap.type === 'work' ? 'Treball' : 'Descans';
+            // Orden: #, HORA, DURADA, TIPUS, NOM
+            let line = `${index + 1}\t${lapTimeStr}`;
+            // Añadir duración
+            if (index < savedLaps.length - 1) {
+                const nextTime = new Date(savedLaps[index + 1].time);
+                const duration = (nextTime - lapTime) / 1000;
+                if (lap.type === 'work') totalWorkSeconds += duration; else totalRestSeconds += duration;
+                line += `\t${formatDurationPlain(duration)}`;
+            } else {
+                line += `\t`;
+            }
+            // Añadir tipo y nombre
+            line += `\t${lapTypeLabel}\t${lap.name}`;
+            shareText += line + "\n";
+        });
+
+        const totalTimeSeconds = totalWorkSeconds + totalRestSeconds;
+        shareText += `\nResumen:\n`;
+        shareText += `  Treball: ${formatDurationPlain(totalWorkSeconds)}\n`;
+        shareText += `  Descans: ${formatDurationPlain(totalRestSeconds)}\n`;
+        shareText += `  Total: ${formatDurationPlain(totalTimeSeconds)}\n`;
+
+        // Intentar copiar al portapapeles
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(shareText)
+                .then(() => {
+                    // Mostrar feedback visual de éxito
+                    const btn = document.querySelector('#session-view-clipboard-btn');
+                    if (btn) {
+                        const originalHTML = btn.innerHTML;
+                        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> COPIAT!`;
+                        btn.style.backgroundColor = '#28a745';
+                        btn.style.borderColor = '#28a745';
+                        setTimeout(() => {
+                            btn.innerHTML = originalHTML;
+                            btn.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim();
+                            btn.style.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim();
+                        }, 2000);
+                    }
+                })
+                .catch((err) => {
+                    alert('No se pudo copiar al portapapeles. Por favor, cópialo manualmente.');
+                    prompt('Copia este texto:', shareText);
+                });
+        } else {
+            // Fallback para navegadores que no soportan clipboard API
+            prompt('Copia este texto al portapapeles:', shareText);
         }
     };
 
@@ -3131,6 +4665,11 @@ document.addEventListener('DOMContentLoaded', () => {
     finalizeBtn.addEventListener('click', async () => {
         await finalizeSession();
     });
+    
+    // Inicializar vistas: mostrar registration-view, ocultar sessions-view
+    registrationView.style.display = 'block';
+    sessionsView.style.display = 'none';
+    
     startClock();
     renderSessions();
 
@@ -3263,6 +4802,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- Gestión del orden de las vueltas ---
+    const LAPS_ORDER_PREF_KEY = 'lapsOrderDescending';
+
+    // Cargar preferencia de orden de vueltas
+    function loadLapsOrderPreference() {
+        try {
+            const saved = localStorage.getItem(LAPS_ORDER_PREF_KEY);
+            if (saved !== null) {
+                appState.lapsOrderDescending = saved === 'true';
+                lapsOrderDescending = appState.lapsOrderDescending;
+            }
+        } catch (err) {
+        }
+    }
+
+    // Guardar preferencia de orden de vueltas
+    function saveLapsOrderPreference(descending) {
+        try {
+            localStorage.setItem(LAPS_ORDER_PREF_KEY, String(descending));
+            appState.lapsOrderDescending = descending;
+            lapsOrderDescending = descending;
+        } catch (err) {
+        }
+    }
+
     // Toggle Wake Lock
     async function toggleWakeLock() {
         if (!wakeLockManager.isSupported) {
@@ -3301,142 +4865,240 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Modal de información al pulsar título VOLTES ---
-    const appTitleText = document.getElementById('app-title-text');
-    if (appTitleText) {
-        appTitleText.style.cursor = 'pointer';
-        appTitleText.addEventListener('click', async () => {
-            const appVersion = '1.0.9'; // Versión desde manifest.json
-            
-            // Crear contenedor del modal con opciones
-            const modalContent = document.createElement('div');
-            modalContent.style.textAlign = 'left';
-            modalContent.style.width = '100%';
-            
-            const infoText = document.createElement('div');
-            infoText.innerHTML = `
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <strong style="font-size: 1.4rem;">CONTROL DE VOLTES</strong><br>
-                    <span style="opacity: 0.8;">Versió: ${appVersion}</span>
-                </div>
-                <div style="margin-bottom: 15px; line-height: 1.6;">
-                    <strong>© 2025 - Albert Ruiz Pujol</strong><br>
-                    <a href="mailto:ruiggi@gmail.com" style="color:rgb(255, 255, 255); text-decoration: none;">ruiggi@gmail.com</a><br>
-                    <a href="https://ruiggi.github.io/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://ruiggi.github.io/ControlVoltes/</a>
-                </div>
-            `;
-            modalContent.appendChild(infoText);
-            
-            // Botones de acción
-            const actionsContainer = document.createElement('div');
-            actionsContainer.style.display = 'flex';
-            actionsContainer.style.flexDirection = 'column';
-            actionsContainer.style.gap = '10px';
-            actionsContainer.style.marginTop = '20px';
-            
-            // Botón Forzar instalación
-            const forceInstallBtn = document.createElement('button');
-            forceInstallBtn.textContent = '📲 Forçar instal·lació';
-            forceInstallBtn.style.padding = '12px';
-            forceInstallBtn.style.backgroundColor = '#0d6efd';
-            forceInstallBtn.style.color = '#fff';
-            forceInstallBtn.style.border = 'none';
-            forceInstallBtn.style.borderRadius = '6px';
-            forceInstallBtn.style.fontWeight = '700';
-            forceInstallBtn.style.cursor = 'pointer';
-            forceInstallBtn.style.fontSize = '1rem';
-            forceInstallBtn.addEventListener('click', () => {
-                const forceBtn = document.getElementById('force-install-btn');
-                if (forceBtn) forceBtn.click();
-                // Cerrar modal
-                document.querySelector('.modal-overlay')?.remove();
-            });
-            
-            // Botón Actualizar aplicación
-            const updateBtn = document.createElement('button');
-            updateBtn.textContent = '🔄 Actualitzar aplicació';
-            updateBtn.style.padding = '12px';
-            updateBtn.style.backgroundColor = '#28a745';
-            updateBtn.style.color = '#fff';
-            updateBtn.style.border = 'none';
-            updateBtn.style.borderRadius = '6px';
-            updateBtn.style.fontWeight = '700';
-            updateBtn.style.cursor = 'pointer';
-            updateBtn.style.fontSize = '1rem';
-            updateBtn.addEventListener('click', async () => {
-                try {
-                    const registration = await navigator.serviceWorker.getRegistration();
-                    if (registration) {
-                        await registration.update();
-                        window.location.reload();
-                    }
-                } catch (e) {
-                    alert('Error actualitzant l\'aplicació');
-                }
-            });
-            
-            actionsContainer.appendChild(forceInstallBtn);
-            actionsContainer.appendChild(updateBtn);
-            modalContent.appendChild(actionsContainer);
-            
-            // Mostrar modal personalizado
-            const overlay = document.createElement('div');
-            overlay.className = 'modal-overlay';
-            overlay.style.position = 'fixed';
-            overlay.style.top = '0';
-            overlay.style.left = '0';
-            overlay.style.width = '100vw';
-            overlay.style.height = '100vh';
-            overlay.style.backgroundColor = 'rgba(0,0,0,0.75)';
-            overlay.style.zIndex = '9999';
-            overlay.style.display = 'flex';
-            overlay.style.alignItems = 'center';
-            overlay.style.justifyContent = 'center';
-            overlay.style.padding = '20px';
-            overlay.style.boxSizing = 'border-box';
-            
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.style.backgroundColor = 'var(--card-bg-color)';
-            modal.style.borderRadius = '12px';
-            modal.style.padding = '24px';
-            modal.style.maxWidth = '500px';
-            modal.style.width = '95vw';
-            modal.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
-            modal.style.border = '1px solid var(--accent-color)';
-            
-            modal.appendChild(modalContent);
-            
-            // Botón ACEPTAR
-            const okButton = document.createElement('button');
-            okButton.textContent = 'ACEPTAR';
-            okButton.style.width = '100%';
-            okButton.style.padding = '14px';
-            okButton.style.marginTop = '20px';
-            okButton.style.backgroundColor = '#666';
-            okButton.style.color = '#fff';
-            okButton.style.border = 'none';
-            okButton.style.borderRadius = '6px';
-            okButton.style.fontWeight = '700';
-            okButton.style.cursor = 'pointer';
-            okButton.style.fontSize = '1.1rem';
-            okButton.style.textTransform = 'uppercase';
-            okButton.addEventListener('click', () => overlay.remove());
-            
-            modal.appendChild(okButton);
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
-            
-            // Cerrar al hacer clic fuera del modal
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) overlay.remove();
-            });
+    const showInfoModal = async () => {
+        // Evitar que se abra el modal múltiples veces
+        if (document.getElementById('info-modal-overlay')) {
+            return;
+        }
+        
+        const appVersion = '1.0.9'; // Versión desde manifest.json
+        
+        // Crear contenedor del modal con opciones
+        const modalContent = document.createElement('div');
+        modalContent.style.textAlign = 'left';
+        modalContent.style.width = '100%';
+        
+        const infoText = document.createElement('div');
+        infoText.innerHTML = `
+            <div style="text-align: center; margin-bottom: 15px;">
+                
+                <strong style="font-size: 1.9rem; border: 3px solid black; padding: 8px 16px; display: block; border-radius: 6px; background-color: yellow; color: black;">CONTROL DE VOLTES</strong>
+            </div>
+            <div style="text-align: center; margin-bottom: 15px; line-height: 1.6;">
+                <span style="opacity: 0.8;">Versió: ${appVersion}</span>
+            </div>
+            <div style="text-align: center; margin-bottom: 15px; line-height: 1.6;">
+                <strong>© 2025 - Albert Ruiz Pujol</strong><br>
+                <a href="mailto:ruiggi@gmail.com" style="color:rgb(255, 255, 255); text-decoration: none;">ruiggi@gmail.com</a><br>
+                <a href="https://ruiggi.github.io/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://ruiggi.github.io/ControlVoltes/</a>
+            </div>
+        `;
+        modalContent.appendChild(infoText);
+        
+        // Botones de acción
+        const actionsContainer = document.createElement('div');
+        actionsContainer.style.display = 'flex';
+        actionsContainer.style.flexDirection = 'column';
+        actionsContainer.style.gap = '10px';
+        actionsContainer.style.marginTop = '20px';
+        
+        // Botón Forzar instalación
+        const forceInstallBtn = document.createElement('button');
+        forceInstallBtn.textContent = '📲 Forçar instal·lació';
+        forceInstallBtn.style.padding = '12px';
+        forceInstallBtn.style.backgroundColor = '#0d6efd';
+        forceInstallBtn.style.color = '#fff';
+        forceInstallBtn.style.border = 'none';
+        forceInstallBtn.style.borderRadius = '6px';
+        forceInstallBtn.style.fontWeight = '700';
+        forceInstallBtn.style.cursor = 'pointer';
+        forceInstallBtn.style.fontSize = '1rem';
+        forceInstallBtn.addEventListener('click', () => {
+            const forceBtn = document.getElementById('force-install-btn');
+            if (forceBtn) forceBtn.click();
+            // Cerrar modal
+            document.getElementById('info-modal-overlay')?.remove();
         });
+        
+        // Botón Actualizar aplicación
+        const updateBtn = document.createElement('button');
+        updateBtn.textContent = '🔄 Actualitzar aplicació';
+        updateBtn.style.padding = '12px';
+        updateBtn.style.backgroundColor = '#0d6efd';
+        updateBtn.style.color = '#fff';
+        updateBtn.style.border = 'none';
+        updateBtn.style.borderRadius = '6px';
+        updateBtn.style.fontWeight = '700';
+        updateBtn.style.cursor = 'pointer';
+        updateBtn.style.fontSize = '1rem';
+        updateBtn.addEventListener('click', async () => {
+            try {
+                const registration = await navigator.serviceWorker.getRegistration();
+                if (registration) {
+                    await registration.update();
+                    window.location.reload();
+                }
+            } catch (e) {
+                alert('Error actualitzant l\'aplicació');
+            }
+        });
+        
+        actionsContainer.appendChild(forceInstallBtn);
+        actionsContainer.appendChild(updateBtn);
+        modalContent.appendChild(actionsContainer);
+        
+        // Mostrar modal personalizado
+        const overlay = document.createElement('div');
+        overlay.id = 'info-modal-overlay';
+        overlay.className = 'info-modal-overlay';
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100vw';
+        overlay.style.height = '100vh';
+        overlay.style.backgroundColor = 'rgba(0,0,0,0.75)';
+        overlay.style.zIndex = '9999';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.padding = '20px';
+        overlay.style.boxSizing = 'border-box';
+        
+        const modal = document.createElement('div');
+        modal.className = 'info-modal';
+        modal.style.backgroundColor = 'var(--card-bg-color)';
+        modal.style.borderRadius = '12px';
+        modal.style.padding = '24px';
+        modal.style.maxWidth = '500px';
+        modal.style.width = '95vw';
+        modal.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+        modal.style.border = '1px solid var(--accent-color)';
+        
+        modal.appendChild(modalContent);
+        
+        // Switch para el orden de las vueltas
+        const orderSwitchContainer = document.createElement('div');
+        orderSwitchContainer.style.display = 'flex';
+        orderSwitchContainer.style.alignItems = 'center';
+        orderSwitchContainer.style.justifyContent = 'space-between';
+        orderSwitchContainer.style.gap = '10px';
+        orderSwitchContainer.style.padding = '12px';
+        orderSwitchContainer.style.marginTop = '20px';
+        orderSwitchContainer.style.borderRadius = '8px';
+        orderSwitchContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
+        orderSwitchContainer.style.border = '1px solid var(--accent-color)';
+        
+        const orderLabel = document.createElement('span');
+        orderLabel.textContent = 'ORDRE VOLTES:';
+        orderLabel.style.fontWeight = '600';
+        orderLabel.style.fontSize = '0.9rem';
+        orderLabel.style.color = 'var(--text-color)';
+        orderLabel.style.whiteSpace = 'nowrap';
+        
+        const orderSwitch = document.createElement('div');
+        orderSwitch.role = 'switch';
+        orderSwitch.tabIndex = 0;
+        orderSwitch.setAttribute('aria-checked', String(lapsOrderDescending));
+        orderSwitch.style.display = 'inline-flex';
+        orderSwitch.style.alignItems = 'center';
+        orderSwitch.style.padding = '2px';
+        orderSwitch.style.width = '34px';
+        orderSwitch.style.height = '20px';
+        orderSwitch.style.borderRadius = '999px';
+        orderSwitch.style.cursor = 'pointer';
+        orderSwitch.style.transition = 'background 0.2s';
+        orderSwitch.style.boxSizing = 'border-box';
+        orderSwitch.style.background = lapsOrderDescending ? '#0d6efd' : '#666';
+        orderSwitch.style.flexShrink = '0';
+        
+        const orderDot = document.createElement('span');
+        orderDot.style.width = '16px';
+        orderDot.style.height = '16px';
+        orderDot.style.borderRadius = '50%';
+        orderDot.style.background = '#fff';
+        orderDot.style.transition = 'transform 0.2s';
+        orderDot.style.transform = lapsOrderDescending ? 'translateX(14px)' : 'translateX(0)';
+        
+        orderSwitch.appendChild(orderDot);
+        
+        const orderStateText = document.createElement('span');
+        orderStateText.textContent = lapsOrderDescending ? '(DESCENDENT: Més recent a dalt)' : '(ASCENDENT: més recent al final)';
+        orderStateText.style.fontWeight = '500';
+        orderStateText.style.fontSize = '0.85rem';
+        orderStateText.style.color = 'var(--text-color)';
+        orderStateText.style.opacity = '0.9';
+        orderStateText.style.textAlign = 'right';
+        
+        // Event listener para el switch
+        orderSwitch.addEventListener('click', () => {
+            const newValue = !lapsOrderDescending;
+            saveLapsOrderPreference(newValue);
+            
+            // Actualizar UI del switch
+            orderSwitch.style.background = newValue ? '#0d6efd' : '#666';
+            orderDot.style.transform = newValue ? 'translateX(14px)' : 'translateX(0)';
+            orderSwitch.setAttribute('aria-checked', String(newValue));
+            
+            // Actualizar texto del estado
+            orderStateText.textContent = newValue ? '(DESCENDENT: Més recent a dalt)' : '(ASCENDENT: més recent al final)';
+            
+            // Re-renderizar las vueltas con el nuevo orden
+            renderLaps();
+        });
+        
+        // Agregar soporte de teclado
+        orderSwitch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                orderSwitch.click();
+            }
+        });
+        
+        orderSwitchContainer.appendChild(orderLabel);
+        orderSwitchContainer.appendChild(orderSwitch);
+        orderSwitchContainer.appendChild(orderStateText);
+        modal.appendChild(orderSwitchContainer);
+        
+        // Botón ACEPTAR
+        const okButton = document.createElement('button');
+        okButton.textContent = 'TANCAR';
+        okButton.style.width = '100%';
+        okButton.style.padding = '14px';
+        okButton.style.marginTop = '12px';
+        okButton.style.backgroundColor = '#28a745';
+        okButton.style.color = '#fff';
+        okButton.style.border = 'none';
+        okButton.style.borderRadius = '6px';
+        okButton.style.fontWeight = '700';
+        okButton.style.cursor = 'pointer';
+        okButton.style.fontSize = '1.1rem';
+        okButton.style.textTransform = 'uppercase';
+        okButton.addEventListener('click', () => overlay.remove());
+        
+        modal.appendChild(okButton);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        // Cerrar al hacer clic fuera del modal
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.remove();
+        });
+    };
+
+    // Añadir event listener al contenedor del título (incluye tanto texto como icono)
+    const titleLeft = document.getElementById('title-left');
+    if (titleLeft) {
+        titleLeft.style.cursor = 'pointer';
+        titleLeft.addEventListener('click', showInfoModal);
     }
 
     // Inicializar Wake Lock
     // Establecer texto inicial por defecto
     if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} ON`;
     loadWakeLockPreference();
+
+    // Cargar preferencia de orden de vueltas
+    loadLapsOrderPreference();
 
     // Ocultar vista de sessions a l'inici
     sessionsView.style.display = 'none';
@@ -3532,199 +5194,17 @@ document.addEventListener('DOMContentLoaded', () => {
     clockContainer.style.width = '100%';     // Add width
     clockContainer.style.boxSizing = 'border-box'; // Ensure padding is included in width
 
-    // Add custom styles for delete session confirm modal
-    const deleteSessionConfirmModalStyles = document.createElement('style');
-    deleteSessionConfirmModalStyles.textContent = `
-        /* Custom styles for delete session confirm modal */
-        .modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons {
-            display: flex !important;
-            flex-direction: row !important;
-            gap: 12px !important;
-            justify-content: center !important;
-        }
+    // Clock container styles applied via CSS classes
+    clockContainer.style.flexDirection = 'column';
+    clockContainer.style.alignItems = 'center';
+    clockContainer.style.justifyContent = 'center';
+    clockContainer.style.padding = '20px';
+    clockContainer.style.borderRadius = '8px';
+    clockContainer.style.cursor = 'pointer';
+    clockContainer.style.transition = 'background-color 0.2s ease';
+    clockContainer.style.maxWidth = '100%';
+    clockContainer.style.width = '100%';
+    clockContainer.style.boxSizing = 'border-box';
 
-        .modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons button {
-            flex: 1 !important;
-            max-width: 120px !important;
-            font-weight: 700 !important;
-            text-transform: uppercase !important;
-            font-size: 1rem !important;
-            padding: 12px 16px !important;
-            border-radius: 6px !important;
-            border: 2px solid !important;
-        }
-
-        .modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons button:first-child {
-            background: #f44336 !important;
-            color: white !important;
-            border-color: #f44336 !important;
-        }
-
-        .modal[data-modal-id="modal-delete-session-confirm"] .modal-buttons button:last-child {
-            background: #4CAF50 !important;
-            color: white !important;
-            border-color: #4CAF50 !important;
-        }
-    `;
-    document.head.appendChild(deleteSessionConfirmModalStyles);
-
-    // Add custom styles for delete lap confirm modal
-    const deleteLapConfirmModalStyles = document.createElement('style');
-    deleteLapConfirmModalStyles.textContent = `
-        /* Custom styles for delete lap confirm modal */
-        .modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons {
-            display: flex !important;
-            flex-direction: row !important;
-            gap: 12px !important;
-            justify-content: center !important;
-        }
-
-        .modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons button {
-            flex: 1 !important;
-            max-width: 120px !important;
-            font-weight: 700 !important;
-            text-transform: uppercase !important;
-            font-size: 1rem !important;
-            padding: 12px 16px !important;
-            border-radius: 6px !important;
-            border: 2px solid transparent !important;
-        }
-
-        .modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons button:first-child {
-            background: #f44336 !important;
-            color: white !important;
-            border-color: #f44336 !important;
-        }
-
-        .modal[data-modal-id="modal-delete-lap-confirm"] .modal-buttons button:last-child {
-            background: #4CAF50 !important;
-            color: white !important;
-            border-color: #4CAF50 !important;
-        }
-    `;
-    document.head.appendChild(deleteLapConfirmModalStyles);
-
-    // Add custom styles for improved modal appearance
-    const modalStyles = document.createElement('style');
-    modalStyles.textContent = `
-        /* Modal improvements */
-        .modal-overlay {
-            padding: max(20px, 5vw) !important;
-            box-sizing: border-box !important;
-        }
-
-        .modal {
-            max-width: min(500px, 95vw) !important;
-            width: 95vw !important;
-            padding: 24px !important;
-            gap: 20px !important;
-            font-size: 1.1rem !important;
-            box-sizing: border-box !important;
-            margin: 0 auto !important;
-        }
-
-        /* Modal input improvements */
-        .modal input[type="text"] {
-            background-color: #fff !important;
-            border: 3px solid #333 !important;
-            color: #000 !important;
-            font-size: 1.6rem !important;
-            font-weight: 600 !important;
-            padding: 18px 20px !important;
-            border-radius: 8px !important;
-            transition: all 0.2s ease !important;
-            text-shadow: none !important;
-        }
-
-        .modal input[type="text"]:focus {
-            background-color: #f8f9fa !important;
-            border-color: #000 !important;
-            outline: none !important;
-            transform: scale(1.02) !important;
-        }
-
-        .modal input[type="text"]::placeholder {
-            color: #666 !important;
-            font-weight: 500 !important;
-        }
-
-        /* Modal buttons improvements */
-        .modal button {
-            font-size: 1.2rem !important;
-            padding: 16px 20px !important;
-            min-height: 60px !important;
-            border-radius: 8px !important;
-            font-weight: 700 !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.5px !important;
-            position: relative !important;
-            z-index: 10 !important;
-            cursor: pointer !important;
-        }
-
-        .modal button:active {
-            transform: scale(0.98) !important;
-            opacity: 0.9 !important;
-        }
-
-        .modal button:focus {
-            outline: 3px solid rgba(255, 255, 255, 0.3) !important;
-            outline-offset: 2px !important;
-        }
-
-        .modal button svg {
-            width: 32px !important;
-            height: 32px !important;
-            flex-shrink: 0 !important;
-        }
-
-        .modal button[style*="flex-direction: column"] div {
-            font-size: 0.9rem !important;
-            opacity: 0.9 !important;
-            margin-top: 4px !important;
-        }
-
-        /* Modal title and message improvements */
-        .modal span[style*="font-size: 1.8rem"] {
-            font-size: 1.8rem !important;
-            margin-bottom: 12px !important;
-        }
-
-        .modal span[style*="font-size: 1.2rem"] {
-            font-size: 1.2rem !important;
-            line-height: 1.6 !important;
-        }
-
-        /* Responsive modal improvements for mobile */
-        @media (max-width: 480px) {
-            .modal {
-                padding: 20px !important;
-                width: 90vw !important;
-                max-width: 90vw !important;
-            }
-
-            .modal input[type="text"] {
-                font-size: 1.4rem !important;
-                padding: 16px 18px !important;
-                border: 2px solid #333 !important;
-            }
-
-            .modal button {
-                font-size: 1.1rem !important;
-                padding: 14px 18px !important;
-                min-height: 56px !important;
-            }
-
-            .modal button svg {
-                width: 28px !important;
-                height: 28px !important;
-            }
-        }
-
-        /* Modal button container improvements */
-        .modal > div[style*="flex-direction: column"] {
-            gap: 16px !important;
-        }
-    `;
-    document.head.appendChild(modalStyles);
+    // Note: Modal styles are now in styles.css - no need to create them dynamically
 });
