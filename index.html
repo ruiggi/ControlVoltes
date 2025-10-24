@@ -55,10 +55,13 @@
                     <!-- Centro -->
                     <circle cx="256" cy="300" r="20" fill="#2c3e50"/>
                 </svg>
-                <span id="app-title-text">VOLTES</span>
             </div>
             <div id="header-actions" style="display:flex; align-items:center; gap:8px;">
                 <button id="install-btn" style="display:none; align-items:center; gap:6px; padding:4px 8px; border-radius:6px; border:1px solid #0d6efd; background:#0d6efd; color:#fff; font-weight:700; cursor:pointer;">INSTALAR</button>
+                <div id="lock-toggle" style="display:flex; align-items:center; gap:4px; cursor:pointer; padding:4px 8px; border-radius:6px; border:1px solid #28a745; background:transparent; transition:all 0.2s;">
+                    <button id="lock-btn" style="display:flex; align-items:center; justify-content:center; background:transparent; border:none; color:#28a745; cursor:pointer; padding:0;"></button>
+                    <span id="lock-label" style="font-size:0.75rem; font-weight:700; color:#28a745; white-space:nowrap;">OBERT</span>
+                </div>
                 <div id="wake-toggle" role="switch" aria-checked="false" tabindex="0" title="Mantener pantalla activa">
                     <span id="wake-label"></span>
                     <span id="wake-indicator" style="width:34px; height:20px; display:inline-flex; align-items:center; padding:2px; border-radius:999px; background:#666; box-sizing:border-box;">

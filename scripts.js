@@ -15,6 +15,15 @@ document.addEventListener('DOMContentLoaded', () => {
         recordingName: 'SessióSenseNom',
         lapsOrderDescending: true, // true = descendente (más nueva arriba), false = ascendente
         
+        // Configuración
+        settings: {
+            showRepetitions: true,  // Por defecto habilitado
+            goToSessionsAfterFinalize: true,  // Por defecto ir al listado después de finalizar
+            isLocked: false,  // Por defecto desbloqueado
+            volumeButtonsEnabled: false,  // Por defecto desactivado (botones de volumen para marcar vueltas)
+            csvExportAsFile: false  // Por defecto exportar como texto (false = texto, true = archivo)
+        },
+        
         // Intervalos
         clockInterval: null,
         lastLapUpdateId: null,
@@ -105,6 +114,129 @@ document.addEventListener('DOMContentLoaded', () => {
     let isMultiSelectMode = false;
     let selectedSessions = new Set(); // Set de session keys seleccionadas
     let finalizeViewHandler = appState.finalizeViewHandler;
+
+    // =======================
+    // FUNCIONES DE CONFIGURACIÓN
+    // =======================
+    
+    const loadSettings = () => {
+        try {
+            const saved = localStorage.getItem('voltes_settings');
+            if (saved) {
+                const settings = JSON.parse(saved);
+                appState.settings.showRepetitions = settings.showRepetitions !== undefined ? settings.showRepetitions : true;
+                appState.settings.goToSessionsAfterFinalize = settings.goToSessionsAfterFinalize !== undefined ? settings.goToSessionsAfterFinalize : true;
+                appState.settings.isLocked = settings.isLocked !== undefined ? settings.isLocked : false;
+                appState.settings.volumeButtonsEnabled = settings.volumeButtonsEnabled !== undefined ? settings.volumeButtonsEnabled : false;
+                appState.settings.csvExportAsFile = settings.csvExportAsFile !== undefined ? settings.csvExportAsFile : false;
+            }
+        } catch (e) {
+            console.warn('Error cargando configuración:', e);
+            appState.settings.showRepetitions = true;
+            appState.settings.goToSessionsAfterFinalize = true;
+            appState.settings.isLocked = false;
+            appState.settings.volumeButtonsEnabled = false;
+            appState.settings.csvExportAsFile = false;
+        }
+    };
+    
+    const saveSettings = () => {
+        try {
+            localStorage.setItem('voltes_settings', JSON.stringify(appState.settings));
+        } catch (e) {
+            console.warn('Error guardando configuración:', e);
+        }
+    };
+    
+    const toggleLock = () => {
+        appState.settings.isLocked = !appState.settings.isLocked;
+        saveSettings();
+        
+        // Actualizar UI del botón de bloqueo
+        const lockBtn = document.getElementById('lock-btn');
+        const lockLabel = document.getElementById('lock-label');
+        const lockToggle = document.getElementById('lock-toggle');
+        
+        if (lockBtn && lockLabel && lockToggle) {
+            lockBtn.innerHTML = appState.settings.isLocked ? lockIcon : unlockIcon;
+            lockLabel.textContent = appState.settings.isLocked ? 'BLOCAT' : 'OBERT';
+            lockBtn.style.color = appState.settings.isLocked ? '#dc3545' : '#28a745';
+            lockLabel.style.color = appState.settings.isLocked ? '#dc3545' : '#28a745';
+            lockToggle.style.borderColor = appState.settings.isLocked ? '#dc3545' : '#28a745';
+        }
+        
+        // Aplicar el estado de bloqueo a todos los botones
+        applyLockState();
+    };
+    
+    const applyLockState = () => {
+        const isLocked = appState.settings.isLocked;
+        
+        // Selector para todos los botones excepto el de bloqueo
+        const selectors = [
+            '#clock-container',
+            '#finalize-btn',
+            '#delete-all-btn',
+            '#toggle-view-btn',
+            '.wake-lock-toggle',
+            '.lap-delete-btn',
+            '.lap-type-toggle',
+            'button[id^="edit-time-btn"]',
+            '.repetition-button',
+            '.add-repetition-btn',
+            '.add-rep-after-btn',
+            'button[id^="rep-edit-time-btn"]',
+            'button[id^="rep-type-toggle"]',
+            '.repetition-delete-btn',
+            '.lap-name',
+            '.repetition-name',
+            '#recording-name-input',
+            '#session-save-btn',
+            '#session-delete-btn',
+            '#session-share-btn'
+        ];
+        
+        selectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
+                if (isLocked) {
+                    el.style.pointerEvents = 'none';
+                    el.style.opacity = '0.5';
+                    if (el.tagName === 'INPUT') {
+                        el.disabled = true;
+                    }
+                } else {
+                    el.style.pointerEvents = '';
+                    el.style.opacity = '';
+                    if (el.tagName === 'INPUT') {
+                        el.disabled = false;
+                    }
+                }
+            });
+        });
+        
+        // Añadir overlay visual si está bloqueado
+        let lockOverlay = document.getElementById('lock-overlay');
+        if (isLocked && !lockOverlay) {
+            lockOverlay = document.createElement('div');
+            lockOverlay.id = 'lock-overlay';
+            lockOverlay.style.position = 'fixed';
+            lockOverlay.style.top = '0';
+            lockOverlay.style.left = '0';
+            lockOverlay.style.width = '100%';
+            lockOverlay.style.height = '100%';
+            lockOverlay.style.backgroundColor = 'rgba(255, 0, 0, 0.05)';
+            lockOverlay.style.pointerEvents = 'none';
+            lockOverlay.style.zIndex = '999';
+            lockOverlay.style.display = 'flex';
+            lockOverlay.style.alignItems = 'center';
+            lockOverlay.style.justifyContent = 'center';
+            lockOverlay.innerHTML = '<div style="background: rgba(220, 53, 69, 0.9); color: white; padding: 10px 20px; border-radius: 8px; font-weight: 700; font-size: 1.2rem;">🔒 PANTALLA BLOCADA</div>';
+            document.body.appendChild(lockOverlay);
+        } else if (!isLocked && lockOverlay) {
+            lockOverlay.remove();
+        }
+    };
 
     const disketteIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" stroke-width="1.5" stroke="black" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" /><path d="M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M14 4l0 4l-6 0l0 -4" /></svg>`;
     const stopwatchIcon = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 7V12H17M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -223,6 +355,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const xIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
     const plusIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
     const screenIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`;
+    const lockIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+    const unlockIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`;
 
     // --- WakeLockManager Class ---
     class WakeLockManager {
@@ -2672,6 +2806,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
         }
+        
+        // Reaplica el estado de bloqueo después de renderizar
+        if (typeof applyLockState === 'function') {
+            applyLockState();
+        }
     };
 
     const updateInstructionText = () => {
@@ -4290,12 +4429,30 @@ document.addEventListener('DOMContentLoaded', () => {
         csv += `Resumen;Descans;${formatDurationPlain(totalRestSeconds)}\n`;
         csv += `Resumen;Total;${formatDurationPlain(totalTimeSeconds)}\n`;
 
-        if (navigator.share && navigator.canShare && navigator.canShare({ text: csv })) {
-            navigator.share({ title: `Sesión CSV: ${sessionName}`, text: csv })
-                .catch(() => {});
+        // Verificar si se debe exportar como archivo o como texto
+        if (appState.settings.csvExportAsFile) {
+            // Generar archivo CSV para descargar
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            const fileName = `${sessionName}_${startDateStr}.csv`;
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         } else {
-            // Fallback: prompt para copiar
-            prompt('Copia el CSV:', csv);
+            // Compartir como texto
+            if (navigator.share && navigator.canShare && navigator.canShare({ text: csv })) {
+                navigator.share({ title: `Sesión CSV: ${sessionName}`, text: csv })
+                    .catch(() => {});
+            } else {
+                // Fallback: prompt para copiar
+                prompt('Copia el CSV:', csv);
+            }
         }
     };
 
@@ -4335,12 +4492,30 @@ document.addEventListener('DOMContentLoaded', () => {
         csv += `Resumen,Descans,${formatDurationPlain(totalRestSeconds)}\n`;
         csv += `Resumen,Total,${formatDurationPlain(totalTimeSeconds)}\n`;
 
-        if (navigator.share && navigator.canShare && navigator.canShare({ text: csv })) {
-            navigator.share({ title: `Sesión CSV (Coma): ${sessionName}`, text: csv })
-                .catch(() => {});
+        // Verificar si se debe exportar como archivo o como texto
+        if (appState.settings.csvExportAsFile) {
+            // Generar archivo CSV para descargar
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            const fileName = `${sessionName}_${startDateStr}_coma.csv`;
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         } else {
-            // Fallback: prompt para copiar
-            prompt('Copia el CSV (Coma):', csv);
+            // Compartir como texto
+            if (navigator.share && navigator.canShare && navigator.canShare({ text: csv })) {
+                navigator.share({ title: `Sesión CSV (Coma): ${sessionName}`, text: csv })
+                    .catch(() => {});
+            } else {
+                // Fallback: prompt para copiar
+                prompt('Copia el CSV (Coma):', csv);
+            }
         }
     };
 
@@ -4662,6 +4837,49 @@ document.addEventListener('DOMContentLoaded', () => {
             addLap();
         }
     });
+    
+    // --- Capturar botones físicos del móvil (volumen) para marcar vueltas ---
+    let lastVolumeKeyTime = 0;
+    const volumeKeyDebounce = 300; // ms para evitar registros duplicados
+    
+    document.addEventListener('keydown', (e) => {
+        // Solo funcionar si la funcionalidad está activada
+        if (!appState.settings.volumeButtonsEnabled) return;
+        
+        // Capturar botones de volumen (VolumeUp/VolumeDown) y otras teclas útiles
+        const validKeys = ['VolumeUp', 'VolumeDown', 'MediaTrackNext', 'MediaTrackPrevious'];
+        
+        if (validKeys.includes(e.key)) {
+            const now = Date.now();
+            
+            // Debounce para evitar múltiples registros
+            if (now - lastVolumeKeyTime < volumeKeyDebounce) {
+                e.preventDefault();
+                return;
+            }
+            
+            lastVolumeKeyTime = now;
+            
+            // Solo marcar vuelta si estamos en la vista de registro
+            if (registrationView.style.display === 'block') {
+                e.preventDefault(); // Evitar que cambie el volumen
+                addLap();
+                
+                // Feedback visual/háptico opcional
+                if (navigator.vibrate) {
+                    navigator.vibrate(50); // Vibración corta de confirmación
+                }
+                
+                // Feedback visual en el reloj
+                const originalBg = clockContainer.style.backgroundColor;
+                clockContainer.style.backgroundColor = '#FFD700'; // Amarillo dorado
+                setTimeout(() => {
+                    clockContainer.style.backgroundColor = originalBg;
+                }, 150);
+            }
+        }
+    }, true); // useCapture=true para capturar antes que otros handlers
+    
     finalizeBtn.addEventListener('click', async () => {
         await finalizeSession();
     });
@@ -5059,6 +5277,173 @@ document.addEventListener('DOMContentLoaded', () => {
         orderSwitchContainer.appendChild(orderStateText);
         modal.appendChild(orderSwitchContainer);
         
+        // --- Switch para botones de volumen ---
+        const volumeButtonsSwitchContainer = document.createElement('div');
+        volumeButtonsSwitchContainer.style.display = 'flex';
+        volumeButtonsSwitchContainer.style.alignItems = 'center';
+        volumeButtonsSwitchContainer.style.justifyContent = 'space-between';
+        volumeButtonsSwitchContainer.style.gap = '10px';
+        volumeButtonsSwitchContainer.style.padding = '12px';
+        volumeButtonsSwitchContainer.style.marginTop = '10px';
+        volumeButtonsSwitchContainer.style.borderRadius = '8px';
+        volumeButtonsSwitchContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
+        volumeButtonsSwitchContainer.style.border = '1px solid var(--accent-color)';
+        
+        const volumeButtonsLabel = document.createElement('span');
+        volumeButtonsLabel.textContent = '🎚️ BOTONS VOLUM:';
+        volumeButtonsLabel.style.fontWeight = '600';
+        volumeButtonsLabel.style.fontSize = '0.9rem';
+        volumeButtonsLabel.style.color = 'var(--text-color)';
+        volumeButtonsLabel.style.whiteSpace = 'nowrap';
+        
+        const volumeButtonsSwitch = document.createElement('div');
+        volumeButtonsSwitch.role = 'switch';
+        volumeButtonsSwitch.tabIndex = 0;
+        volumeButtonsSwitch.setAttribute('aria-checked', String(appState.settings.volumeButtonsEnabled));
+        volumeButtonsSwitch.style.display = 'inline-flex';
+        volumeButtonsSwitch.style.alignItems = 'center';
+        volumeButtonsSwitch.style.padding = '2px';
+        volumeButtonsSwitch.style.width = '34px';
+        volumeButtonsSwitch.style.height = '20px';
+        volumeButtonsSwitch.style.borderRadius = '999px';
+        volumeButtonsSwitch.style.cursor = 'pointer';
+        volumeButtonsSwitch.style.transition = 'background 0.2s';
+        volumeButtonsSwitch.style.boxSizing = 'border-box';
+        volumeButtonsSwitch.style.background = appState.settings.volumeButtonsEnabled ? '#28a745' : '#666';
+        volumeButtonsSwitch.style.flexShrink = '0';
+        
+        const volumeButtonsDot = document.createElement('span');
+        volumeButtonsDot.style.width = '16px';
+        volumeButtonsDot.style.height = '16px';
+        volumeButtonsDot.style.borderRadius = '50%';
+        volumeButtonsDot.style.background = '#fff';
+        volumeButtonsDot.style.transition = 'transform 0.2s';
+        volumeButtonsDot.style.transform = appState.settings.volumeButtonsEnabled ? 'translateX(14px)' : 'translateX(0)';
+        
+        volumeButtonsSwitch.appendChild(volumeButtonsDot);
+        
+        const volumeButtonsStateText = document.createElement('span');
+        volumeButtonsStateText.textContent = appState.settings.volumeButtonsEnabled ? '(Marcar voltes amb botons)' : '(Desactivat)';
+        volumeButtonsStateText.style.fontWeight = '500';
+        volumeButtonsStateText.style.fontSize = '0.85rem';
+        volumeButtonsStateText.style.color = 'var(--text-color)';
+        volumeButtonsStateText.style.opacity = '0.9';
+        volumeButtonsStateText.style.textAlign = 'right';
+        
+        // Event listener para el switch
+        volumeButtonsSwitch.addEventListener('click', () => {
+            const newValue = !appState.settings.volumeButtonsEnabled;
+            appState.settings.volumeButtonsEnabled = newValue;
+            saveSettings();
+            
+            // Actualizar UI del switch
+            volumeButtonsSwitch.style.background = newValue ? '#28a745' : '#666';
+            volumeButtonsDot.style.transform = newValue ? 'translateX(14px)' : 'translateX(0)';
+            volumeButtonsSwitch.setAttribute('aria-checked', String(newValue));
+            
+            // Actualizar texto del estado
+            volumeButtonsStateText.textContent = newValue ? '(Marcar voltes amb botons)' : '(Desactivat)';
+            
+            // Mostrar mensaje de confirmación
+            if (newValue && navigator.vibrate) {
+                navigator.vibrate([50, 100, 50]); // Patrón de vibración de confirmación
+            }
+        });
+        
+        // Agregar soporte de teclado
+        volumeButtonsSwitch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                volumeButtonsSwitch.click();
+            }
+        });
+        
+        volumeButtonsSwitchContainer.appendChild(volumeButtonsLabel);
+        volumeButtonsSwitchContainer.appendChild(volumeButtonsSwitch);
+        volumeButtonsSwitchContainer.appendChild(volumeButtonsStateText);
+        modal.appendChild(volumeButtonsSwitchContainer);
+        
+        // --- Switch para exportación CSV como archivo ---
+        const csvExportSwitchContainer = document.createElement('div');
+        csvExportSwitchContainer.style.display = 'flex';
+        csvExportSwitchContainer.style.alignItems = 'center';
+        csvExportSwitchContainer.style.justifyContent = 'space-between';
+        csvExportSwitchContainer.style.gap = '10px';
+        csvExportSwitchContainer.style.padding = '12px';
+        csvExportSwitchContainer.style.marginTop = '10px';
+        csvExportSwitchContainer.style.borderRadius = '8px';
+        csvExportSwitchContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
+        csvExportSwitchContainer.style.border = '1px solid var(--accent-color)';
+        
+        const csvExportLabel = document.createElement('span');
+        csvExportLabel.textContent = '📄 EXPORTAR CSV:';
+        csvExportLabel.style.fontWeight = '600';
+        csvExportLabel.style.fontSize = '0.9rem';
+        csvExportLabel.style.color = 'var(--text-color)';
+        csvExportLabel.style.whiteSpace = 'nowrap';
+        
+        const csvExportSwitch = document.createElement('div');
+        csvExportSwitch.role = 'switch';
+        csvExportSwitch.tabIndex = 0;
+        csvExportSwitch.setAttribute('aria-checked', String(appState.settings.csvExportAsFile));
+        csvExportSwitch.style.display = 'inline-flex';
+        csvExportSwitch.style.alignItems = 'center';
+        csvExportSwitch.style.padding = '2px';
+        csvExportSwitch.style.width = '34px';
+        csvExportSwitch.style.height = '20px';
+        csvExportSwitch.style.borderRadius = '999px';
+        csvExportSwitch.style.cursor = 'pointer';
+        csvExportSwitch.style.transition = 'background 0.2s';
+        csvExportSwitch.style.boxSizing = 'border-box';
+        csvExportSwitch.style.background = appState.settings.csvExportAsFile ? '#28a745' : '#666';
+        csvExportSwitch.style.flexShrink = '0';
+        
+        const csvExportDot = document.createElement('span');
+        csvExportDot.style.width = '16px';
+        csvExportDot.style.height = '16px';
+        csvExportDot.style.borderRadius = '50%';
+        csvExportDot.style.background = '#fff';
+        csvExportDot.style.transition = 'transform 0.2s';
+        csvExportDot.style.transform = appState.settings.csvExportAsFile ? 'translateX(14px)' : 'translateX(0)';
+        
+        csvExportSwitch.appendChild(csvExportDot);
+        
+        const csvExportStateText = document.createElement('span');
+        csvExportStateText.textContent = appState.settings.csvExportAsFile ? '(Generar arxiu)' : '(Compartir text)';
+        csvExportStateText.style.fontWeight = '500';
+        csvExportStateText.style.fontSize = '0.85rem';
+        csvExportStateText.style.color = 'var(--text-color)';
+        csvExportStateText.style.opacity = '0.9';
+        csvExportStateText.style.textAlign = 'right';
+        
+        // Event listener para el switch
+        csvExportSwitch.addEventListener('click', () => {
+            const newValue = !appState.settings.csvExportAsFile;
+            appState.settings.csvExportAsFile = newValue;
+            saveSettings();
+            
+            // Actualizar UI del switch
+            csvExportSwitch.style.background = newValue ? '#28a745' : '#666';
+            csvExportDot.style.transform = newValue ? 'translateX(14px)' : 'translateX(0)';
+            csvExportSwitch.setAttribute('aria-checked', String(newValue));
+            
+            // Actualizar texto del estado
+            csvExportStateText.textContent = newValue ? '(Generar arxiu)' : '(Compartir text)';
+        });
+        
+        // Agregar soporte de teclado
+        csvExportSwitch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                csvExportSwitch.click();
+            }
+        });
+        
+        csvExportSwitchContainer.appendChild(csvExportLabel);
+        csvExportSwitchContainer.appendChild(csvExportSwitch);
+        csvExportSwitchContainer.appendChild(csvExportStateText);
+        modal.appendChild(csvExportSwitchContainer);
+        
         // Botón ACEPTAR
         const okButton = document.createElement('button');
         okButton.textContent = 'TANCAR';
@@ -5092,6 +5477,9 @@ document.addEventListener('DOMContentLoaded', () => {
         titleLeft.addEventListener('click', showInfoModal);
     }
 
+    // Cargar configuración inicial
+    loadSettings();
+
     // Inicializar Wake Lock
     // Establecer texto inicial por defecto
     if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} ON`;
@@ -5099,6 +5487,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Cargar preferencia de orden de vueltas
     loadLapsOrderPreference();
+
+    // Inicializar botón de bloqueo
+    const lockBtn = document.getElementById('lock-btn');
+    const lockLabel = document.getElementById('lock-label');
+    const lockToggle = document.getElementById('lock-toggle');
+    
+    if (lockBtn && lockLabel && lockToggle) {
+        // Establecer estado inicial
+        lockBtn.innerHTML = appState.settings.isLocked ? lockIcon : unlockIcon;
+        lockLabel.textContent = appState.settings.isLocked ? 'BLOCAT' : 'OBERT';
+        lockBtn.style.color = appState.settings.isLocked ? '#dc3545' : '#28a745';
+        lockLabel.style.color = appState.settings.isLocked ? '#dc3545' : '#28a745';
+        lockToggle.style.borderColor = appState.settings.isLocked ? '#dc3545' : '#28a745';
+        
+        // Event listener
+        lockToggle.addEventListener('click', toggleLock);
+        
+        // Aplicar estado inicial
+        applyLockState();
+    }
 
     // Ocultar vista de sessions a l'inici
     sessionsView.style.display = 'none';
