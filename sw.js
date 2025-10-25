@@ -1,4 +1,4 @@
-const CACHE_NAME = 'control-voltes-cache-v1.2.2';
+const CACHE_NAME = 'control-voltes-cache-v1.2.3';
 
 // Detectar si estamos en GitHub Pages o local
 const isGitHubPages = self.location.hostname.includes('github.io');

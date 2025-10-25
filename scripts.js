@@ -4850,11 +4850,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const validKeys = ['VolumeUp', 'VolumeDown', 'MediaTrackNext', 'MediaTrackPrevious'];
         
         if (validKeys.includes(e.key)) {
+            // Prevenir el comportamiento por defecto INMEDIATAMENTE
+            e.preventDefault();
+            
             const now = Date.now();
             
             // Debounce para evitar múltiples registros
             if (now - lastVolumeKeyTime < volumeKeyDebounce) {
-                e.preventDefault();
                 return;
             }
             
@@ -4862,7 +4864,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Solo marcar vuelta si estamos en la vista de registro
             if (registrationView.style.display === 'block') {
-                e.preventDefault(); // Evitar que cambie el volumen
                 addLap();
                 
                 // Feedback visual/háptico opcional
