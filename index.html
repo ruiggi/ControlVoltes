@@ -1,4 +1,11 @@
 <!DOCTYPE html>
+<!-- 
+╔═══════════════════════════════════════════════════════════════════════════╗
+║  ⚠️  ACTUALIZAR VERSIÓN: Cambiar ?v=X.X.X en líneas 14-15 y 140       ⚠️ ║
+║  Debe coincidir con: sw.js, manifest.json y scripts.js (appVersion)      ║
+║  VERSIÓN ACTUAL: 1.2.3                                                    ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+-->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -89,6 +96,17 @@
                     <strong id="total-time" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
                 </div>
             </div>
+            <div id="volume-buttons-indicator" style="display:none; padding:8px; background:rgba(0,170,255,0.1); border:1px solid #00aaff; border-radius:8px; margin-top:4px; text-align:center;">
+                <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:4px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span style="color:#4CAF50; font-weight:700; font-size:0.9rem;">Botones físicos activos</span>
+                </div>
+                <div style="font-size:0.75rem; color:#a0a0a0; font-weight:600;">
+                    Vol+ = Vuelta | Vol- = Pausar
+                </div>
+            </div>
             <div id="controls-container">
                 <button id="finalize-btn" class="control-btn">PREM EL RELLOTGE PER COMENÇAR</button>
                <!--  <button id="force-install-btn" class="control-btn" style="display:none;">Instalar app</button>
@@ -115,6 +133,10 @@
             </div>
         </div>
     </div>
+    <!-- Audio silencioso para Media Session API -->
+    <audio id="silent-audio" loop preload="auto" style="display:none;">
+        <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" type="audio/wav">
+    </audio>
     <script src="scripts.js?v=1.2.3"></script>
 </body>
 </html>

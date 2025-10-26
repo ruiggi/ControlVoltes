@@ -1,3 +1,17 @@
+// ╔═══════════════════════════════════════════════════════════════════════════╗
+// ║  ⚠️  IMPORTANTE: ACTUALIZAR VERSIÓN EN CADA MODIFICACIÓN DEL CÓDIGO  ⚠️   ║
+// ╠═══════════════════════════════════════════════════════════════════════════╣
+// ║  Para que la PWA se actualice correctamente, DEBES cambiar la versión en:║
+// ║                                                                           ║
+// ║  1. sw.js (línea siguiente) → 'control-voltes-cache-vX.X.X'             ║
+// ║  2. manifest.json → "version": "X.X.X"                                   ║
+// ║  3. index.html → scripts.js?v=X.X.X y styles.css?v=X.X.X                ║
+// ║  4. scripts.js → const appVersion = 'X.X.X' (línea ~5429)               ║
+// ║                                                                           ║
+// ║  VERSIÓN ACTUAL: 1.2.3                                                   ║
+// ║  PRÓXIMA VERSIÓN: 1.2.4 (incrementar al hacer cambios)                  ║
+// ╚═══════════════════════════════════════════════════════════════════════════╝
+
 const CACHE_NAME = 'control-voltes-cache-v1.2.3';
 
 // Detectar si estamos en GitHub Pages o local

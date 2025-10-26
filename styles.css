@@ -494,8 +494,10 @@ button:focus-visible,
 .control-btn {
     width: 100%;
     padding: 8px;
-    font-size: 1rem;
-    font-weight: 500;
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
     border-radius: 10px;
     border: none;
     cursor: pointer;
@@ -1279,7 +1281,6 @@ button:focus-visible,
 }
 
 .order-switch {
-  role: switch;
   display: inline-flex;
   align-items: center;
   padding: 2px;

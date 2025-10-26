@@ -1,3 +1,20 @@
+// ╔═══════════════════════════════════════════════════════════════════════════╗
+// ║  ⚠️  RECORDATORIO: ACTUALIZAR VERSIÓN DESPUÉS DE MODIFICAR CÓDIGO  ⚠️     ║
+// ╠═══════════════════════════════════════════════════════════════════════════╣
+// ║  Cuando modifiques este archivo o cualquier otro de la aplicación:       ║
+// ║                                                                           ║
+// ║  DEBES actualizar la versión en estos 4 lugares:                         ║
+// ║  1. sw.js           → const CACHE_NAME = 'control-voltes-cache-vX.X.X'  ║
+// ║  2. manifest.json   → "version": "X.X.X"                                 ║
+// ║  3. index.html      → styles.css?v=X.X.X y scripts.js?v=X.X.X           ║
+// ║  4. scripts.js      → const appVersion = 'X.X.X' (línea ~5429)          ║
+// ║                                                                           ║
+// ║  VERSIÓN ACTUAL: 1.2.3                                                   ║
+// ║                                                                           ║
+// ║  Esto es CRÍTICO para que los usuarios reciban las actualizaciones       ║
+// ║  automáticamente cuando abran la aplicación.                             ║
+// ╚═══════════════════════════════════════════════════════════════════════════╝
+
 document.addEventListener('DOMContentLoaded', () => {
     // Estado centralizado de la aplicación
     const appState = {
@@ -145,6 +162,68 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('voltes_settings', JSON.stringify(appState.settings));
         } catch (e) {
             console.warn('Error guardando configuración:', e);
+        }
+    };
+    
+    // ========================================
+    // PERSISTENCIA DE SESIÓN ACTUAL
+    // ========================================
+    
+    const saveCurrentSession = () => {
+        try {
+            if (laps.length === 0) return;
+            
+            const sessionData = {
+                laps: laps.map(lap => ({
+                    time: lap.time.toISOString(),
+                    name: lap.name,
+                    type: lap.type
+                })),
+                recordingName: recordingName,
+                isRecording: isRecording,
+                timestamp: new Date().toISOString()
+            };
+            
+            localStorage.setItem('voltes_current_session', JSON.stringify(sessionData));
+        } catch (e) {
+            console.warn('Error guardando sesión actual:', e);
+        }
+    };
+    
+    const loadCurrentSession = () => {
+        try {
+            const saved = localStorage.getItem('voltes_current_session');
+            if (!saved) return null;
+            
+            const sessionData = JSON.parse(saved);
+            
+            // Verificar que los datos son válidos
+            if (!sessionData.laps || !Array.isArray(sessionData.laps)) return null;
+            
+            // Convertir las fechas de string a Date
+            const lapsData = sessionData.laps.map(lap => ({
+                time: new Date(lap.time),
+                name: lap.name,
+                type: lap.type
+            }));
+            
+            return {
+                laps: lapsData,
+                recordingName: sessionData.recordingName || 'SessióSenseNom',
+                isRecording: sessionData.isRecording || false,
+                timestamp: new Date(sessionData.timestamp)
+            };
+        } catch (e) {
+            console.warn('Error cargando sesión actual:', e);
+            return null;
+        }
+    };
+    
+    const clearCurrentSession = () => {
+        try {
+            localStorage.removeItem('voltes_current_session');
+        } catch (e) {
+            console.warn('Error limpiando sesión actual:', e);
         }
     };
     
@@ -2081,6 +2160,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Detener actualizaciones
         stopLastLapUpdate();
         stopClock();
+        
+        // Desactivar botones de volumen
+        if (typeof deactivateVolumeButtons === 'function') {
+            deactivateVolumeButtons();
+        }
+        
+        // Limpiar sesión guardada en localStorage
+        clearCurrentSession();
 
         // Limpiar contenedores de la interfaz
         clearElement(lapsContainer);
@@ -2901,6 +2988,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addLap = () => {
         if (isReadOnly) return;
         const now = new Date();
+        const wasRecording = isRecording;
         if (!isRecording) {
             isRecording = true;
             finalizeBtn.textContent = 'FINALITZAR SESSIÓ';
@@ -2913,6 +3001,15 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Montar campo de nombre de sesión para grabación
             mountRecordingNameRow();
+            
+            // Activar botones de volumen si está habilitado
+            if (appState.settings.volumeButtonsEnabled) {
+                setTimeout(() => {
+                    if (typeof activateVolumeButtons === 'function') {
+                        activateVolumeButtons();
+                    }
+                }, 100);
+            }
         }
         laps.push({
             time: now,
@@ -2926,6 +3023,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (laps.length >= 2) {
             startLastLapUpdate();
         }
+        
+        // Guardar sesión en localStorage para persistencia
+        saveCurrentSession();
     };
 
     // Actualizar solo la duración de la última vuelta (optimizado)
@@ -3180,6 +3280,14 @@ document.addEventListener('DOMContentLoaded', () => {
             appState.isRecording = false; // Sincronizar con appState
             recordingName = 'SessióSenseNom';
             appState.recordingName = recordingName; // Sincronizar con appState
+            
+            // Desactivar botones de volumen
+            if (typeof deactivateVolumeButtons === 'function') {
+                deactivateVolumeButtons();
+            }
+            
+            // Limpiar sesión guardada en localStorage
+            clearCurrentSession();
             
             // Restaurar texto del botón
             finalizeBtn.textContent = 'PREM EL RELLOTGE PER COMENÇAR';
@@ -4838,6 +4946,232 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
+    // ========================================
+    // MEDIA SESSION API + BOTONES DE VOLUMEN FÍSICOS
+    // ========================================
+    
+    let silentAudio = null;
+    let mediaSessionActive = false;
+    let isChronoPaused = false;
+    let pausedTime = null;
+    
+    // Función para inicializar audio silencioso
+    const initSilentAudio = () => {
+        try {
+            silentAudio = document.getElementById('silent-audio');
+            if (silentAudio) {
+                silentAudio.volume = 0.01;
+                silentAudio.loop = true;
+            }
+        } catch (e) {
+            console.warn('Error inicializando audio silencioso:', e);
+        }
+    };
+    
+    // Función para iniciar audio silencioso (requiere interacción del usuario)
+    const startSilentAudio = async () => {
+        if (!silentAudio || !appState.settings.volumeButtonsEnabled) return false;
+        
+        try {
+            await silentAudio.play();
+            console.log('Audio silencioso iniciado');
+            return true;
+        } catch (e) {
+            console.warn('Error reproduciendo audio silencioso:', e);
+            return false;
+        }
+    };
+    
+    // Función para detener audio silencioso
+    const stopSilentAudio = () => {
+        if (!silentAudio) return;
+        
+        try {
+            silentAudio.pause();
+            silentAudio.currentTime = 0;
+            console.log('Audio silencioso detenido');
+        } catch (e) {
+            console.warn('Error deteniendo audio silencioso:', e);
+        }
+    };
+    
+    // Función para pausar/reanudar cronómetro
+    const toggleChronoPause = () => {
+        if (!isRecording) return;
+        
+        isChronoPaused = !isChronoPaused;
+        
+        if (isChronoPaused) {
+            // Pausar cronómetro
+            pausedTime = new Date();
+            
+            // Cambiar color del reloj a naranja para indicar pausa
+            clockContainer.style.backgroundColor = '#FF9800';
+            clockElement.style.color = '#000';
+            
+            // Feedback háptico
+            if (navigator.vibrate) {
+                navigator.vibrate([50, 50, 50]); // Vibración de pausa
+            }
+            
+            console.log('Cronómetro pausado');
+        } else {
+            // Reanudar cronómetro
+            if (pausedTime) {
+                const pauseDuration = new Date() - pausedTime;
+                
+                // Ajustar todos los tiempos de las vueltas
+                laps.forEach(lap => {
+                    lap.time = new Date(lap.time.getTime() + pauseDuration);
+                });
+                
+                pausedTime = null;
+            }
+            
+            // Restaurar color verde
+            clockContainer.style.backgroundColor = '#2E7D32';
+            clockElement.style.color = '#fff';
+            
+            // Feedback háptico
+            if (navigator.vibrate) {
+                navigator.vibrate(100); // Vibración de reanudación
+            }
+            
+            console.log('Cronómetro reanudado');
+        }
+        
+        renderLaps();
+        updateSummary();
+    };
+    
+    // Función para configurar Media Session API
+    const setupMediaSession = () => {
+        if (!('mediaSession' in navigator)) {
+            console.warn('Media Session API no soportada en este navegador');
+            return false;
+        }
+        
+        try {
+            // Configurar metadata
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: 'Cronómetro de Entrenamiento',
+                artist: 'Sesión Activa',
+                album: 'Entrenamiento'
+            });
+            
+            // Botón VOLUMEN ARRIBA (Vol+) → Registrar nueva vuelta
+            navigator.mediaSession.setActionHandler('seekforward', () => {
+                console.log('Media Session: seekforward (Vol+) - Registrar vuelta');
+                if (registrationView.style.display === 'block' && !isReadOnly) {
+                    addLap();
+                    
+                    // Feedback visual
+                    const originalBg = clockContainer.style.backgroundColor;
+                    clockContainer.style.backgroundColor = '#FFD700';
+                    setTimeout(() => {
+                        clockContainer.style.backgroundColor = originalBg;
+                    }, 150);
+                    
+                    // Feedback háptico
+                    if (navigator.vibrate) {
+                        navigator.vibrate(50);
+                    }
+                }
+            });
+            
+            // Botón VOLUMEN ABAJO (Vol-) → Pausar/Reanudar cronómetro
+            navigator.mediaSession.setActionHandler('seekbackward', () => {
+                console.log('Media Session: seekbackward (Vol-) - Pausar/Reanudar');
+                if (registrationView.style.display === 'block' && !isReadOnly) {
+                    toggleChronoPause();
+                }
+            });
+            
+            // Handlers adicionales para controles de notificación
+            navigator.mediaSession.setActionHandler('play', () => {
+                console.log('Media Session: play - Reanudar');
+                if (isChronoPaused) {
+                    toggleChronoPause();
+                }
+            });
+            
+            navigator.mediaSession.setActionHandler('pause', () => {
+                console.log('Media Session: pause - Pausar');
+                if (!isChronoPaused && isRecording) {
+                    toggleChronoPause();
+                }
+            });
+            
+            console.log('Media Session API configurada correctamente');
+            mediaSessionActive = true;
+            return true;
+        } catch (e) {
+            console.warn('Error configurando Media Session API:', e);
+            return false;
+        }
+    };
+    
+    // Función para activar botones de volumen
+    const activateVolumeButtons = async () => {
+        if (!appState.settings.volumeButtonsEnabled) return;
+        
+        // Inicializar audio
+        const audioStarted = await startSilentAudio();
+        
+        if (audioStarted) {
+            // Configurar Media Session
+            setupMediaSession();
+            
+            // Mostrar indicador
+            const indicator = document.getElementById('volume-buttons-indicator');
+            if (indicator) {
+                indicator.style.display = 'block';
+            }
+        }
+    };
+    
+    // Función para desactivar botones de volumen
+    const deactivateVolumeButtons = () => {
+        stopSilentAudio();
+        mediaSessionActive = false;
+        
+        // Ocultar indicador
+        const indicator = document.getElementById('volume-buttons-indicator');
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+        
+        // Limpiar handlers de Media Session
+        if ('mediaSession' in navigator) {
+            try {
+                navigator.mediaSession.setActionHandler('seekforward', null);
+                navigator.mediaSession.setActionHandler('seekbackward', null);
+                navigator.mediaSession.setActionHandler('play', null);
+                navigator.mediaSession.setActionHandler('pause', null);
+            } catch (e) {
+                console.warn('Error limpiando Media Session handlers:', e);
+            }
+        }
+    };
+    
+    // Inicializar audio al cargar la página
+    initSilentAudio();
+    
+    // Modificar la función addLap para activar botones de volumen al iniciar
+    const originalAddLap = addLap;
+    window.addLapWithVolumeButtons = function() {
+        const wasRecording = isRecording;
+        originalAddLap.call(this);
+        
+        // Si acabamos de iniciar grabación, activar botones de volumen
+        if (!wasRecording && isRecording && appState.settings.volumeButtonsEnabled) {
+            setTimeout(() => activateVolumeButtons(), 100);
+        }
+    };
+    
+    // Reemplazar la función addLap
+    const addLapOriginal = addLap;
+    
     // --- Capturar botones físicos del móvil (volumen) para marcar vueltas ---
     let lastVolumeKeyTime = 0;
     const volumeKeyDebounce = 300; // ms para evitar registros duplicados
@@ -5090,7 +5424,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        const appVersion = '1.0.9'; // Versión desde manifest.json
+        // ⚠️⚠️⚠️ ACTUALIZAR VERSIÓN AQUÍ EN CADA CAMBIO ⚠️⚠️⚠️
+        // Esta versión se muestra en el modal de información de la app
+        // DEBE coincidir con: sw.js, manifest.json e index.html
+        const appVersion = '1.2.3'; // ⬅️ CAMBIAR AQUÍ la versión
         
         // Crear contenedor del modal con opciones
         const modalContent = document.createElement('div');
@@ -5117,13 +5454,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Botones de acción
         const actionsContainer = document.createElement('div');
         actionsContainer.style.display = 'flex';
-        actionsContainer.style.flexDirection = 'column';
+        actionsContainer.style.flexDirection = 'row'; // Botones lado a lado
         actionsContainer.style.gap = '10px';
         actionsContainer.style.marginTop = '20px';
+        actionsContainer.style.flexWrap = 'wrap'; // Permite apilar en pantallas pequeñas
         
         // Botón Forzar instalación
         const forceInstallBtn = document.createElement('button');
-        forceInstallBtn.textContent = '📲 Forçar instal·lació';
+        forceInstallBtn.textContent = '📲 INSTAL·LAR';
         forceInstallBtn.style.padding = '12px';
         forceInstallBtn.style.backgroundColor = '#0d6efd';
         forceInstallBtn.style.color = '#fff';
@@ -5132,6 +5470,8 @@ document.addEventListener('DOMContentLoaded', () => {
         forceInstallBtn.style.fontWeight = '700';
         forceInstallBtn.style.cursor = 'pointer';
         forceInstallBtn.style.fontSize = '1rem';
+        forceInstallBtn.style.flex = '1 1 200px'; // Ocupar mismo espacio, min 200px
+        forceInstallBtn.style.minWidth = '0'; // Permitir reducción
         forceInstallBtn.addEventListener('click', () => {
             const forceBtn = document.getElementById('force-install-btn');
             if (forceBtn) forceBtn.click();
@@ -5141,7 +5481,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Botón Actualizar aplicación
         const updateBtn = document.createElement('button');
-        updateBtn.textContent = '🔄 Actualitzar aplicació';
+        updateBtn.textContent = '🔄 ACTUALITZAR';
         updateBtn.style.padding = '12px';
         updateBtn.style.backgroundColor = '#0d6efd';
         updateBtn.style.color = '#fff';
@@ -5150,6 +5490,8 @@ document.addEventListener('DOMContentLoaded', () => {
         updateBtn.style.fontWeight = '700';
         updateBtn.style.cursor = 'pointer';
         updateBtn.style.fontSize = '1rem';
+        updateBtn.style.flex = '1 1 200px'; // Ocupar mismo espacio, min 200px
+        updateBtn.style.minWidth = '0'; // Permitir reducción
         updateBtn.addEventListener('click', async () => {
             try {
                 const registration = await navigator.serviceWorker.getRegistration();
@@ -5556,9 +5898,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add instruction text
     const instructionText = document.createElement('div');
     instructionText.textContent = 'PREM AQUÍ PER COMENÇAR A REGISTRAR UNA SESSIÓ';
-    instructionText.style.fontSize = '0.8em';
-    instructionText.style.opacity = '0.7';
+    instructionText.style.fontSize = '1.1em'; // Más grande y visible
+    instructionText.style.opacity = '1'; // Completamente visible
     instructionText.style.marginTop = '10px';
+    instructionText.style.fontWeight = '700'; // Negrita para más visibilidad
+    instructionText.style.letterSpacing = '0.5px'; // Mejor legibilidad
+    instructionText.style.lineHeight = '1.2'; // Compacto para no aumentar altura
     clockContainer.appendChild(instructionText);
 
     // Afegir estils al clock container
