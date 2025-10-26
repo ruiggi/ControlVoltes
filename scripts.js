@@ -3008,11 +3008,22 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Activar botones de volumen si está habilitado
             if (appState.settings.volumeButtonsEnabled) {
-                setTimeout(() => {
+                console.log('🎬 Primera vuelta registrada - activando botones de volumen...');
+                setTimeout(async () => {
                     if (typeof activateVolumeButtons === 'function') {
-                        activateVolumeButtons();
+                        const success = await activateVolumeButtons();
+                        if (success) {
+                            console.log('✅✅✅ Botones de volumen ACTIVADOS y listos ✅✅✅');
+                        } else {
+                            console.error('❌ No se pudieron activar los botones de volumen');
+                            console.error('💡 Revisa los mensajes anteriores para ver el motivo');
+                        }
+                    } else {
+                        console.error('❌ Función activateVolumeButtons no encontrada');
                     }
                 }, 100);
+            } else {
+                console.log('⚠️ Botones de volumen NO habilitados (configuración desactivada)');
             }
         }
         laps.push({
@@ -4974,14 +4985,48 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Función para iniciar audio silencioso (requiere interacción del usuario)
     const startSilentAudio = async () => {
-        if (!silentAudio || !appState.settings.volumeButtonsEnabled) return false;
+        if (!silentAudio) {
+            console.error('❌ Audio silencioso no encontrado');
+            return false;
+        }
+        
+        if (!appState.settings.volumeButtonsEnabled) {
+            console.warn('⚠️ Botones de volumen NO habilitados en configuración');
+            return false;
+        }
         
         try {
-            await silentAudio.play();
-            console.log('Audio silencioso iniciado');
-            return true;
+            console.log('🔊 Intentando iniciar audio silencioso...');
+            
+            // Asegurar que el audio está configurado correctamente
+            silentAudio.volume = 0.01;
+            silentAudio.loop = true;
+            
+            // Intentar reproducir
+            const playPromise = silentAudio.play();
+            
+            if (playPromise !== undefined) {
+                await playPromise;
+                console.log('✅ Audio silencioso iniciado correctamente');
+                console.log('📊 Estado del audio:', {
+                    paused: silentAudio.paused,
+                    readyState: silentAudio.readyState,
+                    volume: silentAudio.volume
+                });
+                return true;
+            }
+            
+            return false;
         } catch (e) {
-            console.warn('Error reproduciendo audio silencioso:', e);
+            console.error('❌ Error reproduciendo audio silencioso:', e.name, e.message);
+            console.error('📋 Detalles:', e);
+            
+            // Mostrar mensaje al usuario
+            if (e.name === 'NotAllowedError') {
+                console.error('🚫 El navegador bloqueó la reproducción automática');
+                console.error('💡 Solución: Asegúrate de pulsar el reloj con el dedo directamente');
+            }
+            
             return false;
         }
     };
@@ -5050,22 +5095,27 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Función para configurar Media Session API
     const setupMediaSession = () => {
+        console.log('⚙️ setupMediaSession() - Configurando Media Session...');
+        
         if (!('mediaSession' in navigator)) {
-            console.warn('Media Session API no soportada en este navegador');
+            console.error('❌ Media Session API NO soportada en este navegador');
             return false;
         }
         
         try {
             // Configurar metadata
+            console.log('📝 Configurando metadata...');
             navigator.mediaSession.metadata = new MediaMetadata({
                 title: 'Cronómetro de Entrenamiento',
                 artist: 'Sesión Activa',
                 album: 'Entrenamiento'
             });
+            console.log('✅ Metadata configurada');
             
             // Botón VOLUMEN ARRIBA (Vol+) → Registrar nueva vuelta
+            console.log('🔧 Configurando handler Vol+ (seekforward)...');
             navigator.mediaSession.setActionHandler('seekforward', () => {
-                console.log('Media Session: seekforward (Vol+) - Registrar vuelta');
+                console.log('🔊 ¡BOTÓN VOL+ PULSADO! - Registrar vuelta');
                 if (registrationView.style.display === 'block' && !isReadOnly) {
                     addLap();
                     
@@ -5080,57 +5130,107 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (navigator.vibrate) {
                         navigator.vibrate(50);
                     }
+                } else {
+                    console.warn('⚠️ No se puede registrar vuelta (vista no activa o bloqueada)');
                 }
             });
             
             // Botón VOLUMEN ABAJO (Vol-) → Pausar/Reanudar cronómetro
+            console.log('🔧 Configurando handler Vol- (seekbackward)...');
             navigator.mediaSession.setActionHandler('seekbackward', () => {
-                console.log('Media Session: seekbackward (Vol-) - Pausar/Reanudar');
+                console.log('🔊 ¡BOTÓN VOL- PULSADO! - Pausar/Reanudar');
                 if (registrationView.style.display === 'block' && !isReadOnly) {
                     toggleChronoPause();
+                } else {
+                    console.warn('⚠️ No se puede pausar (vista no activa o bloqueada)');
                 }
             });
             
             // Handlers adicionales para controles de notificación
+            console.log('🔧 Configurando handlers Play/Pause...');
             navigator.mediaSession.setActionHandler('play', () => {
-                console.log('Media Session: play - Reanudar');
+                console.log('▶️ Media Session: play - Reanudar');
                 if (isChronoPaused) {
                     toggleChronoPause();
                 }
             });
             
             navigator.mediaSession.setActionHandler('pause', () => {
-                console.log('Media Session: pause - Pausar');
+                console.log('⏸️ Media Session: pause - Pausar');
                 if (!isChronoPaused && isRecording) {
                     toggleChronoPause();
                 }
             });
             
-            console.log('Media Session API configurada correctamente');
+            console.log('✅✅✅ Media Session API configurada correctamente ✅✅✅');
             mediaSessionActive = true;
             return true;
         } catch (e) {
-            console.warn('Error configurando Media Session API:', e);
+            console.error('❌ Error configurando Media Session API:', e);
             return false;
         }
     };
     
     // Función para activar botones de volumen
     const activateVolumeButtons = async () => {
-        if (!appState.settings.volumeButtonsEnabled) return;
+        console.log('🎯 activateVolumeButtons() llamada');
+        
+        if (!appState.settings.volumeButtonsEnabled) {
+            console.warn('⚠️ Botones de volumen NO habilitados - abortando');
+            return false;
+        }
+        
+        console.log('✅ Botones de volumen habilitados - continuando...');
+        
+        // Verificar soporte de Media Session
+        if (!('mediaSession' in navigator)) {
+            console.error('❌ Media Session API NO soportada en este navegador');
+            return false;
+        }
+        
+        console.log('✅ Media Session API soportada');
         
         // Inicializar audio
+        console.log('🔊 Iniciando audio silencioso...');
         const audioStarted = await startSilentAudio();
         
         if (audioStarted) {
-            // Configurar Media Session
-            setupMediaSession();
+            console.log('✅ Audio iniciado - configurando Media Session...');
             
-            // Mostrar indicador
-            const indicator = document.getElementById('volume-buttons-indicator');
-            if (indicator) {
-                indicator.style.display = 'block';
+            // Configurar Media Session
+            const mediaSessionConfigured = setupMediaSession();
+            
+            if (mediaSessionConfigured) {
+                console.log('✅ Media Session configurada correctamente');
+                
+                // Mostrar indicador
+                const indicator = document.getElementById('volume-buttons-indicator');
+                if (indicator) {
+                    indicator.style.display = 'block';
+                    console.log('✅ Indicador visual mostrado');
+                    
+                    // Vibración de confirmación
+                    if (navigator.vibrate) {
+                        navigator.vibrate([100, 50, 100]);
+                    }
+                } else {
+                    console.error('❌ No se encontró el elemento indicador');
+                }
+                
+                return true;
+            } else {
+                console.error('❌ Error configurando Media Session');
+                return false;
             }
+        } else {
+            console.error('❌ No se pudo iniciar el audio silencioso');
+            console.error('💡 Posibles causas:');
+            console.error('   - Navegador bloqueó reproducción automática');
+            console.error('   - Falta interacción directa del usuario');
+            console.error('   - Permisos de audio denegados');
+            console.error('💡 Solución: Asegúrate de activar los botones en configuración Y pulsar el reloj directamente');
+            
+            return false;
         }
     };
     
@@ -5709,6 +5809,34 @@ document.addEventListener('DOMContentLoaded', () => {
         volumeButtonsSwitchContainer.appendChild(volumeButtonsSwitch);
         volumeButtonsSwitchContainer.appendChild(volumeButtonsStateText);
         modal.appendChild(volumeButtonsSwitchContainer);
+        
+        // --- Mensaje de ayuda para botones de volumen ---
+        const volumeButtonsHelp = document.createElement('div');
+        volumeButtonsHelp.style.padding = '12px';
+        volumeButtonsHelp.style.marginTop = '8px';
+        volumeButtonsHelp.style.borderRadius = '8px';
+        volumeButtonsHelp.style.backgroundColor = 'rgba(0, 170, 255, 0.1)';
+        volumeButtonsHelp.style.border = '1px solid rgba(0, 170, 255, 0.3)';
+        volumeButtonsHelp.style.fontSize = '0.85rem';
+        volumeButtonsHelp.style.lineHeight = '1.6';
+        volumeButtonsHelp.style.color = 'var(--text-color)';
+        volumeButtonsHelp.innerHTML = `
+            <div style="font-weight: 600; margin-bottom: 8px; color: #00aaff;">ℹ️ Com utilitzar:</div>
+            <div style="opacity: 0.9;">
+                1. Activa aquest switch (☝️ dalt)<br>
+                2. Tanca aquest modal<br>
+                3. <strong>Prem el rellotge</strong> per iniciar una sessió<br>
+                4. Veuràs un indicador verd "✅ Botones físicos activos"<br>
+                5. Ara pots usar <strong>Vol+</strong> i <strong>Vol-</strong> en el teu mòbil!
+            </div>
+            <div style="margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+                <strong>Vol+</strong> = Marcar volta | <strong>Vol-</strong> = Pausar/Reanudar
+            </div>
+            <div style="margin-top: 8px; opacity: 0.7; font-size: 0.75rem;">
+                💡 Per diagnosticar problemes, connecta el mòbil al PC i obre la consola del navegador
+            </div>
+        `;
+        modal.appendChild(volumeButtonsHelp);
         
         // --- Switch para exportación CSV como archivo ---
         const csvExportSwitchContainer = document.createElement('div');
