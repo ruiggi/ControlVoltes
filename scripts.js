@@ -9,7 +9,11 @@
 // ║  3. index.html      → styles.css?v=X.X.X y scripts.js?v=X.X.X           ║
 // ║  4. scripts.js      → const appVersion = 'X.X.X' (línea ~5429)          ║
 // ║                                                                           ║
-// ║  VERSIÓN ACTUAL: 1.2.3                                                   ║
+// ║  📌 NOTA PARA ASISTENTE IA:                                              ║
+// ║  Después de CUALQUIER cambio de código, PREGUNTA SIEMPRE al usuario:    ║
+// ║  "¿Quieres actualizar la versión para forzar actualización de la app?"  ║
+// ║                                                                           ║
+// ║  VERSIÓN ACTUAL: 1.2.4                                                   ║
 // ║                                                                           ║
 // ║  Esto es CRÍTICO para que los usuarios reciban las actualizaciones       ║
 // ║  automáticamente cuando abran la aplicación.                             ║
@@ -5427,7 +5431,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ⚠️⚠️⚠️ ACTUALIZAR VERSIÓN AQUÍ EN CADA CAMBIO ⚠️⚠️⚠️
         // Esta versión se muestra en el modal de información de la app
         // DEBE coincidir con: sw.js, manifest.json e index.html
-        const appVersion = '1.2.3'; // ⬅️ CAMBIAR AQUÍ la versión
+        const appVersion = '1.2.4'; // ⬅️ CAMBIAR AQUÍ la versión
         
         // Crear contenedor del modal con opciones
         const modalContent = document.createElement('div');

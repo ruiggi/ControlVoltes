@@ -8,11 +8,15 @@
 // ║  3. index.html → scripts.js?v=X.X.X y styles.css?v=X.X.X                ║
 // ║  4. scripts.js → const appVersion = 'X.X.X' (línea ~5429)               ║
 // ║                                                                           ║
-// ║  VERSIÓN ACTUAL: 1.2.3                                                   ║
-// ║  PRÓXIMA VERSIÓN: 1.2.4 (incrementar al hacer cambios)                  ║
+// ║  📌 NOTA PARA ASISTENTE IA:                                              ║
+// ║  Después de CUALQUIER cambio de código, PREGUNTA al usuario:            ║
+// ║  "¿Quieres actualizar la versión para forzar actualización de la app?"  ║
+// ║                                                                           ║
+// ║  VERSIÓN ACTUAL: 1.2.4                                                   ║
+// ║  PRÓXIMA VERSIÓN: 1.2.5 (incrementar al hacer cambios)                  ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
-const CACHE_NAME = 'control-voltes-cache-v1.2.3';
+const CACHE_NAME = 'control-voltes-cache-v1.2.4';
 
 // Detectar si estamos en GitHub Pages o local
 const isGitHubPages = self.location.hostname.includes('github.io');
