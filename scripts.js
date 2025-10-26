@@ -4779,6 +4779,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 installBtn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
             }
             window.addEventListener('beforeinstallprompt', (e) => {
+                // Prevenir el mini-infobar automático del navegador
+                // Esto es CORRECTO e INTENCIONAL - permite controlar cuándo mostrar el prompt
+                // El aviso en consola es informativo, no un error
                 e.preventDefault();
                 deferredPrompt = e;
                 if (installBtn) installBtn.style.display = 'flex';
@@ -5531,7 +5534,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ⚠️⚠️⚠️ ACTUALIZAR VERSIÓN AQUÍ EN CADA CAMBIO ⚠️⚠️⚠️
         // Esta versión se muestra en el modal de información de la app
         // DEBE coincidir con: sw.js, manifest.json e index.html
-        const appVersion = '1.2.4'; // ⬅️ CAMBIAR AQUÍ la versión
+        const appVersion = '1.2.5'; // ⬅️ CAMBIAR AQUÍ la versión
         
         // Crear contenedor del modal con opciones
         const modalContent = document.createElement('div');
