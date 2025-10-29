@@ -17,7 +17,7 @@
 ### 🤖 Format App (Android)
 - Versió **instal·lable** per a dispositius Android.  
 - Ofereix **tota la funcionalitat completa**, incloent el suport per als **botons físics** per marcar voltes.  
-- 🔗 **Enllaç de descàrrega:** *(afegir quan estigui disponible)*
+- 🔗 **Enllaç de descàrrega:** *[[https://ruiggi.github.io/ControlVoltes/](https://github.com/ruiggi/ControlVoltes/blob/main/ControlVoltes-v1.3.0.apk)*
 
 ---
 
