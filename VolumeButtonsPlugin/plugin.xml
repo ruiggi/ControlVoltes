@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+    id="cordova-plugin-volume-buttons"
+    version="1.0.0">
+    
+    <name>Volume Buttons</name>
+    <description>Captura eventos de botones de volumen físicos en Android</description>
+    
+    <js-module src="www/VolumeButtons.js" name="VolumeButtons">
+        <clobbers target="VolumeButtons" />
+    </js-module>
+    
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="VolumeButtons">
+                <param name="android-package" value="com.test.volumebuttons.VolumeButtons"/>
+                <param name="onload" value="true" />
+            </feature>
+        </config-file>
+        
+        <source-file src="src/android/VolumeButtons.java" target-dir="src/com/test/volumebuttons" />
+    </platform>
+</plugin>
+

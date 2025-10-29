@@ -1,0 +1,22 @@
+{
+  "name": "cordova-plugin-volume-buttons",
+  "version": "1.0.0",
+  "description": "Captura eventos de botones de volumen en Android",
+  "cordova": {
+    "id": "cordova-plugin-volume-buttons",
+    "platforms": [
+      "android"
+    ]
+  },
+  "keywords": [
+    "cordova",
+    "volume",
+    "buttons",
+    "hardware",
+    "ecosystem:cordova",
+    "cordova-android"
+  ],
+  "author": "Test Team",
+  "license": "MIT"
+}
+
