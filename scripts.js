@@ -1,30 +1,10 @@
-// ╔═══════════════════════════════════════════════════════════════════════════╗
-// ║  ⚠️  RECORDATORIO: ACTUALIZAR VERSIÓN DESPUÉS DE MODIFICAR CÓDIGO  ⚠️     ║
-// ╠═══════════════════════════════════════════════════════════════════════════╣
-// ║  Cuando modifiques este archivo o cualquier otro de la aplicación:       ║
-// ║                                                                           ║
-// ║  DEBES actualizar la versión en estos 4 lugares:                         ║
-// ║  1. sw.js           → const CACHE_NAME = 'control-voltes-cache-vX.X.X'  ║
-// ║  2. manifest.json   → "version": "X.X.X"                                 ║
-// ║  3. index.html      → styles.css?v=X.X.X y scripts.js?v=X.X.X           ║
-// ║  4. scripts.js      → const appVersion = 'X.X.X' (línea ~5429)          ║
-// ║                                                                           ║
-// ║  📌 NOTA PARA ASISTENTE IA:                                              ║
-// ║  Después de CUALQUIER cambio de código, PREGUNTA SIEMPRE al usuario:    ║
-// ║  "¿Quieres actualizar la versión para forzar actualización de la app?"  ║
-// ║                                                                           ║
-// ║  VERSIÓN ACTUAL: 1.2.4                                                   ║
-// ║                                                                           ║
-// ║  Esto es CRÍTICO para que los usuarios reciban las actualizaciones       ║
-// ║  automáticamente cuando abran la aplicación.                             ║
-// ╚═══════════════════════════════════════════════════════════════════════════╝
-
-document.addEventListener('DOMContentLoaded', () => {
+// Función principal de inicialización
+function initApp() {
     // Estado centralizado de la aplicación
     const appState = {
         // Referencias DOM (cachear una sola vez)
         dom: {},
-        
+
         // Estado de la aplicación
         laps: [],
         isRecording: false,
@@ -35,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pendingRename: null,
         recordingName: 'SessióSenseNom',
         lapsOrderDescending: true, // true = descendente (más nueva arriba), false = ascendente
-        
+
         // Configuración
         settings: {
             showRepetitions: true,  // Por defecto habilitado
@@ -44,58 +24,58 @@ document.addEventListener('DOMContentLoaded', () => {
             volumeButtonsEnabled: false,  // Por defecto desactivado (botones de volumen para marcar vueltas)
             csvExportAsFile: false  // Por defecto exportar como texto (false = texto, true = archivo)
         },
-        
+
         // Intervalos
         clockInterval: null,
         lastLapUpdateId: null,
-        
+
         // Constantes
         SESSION_PREFIX: 'stopwatch_session_',
-        
+
         // Referencias temporales
         finalizeViewHandler: null,
     };
-    
+
     // Función para inicializar caché DOM
     function initDOMCache() {
         appState.dom = {
             // Elementos principales
             clock: document.getElementById('clock'),
             clockContainer: document.getElementById('clock-container'),
-            
+
             // Summary
             totalWork: document.getElementById('total-work'),
             totalRest: document.getElementById('total-rest'),
             totalTime: document.getElementById('total-time'),
-            
+
             // Laps y controles
             lapsContainer: document.getElementById('laps-container'),
             finalizeBtn: document.getElementById('finalize-btn'),
-            
+
             // Vistas
             registrationView: document.getElementById('registration-view'),
             sessionsView: document.getElementById('sessions-view'),
             sessionsList: document.getElementById('sessions-list'),
             sessionsContainer: document.getElementById('sessions-container'),
-            
+
             // Header
             toggleViewBtn: document.getElementById('toggle-view-btn'),
             wakeToggle: document.getElementById('wake-toggle'),
             wakeIndicator: document.getElementById('wake-indicator'),
             wakeLabel: document.getElementById('wake-label'),
         };
-        
+
         // Aplicar estilo inicial al botón finalizar
-        try { 
+        try {
             if (appState.dom.finalizeBtn) {
                 appState.dom.finalizeBtn.style.height = 'auto';
             }
-        } catch {}
+        } catch { }
     }
-    
+
     // Inicializar caché DOM
     initDOMCache();
-    
+
     // Aliases para compatibilidad con código existente
     const clockElement = appState.dom.clock;
     const clockContainer = appState.dom.clockContainer;
@@ -109,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleViewBtn = appState.dom.toggleViewBtn;
     const registrationView = appState.dom.registrationView;
     const sessionsView = appState.dom.sessionsView;
-    
+
     // Aliases para variables de estado (compatibilidad)
     let laps = appState.laps;
     let clockInterval = appState.clockInterval;
@@ -122,7 +102,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let recordingName = appState.recordingName;
     let lapsOrderDescending = appState.lapsOrderDescending;
     const sessionPrefix = appState.SESSION_PREFIX;
-    
+    const ACTIVE_RECORDING_KEY = 'voltes_active_recording';
+
     // Debug temporal: verificar dimensiones del contenedor de vueltas
     setTimeout(() => {
         if (lapsContainer) {
@@ -130,16 +111,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const styles = window.getComputedStyle(lapsContainer);
         }
     }, 1000);
-    
+
     // Estado para modo multiselección
     let isMultiSelectMode = false;
     let selectedSessions = new Set(); // Set de session keys seleccionadas
     let finalizeViewHandler = appState.finalizeViewHandler;
+    let exitConfirmationInProgress = false;
 
     // =======================
     // FUNCIONES DE CONFIGURACIÓN
     // =======================
-    
+
     const loadSettings = () => {
         try {
             const saved = localStorage.getItem('voltes_settings');
@@ -160,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
             appState.settings.csvExportAsFile = false;
         }
     };
-    
+
     const saveSettings = () => {
         try {
             localStorage.setItem('voltes_settings', JSON.stringify(appState.settings));
@@ -168,78 +150,16 @@ document.addEventListener('DOMContentLoaded', () => {
             console.warn('Error guardando configuración:', e);
         }
     };
-    
-    // ========================================
-    // PERSISTENCIA DE SESIÓN ACTUAL
-    // ========================================
-    
-    const saveCurrentSession = () => {
-        try {
-            if (laps.length === 0) return;
-            
-            const sessionData = {
-                laps: laps.map(lap => ({
-                    time: lap.time.toISOString(),
-                    name: lap.name,
-                    type: lap.type
-                })),
-                recordingName: recordingName,
-                isRecording: isRecording,
-                timestamp: new Date().toISOString()
-            };
-            
-            localStorage.setItem('voltes_current_session', JSON.stringify(sessionData));
-        } catch (e) {
-            console.warn('Error guardando sesión actual:', e);
-        }
-    };
-    
-    const loadCurrentSession = () => {
-        try {
-            const saved = localStorage.getItem('voltes_current_session');
-            if (!saved) return null;
-            
-            const sessionData = JSON.parse(saved);
-            
-            // Verificar que los datos son válidos
-            if (!sessionData.laps || !Array.isArray(sessionData.laps)) return null;
-            
-            // Convertir las fechas de string a Date
-            const lapsData = sessionData.laps.map(lap => ({
-                time: new Date(lap.time),
-                name: lap.name,
-                type: lap.type
-            }));
-            
-            return {
-                laps: lapsData,
-                recordingName: sessionData.recordingName || 'SessióSenseNom',
-                isRecording: sessionData.isRecording || false,
-                timestamp: new Date(sessionData.timestamp)
-            };
-        } catch (e) {
-            console.warn('Error cargando sesión actual:', e);
-            return null;
-        }
-    };
-    
-    const clearCurrentSession = () => {
-        try {
-            localStorage.removeItem('voltes_current_session');
-        } catch (e) {
-            console.warn('Error limpiando sesión actual:', e);
-        }
-    };
-    
+
     const toggleLock = () => {
         appState.settings.isLocked = !appState.settings.isLocked;
         saveSettings();
-        
+
         // Actualizar UI del botón de bloqueo
         const lockBtn = document.getElementById('lock-btn');
         const lockLabel = document.getElementById('lock-label');
         const lockToggle = document.getElementById('lock-toggle');
-        
+
         if (lockBtn && lockLabel && lockToggle) {
             lockBtn.innerHTML = appState.settings.isLocked ? lockIcon : unlockIcon;
             lockLabel.textContent = appState.settings.isLocked ? 'BLOCAT' : 'OBERT';
@@ -247,14 +167,14 @@ document.addEventListener('DOMContentLoaded', () => {
             lockLabel.style.color = appState.settings.isLocked ? '#dc3545' : '#28a745';
             lockToggle.style.borderColor = appState.settings.isLocked ? '#dc3545' : '#28a745';
         }
-        
+
         // Aplicar el estado de bloqueo a todos los botones
         applyLockState();
     };
-    
+
     const applyLockState = () => {
         const isLocked = appState.settings.isLocked;
-        
+
         // Selector para todos los botones excepto el de bloqueo
         const selectors = [
             '#clock-container',
@@ -278,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '#session-delete-btn',
             '#session-share-btn'
         ];
-        
+
         selectors.forEach(selector => {
             const elements = document.querySelectorAll(selector);
             elements.forEach(el => {
@@ -297,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
-        
+
         // Añadir overlay visual si está bloqueado
         let lockOverlay = document.getElementById('lock-overlay');
         if (isLocked && !lockOverlay) {
@@ -323,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const disketteIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" stroke-width="1.5" stroke="black" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" /><path d="M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M14 4l0 4l-6 0l0 -4" /></svg>`;
     const stopwatchIcon = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 7V12H17M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    
+
     const stopwatchIconColor = `<svg width="32" height="32" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
         <!-- Botón superior -->
         <circle cx="256" cy="60" r="40" fill="#e0e0e0" stroke="#999" stroke-width="8"/>
@@ -445,15 +365,25 @@ document.addEventListener('DOMContentLoaded', () => {
     class WakeLockManager {
         constructor() {
             this.wakeLock = null;
-            this.isSupported = 'wakeLock' in navigator;
-            
-            // Gestión de visibilitychange para re-adquirir el wake lock
-            if (this.isSupported) {
-                document.addEventListener('visibilitychange', async () => {
-                    if (document.visibilityState === 'visible' && this.wakeLock !== null) {
-                        await this.request();
-                    }
-                });
+            this.isCordova = !!window.cordova;
+            this._isActive = false;
+
+            // Detectar soporte según el entorno
+            if (this.isCordova) {
+                // En Cordova, verificar si existe el plugin insomnia
+                this.isSupported = !!(window.plugins && window.plugins.insomnia);
+            } else {
+                // En Web, usar Wake Lock API
+                this.isSupported = 'wakeLock' in navigator;
+
+                // Gestión de visibilitychange para re-adquirir el wake lock (solo Web)
+                if (this.isSupported) {
+                    document.addEventListener('visibilitychange', async () => {
+                        if (document.visibilityState === 'visible' && this.wakeLock !== null) {
+                            await this.request();
+                        }
+                    });
+                }
             }
         }
 
@@ -463,29 +393,58 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                this.wakeLock = await navigator.wakeLock.request('screen');
-                return true;
+                if (this.isCordova) {
+                    // Cordova: Usar plugin insomnia
+                    if (window.plugins && window.plugins.insomnia) {
+                        window.plugins.insomnia.keepAwake();
+                        this._isActive = true;
+                        return true;
+                    }
+                    return false;
+                } else {
+                    // Web: Usar Wake Lock API
+                    this.wakeLock = await navigator.wakeLock.request('screen');
+                    this._isActive = true;
+                    return true;
+                }
             } catch (err) {
                 this.wakeLock = null;
+                this._isActive = false;
                 return false;
             }
         }
 
         async release() {
-            if (this.wakeLock !== null) {
-                try {
-                    await this.wakeLock.release();
-                    this.wakeLock = null;
-                    return true;
-                } catch (err) {
+            try {
+                if (this.isCordova) {
+                    // Cordova: Liberar insomnia
+                    if (window.plugins && window.plugins.insomnia) {
+                        window.plugins.insomnia.allowSleepAgain();
+                        this._isActive = false;
+                        return true;
+                    }
                     return false;
+                } else {
+                    // Web: Liberar Wake Lock
+                    if (this.wakeLock !== null) {
+                        await this.wakeLock.release();
+                        this.wakeLock = null;
+                        this._isActive = false;
+                        return true;
+                    }
+                    return true;
                 }
+            } catch (err) {
+                return false;
             }
-            return true;
         }
 
         isActive() {
-            return this.wakeLock !== null && !this.wakeLock.released;
+            if (this.isCordova) {
+                return this._isActive;
+            } else {
+                return this.wakeLock !== null && !this.wakeLock.released;
+            }
         }
     }
 
@@ -546,7 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 modal.setAttribute('role', type === 'alert' ? 'alertdialog' : 'dialog');
                 modal.setAttribute('aria-modal', 'true');
-                
+
                 // Añadir identificador al modal si se proporciona
                 if (id) {
                     modal.setAttribute('id', id);
@@ -631,7 +590,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Para modal horizontal: orden según reverseButtons
                         // Por defecto: CANCEL.LAR (izq) - CONFIRMAR (der)
                         // reverseButtons: CONFIRMAR (izq) - CANCEL.LAR (der)
-                        
+
                         const cancelBtn = createButton({
                             text: cancelText,
                             icon: xIcon,
@@ -679,7 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (okButtonStyle) {
                             okBtn.style.cssText += okButtonStyle;
                         }
-                        
+
                         // Añadir botones en el orden correcto
                         if (reverseButtons) {
                             buttonsContainer.appendChild(okBtn);
@@ -774,7 +733,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 cancelBtn.style.flexDirection = 'column';
                                 cancelBtn.style.gap = '2px';
                                 cancelBtn.appendChild(subtitle);
-                            } catch {}
+                            } catch { }
                         }
                         buttonsContainer.appendChild(cancelBtn);
                     }
@@ -856,7 +815,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const minutes = currentTime.getMinutes();
                 const seconds = currentTime.getSeconds();
                 const milliseconds = currentTime.getMilliseconds();
-                
+
                 // Obtener tiempos de vueltas anterior y posterior para validación
                 const previousLapTime = lapIndex > 0 ? allLaps[lapIndex - 1].time : null;
                 const nextLapTime = lapIndex < allLaps.length - 1 ? allLaps[lapIndex + 1].time : null;
@@ -917,7 +876,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     border-radius: 8px;
                     border: 1px solid var(--accent-color);
                 `;
-                
+
                 const currentTimeLabel = document.createElement('div');
                 currentTimeLabel.textContent = 'VALOR ACTUAL:';
                 currentTimeLabel.style.cssText = `
@@ -925,7 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     font-size: 1.2rem;
                     font-weight: 700;
                 `;
-                
+
                 const currentTimeDisplay = document.createElement('div');
                 currentTimeDisplay.style.cssText = `
                     font-size: 2.5rem;
@@ -938,7 +897,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const s = String(seconds).padStart(2, '0');
                 const ms = String(milliseconds).padStart(3, '0');
                 currentTimeDisplay.textContent = `${h}:${m}:${s}.${ms}`;
-                
+
                 currentTimeContainer.appendChild(currentTimeLabel);
                 currentTimeContainer.appendChild(currentTimeDisplay);
 
@@ -1027,7 +986,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentValue = Math.max(0, Math.min(max, value));
                         const translateY = 50 - (currentValue * 50);
                         itemsContainer.style.transform = `translateY(${translateY}px)`;
-                        
+
                         // Actualizar estilos de items
                         items.forEach((item, idx) => {
                             if (idx === currentValue) {
@@ -1038,7 +997,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 item.style.fontSize = '1.8rem';
                             }
                         });
-                        
+
                         // Llamar al callback de validación si existe
                         if (validationCallback) {
                             validationCallback();
@@ -1125,7 +1084,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const hourSpinner = createSpinwheel('HH', hours, 23, 2);
                 const minuteSpinner = createSpinwheel('MM', minutes, 59, 2);
                 const secondSpinner = createSpinwheel('SS', seconds, 59, 2);
-                
+
                 // Declarar validateBtn aquí para que sea accesible en validateTime
                 let validateBtn;
 
@@ -1212,7 +1171,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     return isValid;
                 };
-                
+
                 // Asignar callback de validación
                 validationCallback = validateTime;
 
@@ -1305,7 +1264,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 modal.appendChild(validationMessage);
                 modal.appendChild(buttonsContainer);
                 overlay.appendChild(modal);
-                
+
                 // Realizar validación inicial
                 validateTime();
 
@@ -1316,7 +1275,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         resolve(null);
                     }
                 };
-                
+
                 // Función de limpieza
                 const cleanup = () => {
                     document.removeEventListener('keydown', onKey);
@@ -1325,7 +1284,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
 
                 document.addEventListener('keydown', onKey);
-                
+
                 const originalOverflow = document.body.style.overflow;
                 document.body.style.overflow = 'hidden';
                 document.body.appendChild(overlay);
@@ -1343,10 +1302,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Calcular un tiempo inicial en el medio de las dos vueltas
                 const prevTime = (previousLapTime instanceof Date) ? previousLapTime : new Date(previousLapTime);
                 const nextTime = (nextLapTime instanceof Date) ? nextLapTime : new Date(nextLapTime);
-                
+
                 // Si es la última vuelta, usar la misma hora que la anterior como inicial
                 const middleTime = isLastLap ? new Date(prevTime.getTime()) : new Date((prevTime.getTime() + nextTime.getTime()) / 2);
-                
+
                 const hours = middleTime.getHours();
                 const minutes = middleTime.getMinutes();
                 const seconds = middleTime.getSeconds();
@@ -1413,7 +1372,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     align-items: center;
                     justify-content: space-between;
                 `;
-                
+
                 const prevLabel = document.createElement('div');
                 prevLabel.textContent = 'VOLTA ANTERIOR:';
                 prevLabel.style.cssText = `
@@ -1421,7 +1380,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     font-size: 1.1rem;
                     font-weight: 700;
                 `;
-                
+
                 const prevTimeDisplay = document.createElement('div');
                 prevTimeDisplay.style.cssText = `
                     font-size: 1.5rem;
@@ -1433,12 +1392,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const prevS = String(prevTime.getSeconds()).padStart(2, '0');
                 const prevMs = String(prevTime.getMilliseconds()).padStart(3, '0');
                 prevTimeDisplay.textContent = `${prevH}:${prevM}:${prevS}.${prevMs}`;
-                
+
                 prevTimeContainer.appendChild(prevLabel);
                 prevTimeContainer.appendChild(prevTimeDisplay);
 
                 referenceContainer.appendChild(prevTimeContainer);
-                
+
                 // Solo mostrar la volta posterior si NO es la última vuelta
                 if (!isLastLap) {
                     const nextTimeContainer = document.createElement('div');
@@ -1447,7 +1406,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         align-items: center;
                         justify-content: space-between;
                     `;
-                    
+
                     const nextLabel = document.createElement('div');
                     nextLabel.textContent = 'VOLTA POSTERIOR:';
                     nextLabel.style.cssText = `
@@ -1455,7 +1414,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         font-size: 1.1rem;
                         font-weight: 700;
                     `;
-                    
+
                     const nextTimeDisplay = document.createElement('div');
                     nextTimeDisplay.style.cssText = `
                         font-size: 1.5rem;
@@ -1467,10 +1426,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const nextS = String(nextTime.getSeconds()).padStart(2, '0');
                     const nextMs = String(nextTime.getMilliseconds()).padStart(3, '0');
                     nextTimeDisplay.textContent = `${nextH}:${nextM}:${nextS}.${nextMs}`;
-                    
+
                     nextTimeContainer.appendChild(nextLabel);
                     nextTimeContainer.appendChild(nextTimeDisplay);
-                    
+
                     referenceContainer.appendChild(nextTimeContainer);
                 }
 
@@ -1559,7 +1518,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentValue = Math.max(0, Math.min(max, value));
                         const translateY = 50 - (currentValue * 50);
                         itemsContainer.style.transform = `translateY(${translateY}px)`;
-                        
+
                         // Actualizar estilos de items
                         items.forEach((item, idx) => {
                             if (idx === currentValue) {
@@ -1570,7 +1529,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 item.style.fontSize = '1.8rem';
                             }
                         });
-                        
+
                         // Llamar al callback de validación si existe
                         if (validationCallback) {
                             validationCallback();
@@ -1657,7 +1616,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const hourSpinner = createSpinwheel('HH', hours, 23, 2);
                 const minuteSpinner = createSpinwheel('MM', minutes, 59, 2);
                 const secondSpinner = createSpinwheel('SS', seconds, 59, 2);
-                
+
                 // Declarar validateBtn aquí
                 let validateBtn;
 
@@ -1710,7 +1669,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (selectedTime <= prevTime) {
                         isValid = false;
                         errorMsg = 'SELECCIÓ INVÀLIDA, ha de ser posterior a la volta anterior';
-                    } 
+                    }
                     // Solo verificar límite superior si NO es la última vuelta
                     else if (!isLastLap && selectedTime >= nextTime) {
                         isValid = false;
@@ -1737,7 +1696,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     return isValid;
                 };
-                
+
                 // Asignar callback de validación
                 validationCallback = validateTime;
 
@@ -1830,7 +1789,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 modal.appendChild(validationMessage);
                 modal.appendChild(buttonsContainer);
                 overlay.appendChild(modal);
-                
+
                 // Realizar validación inicial
                 validateTime();
 
@@ -1841,7 +1800,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         resolve(null);
                     }
                 };
-                
+
                 // Función de limpieza
                 const cleanup = () => {
                     document.removeEventListener('keydown', onKey);
@@ -1850,7 +1809,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
 
                 document.addEventListener('keydown', onKey);
-                
+
                 const originalOverflow = document.body.style.overflow;
                 document.body.style.overflow = 'hidden';
                 document.body.appendChild(overlay);
@@ -1869,7 +1828,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${dayName}, ${date.getDate()} de ${monthName} de ${date.getFullYear()}`;
     };
 
-    
+
 
     // --- Utility functions for DOM operations ---
 
@@ -2149,6 +2108,81 @@ document.addEventListener('DOMContentLoaded', () => {
         const ms = String(remainingMs % 1000).padStart(3, '0');
         return `${String(hours)}:${String(minutes).padStart(2, '0')}:${String(sec).padStart(2, '0')}.${ms}`;
     };
+
+    // Guardar el estado de la grabación en curso para poder reanudarla
+    const persistActiveRecordingState = () => {
+        try {
+            if (!isRecording || laps.length === 0) {
+                localStorage.removeItem(ACTIVE_RECORDING_KEY);
+                return;
+            }
+
+            const payload = {
+                laps: laps.map(lap => ({
+                    ...lap,
+                    time: lap.time instanceof Date ? lap.time.toISOString() : lap.time
+                })),
+                recordingName: recordingName || 'SessióSenseNom',
+                savedAt: new Date().toISOString()
+            };
+
+            localStorage.setItem(ACTIVE_RECORDING_KEY, JSON.stringify(payload));
+        } catch (err) {
+            console.warn('No s\'ha pogut guardar la sessió activa:', err);
+        }
+    };
+
+    // Eliminar el estado persistido de la grabación
+    const clearActiveRecordingState = () => {
+        try {
+            localStorage.removeItem(ACTIVE_RECORDING_KEY);
+        } catch (err) {
+        }
+    };
+
+    // Rehidratar la grabación activa si existe en localStorage
+    const restoreActiveRecordingState = () => {
+        try {
+            const saved = localStorage.getItem(ACTIVE_RECORDING_KEY);
+            if (!saved) return false;
+
+            const parsed = JSON.parse(saved);
+            if (!parsed || !Array.isArray(parsed.laps) || parsed.laps.length === 0) return false;
+
+            laps = parsed.laps.map(lap => ({
+                ...lap,
+                time: new Date(lap.time)
+            }));
+            appState.laps = laps; // Sincronizar con appState
+
+            recordingName = parsed.recordingName || 'SessióSenseNom';
+            appState.recordingName = recordingName; // Sincronizar con appState
+
+            isRecording = true;
+            appState.isRecording = true; // Sincronizar con appState
+
+            // Ajustar UI para modo grabación
+            finalizeBtn.textContent = 'FINALITZAR SESSIÓ';
+            clockContainer.style.backgroundColor = '#2E7D32';
+            clockContainer.style.color = '#ffffff';
+            clockElement.style.color = '#ffffff';
+            mountRecordingNameRow();
+            updateRecordingNameRow();
+            renderLaps();
+            updateSummary();
+
+            if (laps.length >= 2) {
+                startLastLapUpdate();
+            }
+
+            try { startClock(); } catch { }
+            updateInstructionText();
+            return true;
+        } catch (err) {
+            console.warn('No s\'ha pogut restaurar la sessió activa:', err);
+            return false;
+        }
+    };
     const resetAppState = () => {
         // Limpiar estado de la aplicación
         laps = [];
@@ -2160,18 +2194,11 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionDirty = false;
         appState.sessionDirty = false; // Sincronizar con appState
         pendingRename = null;
+        clearActiveRecordingState();
 
         // Detener actualizaciones
         stopLastLapUpdate();
         stopClock();
-        
-        // Desactivar botones de volumen
-        if (typeof deactivateVolumeButtons === 'function') {
-            deactivateVolumeButtons();
-        }
-        
-        // Limpiar sesión guardada en localStorage
-        clearCurrentSession();
 
         // Limpiar contenedores de la interfaz
         clearElement(lapsContainer);
@@ -2200,7 +2227,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Asegurar que la vista de registro esté activa
         sessionsView.style.display = 'none';
-        registrationView.style.display = 'block';
+        registrationView.style.display = 'flex';
 
         // Resetear botón toggle
         toggleViewBtn.innerHTML = `${disketteIcon} <span class="toggle-label">LLISTAT</span>`;
@@ -2370,11 +2397,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const disp = (typeof getComputedStyle === 'function') ? getComputedStyle(sessionsView).display : sessionsView.style.display;
                     return disp !== 'none';
-                } catch { return sessionsView.style.display === 'block'; }
+                } catch { return sessionsView.style.display !== 'none'; }
             })();
             if (isSessionsView) {
                 sessionsView.style.display = 'none';
-                registrationView.style.display = 'block';
+                registrationView.style.display = 'flex';
                 clockContainer.style.display = 'flex';
                 finalizeBtn.style.display = 'block';
                 updateToggleViewBtnLabel();
@@ -2401,7 +2428,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionsList.style.minHeight = '0';
                 sessionsList.style.overflowY = 'auto';
                 updateToggleViewBtnLabel();
-                
+
                 // Renderizar DESPUÉS de aplicar estilos
                 renderSessions();
             }
@@ -2506,7 +2533,7 @@ document.addEventListener('DOMContentLoaded', () => {
             editTimeBtn.style.cursor = 'pointer';
             editTimeBtn.style.flex = '0 0 auto';
             editTimeBtn.innerHTML = editTimeIcon;
-            
+
             editTimeBtn.addEventListener('click', async () => {
                 // Solo permitir edición en sesión activa o en modo edición
                 if (!isReadOnly || isViewingSession) {
@@ -2515,21 +2542,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (newTime !== null) {
                         laps[index].time = newTime;
                         lapTime.innerHTML = formatTime(newTime);
-                        
+
                         // Marcar como modificado si estamos viendo una sesión guardada
                         if (isViewingSession) {
                             sessionDirty = true;
                             const saveBtnEnable = document.getElementById('session-save-btn');
                             if (saveBtnEnable) saveBtnEnable.disabled = false;
                         }
-                        
+
                         // Actualizar vista
                         renderLaps();
                         updateSummary();
                     }
                 }
             });
-            
+
             // Aplicar estilos según el modo
             if (!isReadOnly || isViewingSession) {
                 // Sesión activa o modo edición: botón activo
@@ -2542,7 +2569,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 editTimeBtn.style.opacity = '0.4';
                 editTimeBtn.style.pointerEvents = 'none';
             }
-            
+
             // Icono a la izquierda del tiempo
             lapTimeContainer.appendChild(editTimeBtn);
             lapTimeContainer.appendChild(lapTime);
@@ -2569,7 +2596,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isReadOnly) {
                 lapNameInput.readOnly = true;
             }
-            
+
             // Botón de editar nombre (lápiz azul) - siempre visible
             const editNameBtn = document.createElement('button');
             editNameBtn.type = 'button';
@@ -2586,16 +2613,16 @@ document.addEventListener('DOMContentLoaded', () => {
             editNameBtn.style.cursor = 'pointer';
             editNameBtn.style.flex = '0 0 auto';
             editNameBtn.innerHTML = editIcon;
-            
+
             editNameBtn.addEventListener('click', async () => {
                 // Solo permitir edición en sesión activa o en modo edición
                 if (!isReadOnly || isViewingSession) {
-                    const newName = await showModal({ 
+                    const newName = await showModal({
                         id: 'modal-edit-lap-name',
-                        title: 'Editar nombre de vuelta', 
-                        type: 'prompt', 
-                        defaultValue: lap.name || '', 
-                        okText: 'Guardar', 
+                        title: 'Editar nombre de vuelta',
+                        type: 'prompt',
+                        defaultValue: lap.name || '',
+                        okText: 'Guardar',
                         cancelText: 'Cancelar',
                         buttonLayout: 'horizontal'
                     });
@@ -2604,21 +2631,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         laps[index].name = newName.trim();
                         // Sincronizar con appState
                         appState.laps = laps;
-                        
+
                         // Marcar como modificado si estamos en modo vista de sesión
                         if (isViewingSession) {
                             sessionDirty = true;
                             const saveBtnEnable = document.getElementById('session-save-btn');
                             if (saveBtnEnable) saveBtnEnable.disabled = false;
                         }
-                        
+
                         // Actualizar vista (renderLaps recreará el DOM con el nuevo nombre)
                         renderLaps();
                         updateSummary();
                     }
                 }
             });
-            
+
             // Aplicar estilos según el modo
             if (!isReadOnly || isViewingSession) {
                 // Sesión activa o modo edición: botón activo
@@ -2631,7 +2658,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 editNameBtn.style.opacity = '0.4';
                 editNameBtn.style.pointerEvents = 'none';
             }
-            
+
             // Botón a la izquierda del nombre
             lapNameContainer.appendChild(editNameBtn);
             lapNameContainer.appendChild(lapNameInput);
@@ -2670,19 +2697,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     const nowIsWork = laps[index].type === 'work';
                     lapTypeToggle.setAttribute('aria-pressed', String(nowIsWork));
                     lapTypeToggle.setAttribute('aria-label', nowIsWork ? 'Canvia a descans' : 'Canvia a treball');
-                    
+
                     // Marcar como modificado si estamos viendo una sesión guardada
                     if (isViewingSession) {
                         sessionDirty = true;
                         const saveBtnEnable = document.getElementById('session-save-btn');
                         if (saveBtnEnable) saveBtnEnable.disabled = false;
                     }
-                    
+
                     renderLaps();
                     updateSummary();
                 }
             });
-            
+
             // Aplicar estilos según el modo
             if (!isReadOnly || isViewingSession) {
                 // Sesión activa o modo edición: botón activo
@@ -2733,20 +2760,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     if (confirmDelete) {
                         laps.splice(index, 1);
-                        
+
                         // Marcar como modificado si estamos viendo una sesión guardada
                         if (isViewingSession) {
                             sessionDirty = true;
                             const saveBtnEnable = document.getElementById('session-save-btn');
                             if (saveBtnEnable) saveBtnEnable.disabled = false;
                         }
-                        
+
                         renderLaps();
                         updateSummary();
                     }
                 }
             });
-            
+
             // Aplicar estilos según el modo
             if (!isReadOnly || isViewingSession) {
                 // Sesión activa o modo edición: botón activo
@@ -2773,7 +2800,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!(isSessionViewContext && lap.name === '-FINAL-')) {
                 lapItem.appendChild(lapTypeToggle);
             }
-            
+
             // Añadir botón "+" a la derecha de cada vuelta en modo edición o durante la grabación
             if (isViewingSession || (isRecording && !isReadOnly)) {
                 const addLapAfterBtn = document.createElement('button');
@@ -2797,24 +2824,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     transition: all 0.2s;
                     flex-shrink: 0;
                 `;
-                
+
                 addLapAfterBtn.addEventListener('mouseover', () => {
                     addLapAfterBtn.style.background = '#FFF9E6';
                     addLapAfterBtn.style.transform = 'scale(1.1)';
                 });
-                
+
                 addLapAfterBtn.addEventListener('mouseout', () => {
                     addLapAfterBtn.style.background = 'white';
                     addLapAfterBtn.style.transform = 'scale(1)';
                 });
-                
+
                 addLapAfterBtn.addEventListener('click', async () => {
                     // Determinar los tiempos límite
                     const currentLapTime = laps[index].time;
                     const isLastLap = index === laps.length - 1;
                     let nextLapTime;
                     let isLastLapDuringRecording = false;
-                    
+
                     if (!isLastLap) {
                         // No es la última vuelta: añadir entre esta y la siguiente
                         nextLapTime = laps[index + 1].time;
@@ -2830,10 +2857,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             isLastLapDuringRecording = true; // No validar límite superior
                         }
                     }
-                    
+
                     // Mostrar modal para seleccionar tiempo
                     const newTime = await showAddLapBetweenModal(currentLapTime, nextLapTime, isLastLapDuringRecording);
-                    
+
                     if (newTime !== null) {
                         // Si era la última vuelta, cambiar su tipo a 'rest' y su nombre (ya no será la final)
                         if (isLastLap) {
@@ -2843,38 +2870,38 @@ document.addEventListener('DOMContentLoaded', () => {
                                 laps[index].name = `Volta ${index + 1}`;
                             }
                         }
-                        
+
                         // Crear nueva vuelta con tipo 'rest' por defecto
                         const newLap = {
                             time: newTime,
                             name: `Volta ${index + 2}`,
                             type: 'rest'
                         };
-                        
+
                         // Insertar la nueva vuelta después de la actual
                         laps.splice(index + 1, 0, newLap);
-                        
+
                         // Si se está grabando y se añadió después de la última vuelta,
                         // reiniciar el seguimiento de la última vuelta
                         if (isLastLap && isRecording && !isReadOnly) {
                             stopLastLapUpdate();
                             startLastLapUpdate();
                         }
-                        
+
                         // Marcar como modificado
                         sessionDirty = true;
                         const saveBtnEnable = document.getElementById('session-save-btn');
                         if (saveBtnEnable) saveBtnEnable.disabled = false;
-                        
+
                         // Actualizar vista
                         renderLaps();
                         updateSummary();
                     }
                 });
-                
+
                 lapItem.appendChild(addLapAfterBtn);
             }
-            
+
             // Agregar al contenedor según preferencia de orden
             if (lapsOrderDescending) {
                 lapsContainer.prepend(lapItem); // Descendente: más nueva arriba
@@ -2882,7 +2909,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 lapsContainer.appendChild(lapItem); // Ascendente: más reciente al final
             }
         });
-        
+
         // Si el orden es ascendente, hacer scroll automático hacia las últimas vueltas (solo en el contenedor)
         if (!lapsOrderDescending && lapsContainer.lastChild) {
             // Usar doble requestAnimationFrame para asegurar que el DOM se haya actualizado y el layout recalculado
@@ -2893,11 +2920,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         top: lapsContainer.scrollHeight,
                         behavior: 'smooth'
                     });
-                    
+
                 });
             });
         }
-        
+
         // Reaplica el estado de bloqueo después de renderizar
         if (typeof applyLockState === 'function') {
             applyLockState();
@@ -2905,7 +2932,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const updateInstructionText = () => {
-        instructionText.textContent = isRecording 
+        instructionText.textContent = isRecording
             ? 'PREM AQUÍ PER MARCAR UNA VOLTA'
             : 'PREM AQUÍ PER INICIAR UNA SESSIÓ';
     };
@@ -2981,7 +3008,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const existing = document.getElementById('recording-name-row');
         if (existing) existing.remove();
     };
-    
+
     const updateRecordingNameRow = () => {
         const input = document.getElementById('recording-name-input');
         if (input) {
@@ -2992,39 +3019,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const addLap = () => {
         if (isReadOnly) return;
         const now = new Date();
-        const wasRecording = isRecording;
         if (!isRecording) {
             isRecording = true;
             finalizeBtn.textContent = 'FINALITZAR SESSIÓ';
             updateInstructionText();
-            
+
             // Forzar estilo verde durante grabación
             clockContainer.style.backgroundColor = '#2E7D32'; // Verde oscuro
             clockContainer.style.color = '#ffffff'; // Texto blanco
             clockElement.style.color = '#ffffff'; // Texto blanco para el reloj
-            
+
             // Montar campo de nombre de sesión para grabación
             mountRecordingNameRow();
-            
-            // Activar botones de volumen si está habilitado
-            if (appState.settings.volumeButtonsEnabled) {
-                console.log('🎬 Primera vuelta registrada - activando botones de volumen...');
-                setTimeout(async () => {
-                    if (typeof activateVolumeButtons === 'function') {
-                        const success = await activateVolumeButtons();
-                        if (success) {
-                            console.log('✅✅✅ Botones de volumen ACTIVADOS y listos ✅✅✅');
-                        } else {
-                            console.error('❌ No se pudieron activar los botones de volumen');
-                            console.error('💡 Revisa los mensajes anteriores para ver el motivo');
-                        }
-                    } else {
-                        console.error('❌ Función activateVolumeButtons no encontrada');
-                    }
-                }, 100);
-            } else {
-                console.log('⚠️ Botones de volumen NO habilitados (configuración desactivada)');
-            }
         }
         laps.push({
             time: now,
@@ -3033,14 +3039,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         renderLaps();
         updateSummary();
-        
+        persistActiveRecordingState();
+
         // Iniciar actualización incremental de la última vuelta
         if (laps.length >= 2) {
             startLastLapUpdate();
         }
-        
-        // Guardar sesión en localStorage para persistencia
-        saveCurrentSession();
     };
 
     // Actualizar solo la duración de la última vuelta (optimizado)
@@ -3055,7 +3059,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const lastLap = laps[laps.length - 1];
                 const duration = (now - lastLap.time) / 1000;
                 const formatted = formatSummaryDurationHTML(duration);
-                
+
                 // Solo actualizar si cambió (optimización)
                 if (durationSpan.innerHTML !== formatted) {
                     durationSpan.innerHTML = formatted;
@@ -3063,36 +3067,36 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
-    
+
     // Variables para actualización incremental de última vuelta
     let lastLapUpdateId = null;
-    
+
     // Iniciar actualización periódica de la última vuelta
     function startLastLapUpdate() {
         if (lastLapUpdateId) return; // Ya está actualizando
-        
+
         lastLapUpdateId = setInterval(() => {
             if (laps.length < 2) return;
-            
+
             // Obtener el elemento correcto según el orden
             const lastLapElement = lapsOrderDescending ? lapsContainer.firstChild : lapsContainer.lastChild;
             if (!lastLapElement) return;
-            
+
             const durationSpan = lastLapElement.querySelector('.lap-time');
             if (durationSpan) {
                 const lastLap = laps[laps.length - 1];
                 const duration = (Date.now() - lastLap.time) / 1000;
                 const formatted = formatSummaryDurationHTML(duration);
-                
+
                 // Solo actualizar si cambió
                 if (durationSpan.innerHTML !== formatted) {
                     durationSpan.innerHTML = formatted;
                 }
             }
         }, 100); // Actualizar cada 100ms (suficiente para mostrar cambios)
-        
+
     }
-    
+
     // Detener actualización de última vuelta
     function stopLastLapUpdate() {
         if (lastLapUpdateId) {
@@ -3104,36 +3108,36 @@ document.addEventListener('DOMContentLoaded', () => {
     // Variables para requestAnimationFrame
     let lastClockUpdate = 0;
     let rafId = null;
-    
+
     // Función de actualización del reloj con requestAnimationFrame
     function updateClock() {
         const now = Date.now();
-        
+
         // Throttling: actualizar cada 50ms
         if (now - lastClockUpdate >= 50) {
             lastClockUpdate = now;
-            
+
             const time = new Date();
             const formatted = formatTime(time);
-            
+
             // Solo actualizar DOM si cambió el contenido
             if (clockElement.innerHTML !== formatted) {
                 clockElement.innerHTML = formatted;
             }
-            
+
             // Actualizar duración de última vuelta si está grabando
             updateLastLapDuration();
         }
-        
+
         // Continuar el loop
         rafId = requestAnimationFrame(updateClock);
     }
-    
+
     const startClock = () => {
         if (rafId) return; // Ya está corriendo
         rafId = requestAnimationFrame(updateClock);
     };
-    
+
     const stopClock = () => {
         if (rafId) {
             cancelAnimationFrame(rafId);
@@ -3148,15 +3152,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 finalizeBtn.removeEventListener('click', finalizeViewHandler);
                 finalizeViewHandler = null;
             }
-        } catch {}
-        
+        } catch { }
+
         // Guardar el número de vueltas antes de añadir la vuelta automática
         const lapsCountBeforeFinalize = laps.length;
         let autoLapAdded = false;
-        
+
         // If currently recording, mark a lap as if the user tapped the clock
         if (isRecording && typeof clockContainer !== 'undefined' && clockContainer) {
-            try { clockContainer.click(); } catch {}
+            try { clockContainer.click(); } catch { }
             // Allow the click handler (addLap) to run before proceeding
             await new Promise(r => setTimeout(r, 25));
             // Verificar si se añadió una vuelta
@@ -3168,7 +3172,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (laps.length === 0) {
             try {
                 await showModal({ id: 'modal-no-laps-info', title: 'Informació', message: 'Prem sobre el Rellotge superior per inicial el reigstres de voltes.', type: 'alert', okText: 'D\'acord' });
-            } catch {}
+            } catch { }
             return;
         }
 
@@ -3184,11 +3188,11 @@ document.addEventListener('DOMContentLoaded', () => {
             cancelText: 'CANCEL.LAR'
         });
 
-        
+
         // Manejar respuesta del modal (puede ser string o objeto)
         let action = null;
         let newName = null;
-        
+
         if (typeof sessionNameInput === 'object' && sessionNameInput !== null) {
             // Es un objeto con acción y nombre
             action = sessionNameInput.action;
@@ -3197,10 +3201,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // Es un string (nombre) o null/undefined
             action = sessionNameInput;
         }
-        
+
         // Si el usuario cancela, elige continuar grabación o iniciar nueva, no guardar
         if (action === null || action === undefined || action === '__CONTINUE_RECORDING__' || action === '__NEW_RECORDING__') {
-            
+
             // Reanudar grabación si aplica
             if (action === '__CONTINUE_RECORDING__') {
                 // Eliminar la vuelta automática añadida
@@ -3209,16 +3213,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderLaps();
                     updateSummary();
                 }
-                
+
                 // Actualizar el nombre de la sesión si se modificó
                 if (newName && newName.trim() !== '' && newName !== 'SessióSenseNom') {
                     recordingName = newName.trim();
                     // Actualizar la fila del nombre si existe
                     updateRecordingNameRow();
                 }
-                try { startClock(); } catch {}
+                try { startClock(); } catch { }
                 isRecording = true;
-            } 
+            }
             // Cancelación - pedir confirmación antes de cancelar
             else if (action === '__NEW_RECORDING__' || action === null || action === undefined) {
                 // Pedir confirmación de cancelar
@@ -3234,7 +3238,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     buttonLayout: 'horizontal',
                     reverseButtons: false
                 });
-                
+
                 if (confirmCancel) {
                     // Usuario confirmó: cancelar sesión (resetAppState limpiará todo)
                     resetAppState();
@@ -3247,12 +3251,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     // Reactivar el reloj si estaba grabando
                     if (isRecording) {
-                        try { startClock(); } catch {}
+                        try { startClock(); } catch { }
                     }
                     return;
                 }
             }
-            
+
             return;
         }
 
@@ -3266,8 +3270,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Detectar si el usuario dejó el nombre vacío o sin cambios significativos
         const isEmptyOrDefault = sessionNameInputTrimmed === '' ||
-                                 sessionNameInputTrimmed === defaultName ||
-                                 sessionNameInputTrimmed === 'Sessió Sense Nom';
+            sessionNameInputTrimmed === defaultName ||
+            sessionNameInputTrimmed === 'Sessió Sense Nom';
 
         let fullSessionName;
         if (isEmptyOrDefault) {
@@ -3280,76 +3284,69 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const storageKey = sessionPrefix + fullSessionName;
             const lapsJson = JSON.stringify(laps);
-            
+
             localStorage.setItem(storageKey, lapsJson);
-            
+
             // Verificar que se guardó
             const saved = localStorage.getItem(storageKey);
-            
+            clearActiveRecordingState();
+
             // Detener actualización incremental
             stopLastLapUpdate();
-            
+
             laps = [];
             appState.laps = laps; // Sincronizar con appState
             isRecording = false;
             appState.isRecording = false; // Sincronizar con appState
             recordingName = 'SessióSenseNom';
             appState.recordingName = recordingName; // Sincronizar con appState
-            
-            // Desactivar botones de volumen
-            if (typeof deactivateVolumeButtons === 'function') {
-                deactivateVolumeButtons();
-            }
-            
-            // Limpiar sesión guardada en localStorage
-            clearCurrentSession();
-            
+
             // Restaurar texto del botón
             finalizeBtn.textContent = 'PREM EL RELLOTGE PER COMENÇAR';
-            
+
             // Restaurar color original del clock-container
             clockContainer.style.backgroundColor = '#2E7D32'; // Verde oscuro original
             clockContainer.style.color = '#ffffff'; // Texto blanco original
             clockElement.style.color = '#ffffff'; // Texto blanco original para el reloj
-            
+
             unmountRecordingNameRow();
             renderLaps();
             updateSummary();
             // Mostrar directamente la vista de sesiones y refrescar lista
-            
+
             // IMPORTANTE: Primero ocultar registration-view
             registrationView.style.display = 'none';
-            
+
             // Forzar reflow para asegurar que el layout se recalcula
             void registrationView.offsetHeight;
-            
+
             // Luego mostrar sessions-view con estilos forzados
             sessionsView.style.setProperty('display', 'flex', 'important');
             sessionsView.style.flexDirection = 'column';
             sessionsView.style.flex = '1 1 auto';
             sessionsView.style.minHeight = '0';
             sessionsView.style.overflow = 'hidden';
-            
+
             // Asegurar que sessions-container también tenga los estilos correctos
             sessionsContainer.style.display = 'flex';
             sessionsContainer.style.flexDirection = 'column';
             sessionsContainer.style.flex = '1 1 0';
             sessionsContainer.style.minHeight = '0';
             sessionsContainer.style.overflow = 'hidden';
-            
+
             // Y sessions-list
             sessionsList.style.display = 'flex';
             sessionsList.style.flexDirection = 'column';
             sessionsList.style.flex = '1 1 0';
             sessionsList.style.minHeight = '0';
             sessionsList.style.overflowY = 'auto';
-            
+
             // Forzar reflow
             void sessionsView.offsetHeight;
-            
+
             // Ahora renderizar las sesiones con el layout correcto
             renderSessions();
-            
+
             toggleViewBtn.innerHTML = `${stopwatchIcon} <span class=\"toggle-label\">REGISTRAR</span>`;
         } catch (e) {
             await showModal({ id: 'modal-save-session-error', title: 'Error', message: "Error en desar la sessió. L'emmagatzematge pot estar ple.", type: 'alert', okText: 'Tancar' });
@@ -3360,10 +3357,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleMultiSelectMode = () => {
         isMultiSelectMode = !isMultiSelectMode;
         selectedSessions.clear();
-        
+
         const multiselectToggleBtn = document.getElementById('multiselect-toggle-btn');
         const multiselectActionsBar = document.getElementById('multiselect-actions-bar');
-        
+
         if (isMultiSelectMode) {
             // Activar modo multiselección
             multiselectToggleBtn.style.color = '#0d6efd';
@@ -3377,30 +3374,30 @@ document.addEventListener('DOMContentLoaded', () => {
             multiselectToggleBtn.title = 'Activar mode multiselecció';
             multiselectActionsBar.style.display = 'none';
         }
-        
+
         // Re-renderizar sesiones para mostrar/ocultar checkboxes
         renderSessions();
     };
-    
+
     const toggleSessionSelection = (sessionKey) => {
         if (!isMultiSelectMode) return;
-        
+
         if (selectedSessions.has(sessionKey)) {
             selectedSessions.delete(sessionKey);
         } else {
             selectedSessions.add(sessionKey);
         }
-        
+
         // Actualizar checkbox visual
         const checkbox = document.getElementById(`checkbox-${sessionKey}`);
         if (checkbox) {
             checkbox.checked = selectedSessions.has(sessionKey);
         }
-        
+
         // Actualizar contador en la barra de acciones
         updateMultiselectActionBar();
     };
-    
+
     const updateMultiselectActionBar = () => {
         const countSpan = document.getElementById('multiselect-count');
         if (countSpan) {
@@ -3408,7 +3405,7 @@ document.addEventListener('DOMContentLoaded', () => {
             countSpan.textContent = count > 0 ? `(${count} seleccionades)` : '';
         }
     };
-    
+
     const deleteSelectedSessions = async () => {
         if (selectedSessions.size === 0) {
             await showModal({
@@ -3420,7 +3417,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             return;
         }
-        
+
         const count = selectedSessions.size;
         const ok = await showModal({
             id: 'modal-delete-multiple-sessions',
@@ -3430,20 +3427,20 @@ document.addEventListener('DOMContentLoaded', () => {
             cancelText: 'CANCEL.LAR (Conservar)',
             type: 'confirm'
         });
-        
+
         if (ok) {
             // Eliminar todas las sesiones seleccionadas
             selectedSessions.forEach(sessionKey => {
                 localStorage.removeItem(sessionKey);
             });
-            
+
             // Limpiar selección y salir del modo multiselección
             selectedSessions.clear();
             isMultiSelectMode = false;
-            
+
             // Re-renderizar lista
             renderSessions();
-            
+
             // Ocultar barra de acciones
             const multiselectActionsBar = document.getElementById('multiselect-actions-bar');
             const multiselectToggleBtn = document.getElementById('multiselect-toggle-btn');
@@ -3455,14 +3452,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
-    
+
     const cancelMultiSelect = () => {
         selectedSessions.clear();
         isMultiSelectMode = false;
-        
+
         const multiselectToggleBtn = document.getElementById('multiselect-toggle-btn');
         const multiselectActionsBar = document.getElementById('multiselect-actions-bar');
-        
+
         if (multiselectToggleBtn) {
             multiselectToggleBtn.style.color = '#888';
             multiselectToggleBtn.setAttribute('aria-label', 'Activar mode multiselecció');
@@ -3471,7 +3468,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (multiselectActionsBar) {
             multiselectActionsBar.style.display = 'none';
         }
-        
+
         // Re-renderizar para ocultar checkboxes
         renderSessions();
     };
@@ -3483,11 +3480,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (danglingTopBar) {
                 danglingTopBar.remove();
             }
-        } catch {}
+        } catch { }
         // Asegurar el estado correcto del botón toggle
         updateToggleViewBtnLabel();
         sessionsList.innerHTML = '';
-        
+
         const sessions = Object.keys(localStorage)
             .filter(key => key.startsWith(sessionPrefix))
             .sort((a, b) => {
@@ -3510,8 +3507,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Mantener visible el contenedor y el título aunque no haya sesiones
         sessionsContainer.parentElement.style.display = 'block';
-        
-        
+
+
         // Rest of renderSessions remains the same
         // Mostrar mensaje vacío cuando no haya sesiones
         if (sessions.length === 0) {
@@ -3558,7 +3555,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         totalSeconds += (t1 - t0) / 1000;
                     }
                 }
-            } catch {}
+            } catch { }
             const totalStr = lapsCount > 0 ? `  |  ${formatDurationCompact(totalSeconds)}  |  ${lapsCount} voltes` : '';
 
             // Mostrar fecha y hora correctamente según el tipo de sesión
@@ -3647,7 +3644,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const sessionsViewEl = document.getElementById('sessions-view');
                         const registrationViewEl = document.getElementById('registration-view');
                         if (sessionsViewEl && registrationViewEl) {
-                            sessionsViewEl.style.display = 'block';
+                            sessionsViewEl.style.display = 'flex';
                             registrationViewEl.style.display = 'none';
                         }
                     }
@@ -3670,7 +3667,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.stopPropagation();
                 toggleSessionSelection(sessionKey);
             });
-            
+
             // En modo multiselección, el click en el sessionItem también toggle el checkbox
             if (isMultiSelectMode) {
                 sessionItem.style.cursor = 'pointer';
@@ -3700,7 +3697,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let savedLaps = null;
         try {
             savedLaps = JSON.parse(localStorage.getItem(sessionKey));
-        } catch {}
+        } catch { }
         try {
             let details = null;
             if (Array.isArray(savedLaps)) {
@@ -3722,7 +3719,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                 });
             }
-        } catch {}
+        } catch { }
         if (!Array.isArray(savedLaps) || savedLaps.length === 0) {
             showModal({ id: 'modal-empty-session', title: 'Sessió buida', message: 'Aquesta sessió no conté voltes.', type: 'alert', okText: 'Tancar' });
             return;
@@ -3731,19 +3728,19 @@ document.addEventListener('DOMContentLoaded', () => {
             isReadOnly = true;
             isViewingSession = false; // Inicialmente en modo solo lectura
             currentSessionKey = sessionKey;
-            laps = savedLaps.map(lap => ({...lap, time: new Date(lap.time)}));
+            laps = savedLaps.map(lap => ({ ...lap, time: new Date(lap.time) }));
             appState.laps = laps; // Sincronizar con appState
             sessionDirty = false;
             pendingRename = null;
-            
+
             // Variables de estado para modo edición
             let isEditMode = false;
             let originalLapsState = null;
-            
+
             // Switch to registration view first
             sessionsView.style.display = 'none';
-            registrationView.style.display = 'block';
-            
+            registrationView.style.display = 'flex';
+
             // Create top bar container
             const topBar = document.createElement('div');
             topBar.id = 'session-top-bar';
@@ -3816,9 +3813,9 @@ document.addEventListener('DOMContentLoaded', () => {
             viewDeleteBtn.style.cursor = 'pointer';
             viewDeleteBtn.style.transition = 'all 0.2s';
             viewDeleteBtn.style.textTransform = 'uppercase';
-            viewDeleteBtn.addEventListener('click', (e) => { 
-                e.preventDefault(); 
-                e.stopPropagation(); 
+            viewDeleteBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 if (isEditMode) {
                     cancelEdit();
                 } else {
@@ -3945,7 +3942,7 @@ document.addEventListener('DOMContentLoaded', () => {
             topRow.style.gap = '5px';
             topRow.style.alignItems = 'stretch';
             topRow.style.height = '36px'; // Altura fija para el top row
-            
+
             // Create bottom row with Share buttons (inicialmente oculto)
             const bottomRow = document.createElement('div');
             bottomRow.id = 'session-bottom-row';
@@ -3953,11 +3950,11 @@ document.addEventListener('DOMContentLoaded', () => {
             bottomRow.style.gap = '5px';
             bottomRow.style.alignItems = 'stretch';
             bottomRow.style.height = '36px'; // Altura fija para el bottom row
-            
+
             // Toggle functionality para mostrar/ocultar opciones de compartir
             // (Se configurará después de insertar el topBar en el DOM)
             let shareOptionsVisible = false;
-            
+
             // Add buttons to their respective rows
             topRow.appendChild(viewDeleteBtn);
             topRow.appendChild(toggleShareBtn);
@@ -3966,29 +3963,29 @@ document.addEventListener('DOMContentLoaded', () => {
             bottomRow.appendChild(viewShareCsvBtn);
             bottomRow.appendChild(viewShareCsvCommaBtn);
             bottomRow.appendChild(viewClipboardBtn);
-            
+
             // Funciones para manejo de modo edición
             const toggleEditMode = () => {
                 isEditMode = !isEditMode;
-                
+
                 if (isEditMode) {
                     // Modo Vista → Edición
                     // Guardar estado original
                     originalLapsState = JSON.parse(JSON.stringify(laps));
-                    
+
                     // Cambiar botones
                     sessionEditBtn.innerHTML = `${checkIcon} GUARDAR CAMBIOS`;
                     finalizeBtn.innerHTML = `${checkIcon} VALIDAR`;
                     viewDeleteBtn.innerHTML = `${xIcon} CANCELAR`;
-                    
+
                     // Ocultar botón toggle de compartir y las opciones
                     toggleShareBtn.style.display = 'none';
                     bottomRow.style.display = 'none';
                     shareOptionsVisible = false;
-                    
+
                     // Actualizar margen después de ocultar bottomRow
                     setTimeout(updateRegistrationMargin, 50);
-                    
+
                     // Habilitar edición de nombre de sesión
                     const nameLabel = document.querySelector('#session-name-row .nameLabel');
                     if (nameLabel) {
@@ -3999,13 +3996,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         nameLabel.style.backgroundColor = 'rgba(0, 170, 255, 0.1)';
                         nameLabel.style.textAlign = 'left';
                     }
-                    
+
                     // Mostrar botón "Editar nom"
                     const editBtn = document.querySelector('#session-name-row button');
                     if (editBtn) {
                         editBtn.style.display = 'flex';
                     }
-                    
+
                     // Habilitar edición de tipos de vueltas
                     isViewingSession = true; // Permitir edición de tipos
                     renderLaps();
@@ -4015,18 +4012,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     sessionEditBtn.innerHTML = `${editIcon} EDITAR`;
                     finalizeBtn.innerHTML = `${editIcon} EDITAR`;
                     viewDeleteBtn.innerHTML = `${largeTrashIcon} ELIMINAR`;
-                    
+
                     // Mostrar botón toggle de compartir
                     toggleShareBtn.style.display = 'flex';
-                    
+
                     // No mostrar automáticamente los botones de compartir al salir del modo edición
                     // El usuario debe usar el toggle si los quiere ver
                     bottomRow.style.display = 'none';
                     shareOptionsVisible = false;
-                    
+
                     // Actualizar margen después de ajustar bottomRow
                     setTimeout(updateRegistrationMargin, 50);
-                    
+
                     // Deshabilitar edición de nombre de sesión
                     const nameLabel = document.querySelector('#session-name-row .nameLabel');
                     if (nameLabel) {
@@ -4036,19 +4033,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         nameLabel.style.padding = '4px';
                         nameLabel.style.backgroundColor = 'transparent';
                     }
-                    
+
                     // Ocultar botón "Editar nom"
                     const editBtn = document.querySelector('#session-name-row button');
                     if (editBtn) {
                         editBtn.style.display = 'none';
                     }
-                    
+
                     // Deshabilitar edición de tipos de vueltas
                     isViewingSession = false;
                     renderLaps();
                 }
             };
-            
+
             const cancelEdit = () => {
                 // Restaurar datos originales
                 if (originalLapsState) {
@@ -4057,22 +4054,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderLaps();
                     updateSummary();
                 }
-                
+
                 // Restaurar nombre de sesión original
                 const nameLabel = document.querySelector('#session-name-row .nameLabel');
                 if (nameLabel) {
                     const parsedInfo = parseSessionKey(currentSessionKey || sessionKey);
                     nameLabel.textContent = parsedInfo.name || 'Sessió';
                 }
-                
+
                 // Resetear variables
                 sessionDirty = false;
                 pendingRename = null;
-                
+
                 // Volver a modo vista
                 toggleEditMode();
             };
-            
+
             const validateEdit = async () => {
                 try {
                     // Guardar cambios en localStorage
@@ -4097,14 +4094,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         localStorage.setItem(currentSessionKey, JSON.stringify(laps));
                     }
-                    
+
                     // Resetear variables
                     sessionDirty = false;
                     pendingRename = null;
-                    
+
                     // Volver a modo vista
                     toggleEditMode();
-                    
+
                 } catch (e) {
                     await showModal({ id: 'modal-validate-edit-error', title: 'Error', message: 'Error en guardar los cambios.', type: 'alert', okText: 'Tancar' });
                 }
@@ -4124,7 +4121,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const topBarHeight = topBar.offsetHeight;
                     const totalMargin = appTitleHeight + topBarHeight - 45; // Reducir 45px
                     registrationView.style.marginTop = `${totalMargin}px`;
-                } catch {}
+                } catch { }
             };
 
             // Configurar el toggle para ajustar el margen cuando cambia la visibilidad
@@ -4135,7 +4132,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 bottomRow.style.display = shareOptionsVisible ? 'flex' : 'none';
                 toggleShareBtn.setAttribute('aria-label', shareOptionsVisible ? 'OCULTAR OPCIONS DE COMPARTIR' : 'MOSTRAR OPCIONS DE COMPARTIR');
                 toggleShareBtn.title = shareOptionsVisible ? 'Ocultar opcions de compartir' : 'Mostrar opcions de compartir';
-                
+
                 // Actualizar margen después de que el DOM se actualice
                 setTimeout(updateRegistrationMargin, 50);
             });
@@ -4144,15 +4141,15 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const controlsContainerEl = document.getElementById('controls-container');
                 if (controlsContainerEl) controlsContainerEl.style.display = 'none';
-            } catch {}
+            } catch { }
 
             // Calcular margen inicial después de que el DOM se actualice
             setTimeout(updateRegistrationMargin, 100);
-            
+
             // Hide only the clock text to keep laps list visible
-            try { clockElement.style.display = 'none'; } catch {}
-            try { clockContainer.style.display = 'none'; } catch {}
-            
+            try { clockElement.style.display = 'none'; } catch { }
+            try { clockContainer.style.display = 'none'; } catch { }
+
             // Remove existing session-info if present to avoid duplicates
             const existingSessionInfo = document.getElementById('session-info');
             if (existingSessionInfo) {
@@ -4167,7 +4164,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sessionInfoContainer.style.backgroundColor = '#d3d3d3'; // Gris claro
             sessionInfoContainer.style.padding = '10px';
             sessionInfoContainer.style.borderRadius = '8px';
-            
+
             const sessionDate = laps.length > 0 ? new Date(laps[0].time) : new Date();
             const dateText = document.createElement('div');
             dateText.id = 'session-info-date';
@@ -4175,17 +4172,17 @@ document.addEventListener('DOMContentLoaded', () => {
             dateText.style.fontSize = '1.8em';
             dateText.style.marginBottom = '10px';
             dateText.style.color = '#000000'; // Texto negro
-            
+
             const timeText = document.createElement('div');
             timeText.id = 'session-info-time';
             const sessionTime = laps.length > 0 ? new Date(laps[0].time) : new Date();
             timeText.innerHTML = `Hora d'inici: ${formatTime(sessionTime)}`;
             timeText.style.fontSize = '1.5em';
             timeText.style.color = '#000000'; // Texto negro
-            
+
             sessionInfoContainer.appendChild(dateText);
             sessionInfoContainer.appendChild(timeText);
-            
+
             clockContainer.parentNode.insertBefore(sessionInfoContainer, clockContainer);
 
             // Session name row with edit icon below info box
@@ -4220,7 +4217,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nameLabel.style.borderRadius = '4px';
             nameLabel.style.padding = '4px';
             nameLabel.contentEditable = 'false'; // Inicialmente no editable
-            
+
             // Event listener para cambios en el nombre de la sesión
             nameLabel.addEventListener('input', () => {
                 if (isEditMode) {
@@ -4267,12 +4264,12 @@ document.addEventListener('DOMContentLoaded', () => {
             nameRow.appendChild(nameLabel);
             nameRow.appendChild(actionsRight);
             sessionInfoContainer.parentNode.insertBefore(nameRow, sessionInfoContainer.nextSibling);
-            
+
             // Update display
-            try { stopClock(); } catch {}
+            try { stopClock(); } catch { }
             try { renderLaps(); } catch (e) { }
             try { updateSummary(); } catch (e) { }
-            try { lapsContainer.style.display = 'flex'; } catch {}
+            try { lapsContainer.style.display = 'flex'; } catch { }
             // Fallback: if nothing rendered but there are laps, render minimal rows
             try {
                 if (laps.length > 0 && lapsContainer.childElementCount === 0) {
@@ -4292,8 +4289,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         lapsContainer.appendChild(frag);
                     }
                 }
-            } catch {}
-            try { lapsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
+            } catch { }
+            try { lapsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch { }
         }
     };
 
@@ -4340,22 +4337,22 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.currentSessionKey = null; // Sincronizar con appState
         laps = [];
         appState.laps = laps; // Sincronizar con appState
-        
+
         // Remove top bar and reset margins
         const topBar = document.getElementById('session-top-bar');
         if (topBar) {
             topBar.remove();
         }
-        try { registrationView.style.marginTop = ''; } catch {}
+        try { registrationView.style.marginTop = ''; } catch { }
         registrationView.style.marginTop = '0';
         // Restore finalize button to default behavior and remove view handler
         if (finalizeViewHandler) {
-            try { finalizeBtn.removeEventListener('click', finalizeViewHandler); } catch {}
+            try { finalizeBtn.removeEventListener('click', finalizeViewHandler); } catch { }
             finalizeViewHandler = null;
         }
-        try { finalizeBtn.removeEventListener('click', finalizeSession); } catch {}
+        try { finalizeBtn.removeEventListener('click', finalizeSession); } catch { }
         finalizeBtn.addEventListener('click', finalizeSession);
-        
+
         // Remove session-info if exists
         const existingSessionInfo = document.getElementById('session-info');
         if (existingSessionInfo) existingSessionInfo.remove();
@@ -4391,27 +4388,27 @@ document.addEventListener('DOMContentLoaded', () => {
         finalizeBtn.style.margin = '';
         // Restore registration view UI state
         clockContainer.style.display = 'flex';
-        try { clockElement.style.display = ''; } catch {}
+        try { clockElement.style.display = ''; } catch { }
         renderLaps();
         updateSummary();
-        try { updateInstructionText && updateInstructionText(); } catch {}
-        try { startClock(); } catch {}
+        try { updateInstructionText && updateInstructionText(); } catch { }
+        try { startClock(); } catch { }
         // Caller decides which view to show next
     };
 
     const deleteSession = async (sessionKey) => {
         const sessionName = sessionKey.replace(sessionPrefix, '');
         const ok = await showModal({
-        id: 'modal-delete-session-confirm',
-        title: 'ELIMINAR SESSIÓ',
-        message: `Segur que vols eliminar la sessió:<br>"${sessionName}"?`,
-        okText: 'CONFIRMAR (Eliminar)',
-        cancelText: 'CANCEL.LAR (Conservar)',
-        type: 'confirm'
-    });
+            id: 'modal-delete-session-confirm',
+            title: 'ELIMINAR SESSIÓ',
+            message: `Segur que vols eliminar la sessió:<br>"${sessionName}"?`,
+            okText: 'CONFIRMAR (Eliminar)',
+            cancelText: 'CANCEL.LAR (Conservar)',
+            type: 'confirm'
+        });
         if (ok) {
             localStorage.removeItem(sessionKey);
-            
+
             // Si estamos viendo esta sesión (incluida la vista embebida en registration-view), cerrarla y mostrar solo sessions-view
             if (isViewingSession && currentSessionKey === sessionKey) {
                 try { await closeSessionView(true); } catch (e) { }
@@ -4419,9 +4416,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const tb = document.getElementById('session-top-bar');
                     if (tb) { tb.remove(); }
-                } catch {}
-                try { sessionsView.style.display = 'block'; } catch {}
-                try { registrationView.style.display = 'none'; } catch {}
+                } catch { }
+                try { sessionsView.style.display = 'flex'; } catch { }
+                try { registrationView.style.display = 'none'; } catch { }
                 updateToggleViewBtnLabel();
                 // Normalizar flags de vista
                 isReadOnly = false;
@@ -4430,9 +4427,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 appState.isViewingSession = false;
                 currentSessionKey = null;
                 appState.currentSessionKey = null;
-                try { laps = []; appState.laps = laps; renderLaps(); updateSummary(); } catch {}
+                try { laps = []; appState.laps = laps; renderLaps(); updateSummary(); } catch { }
             }
-            
+
             // Asegurar: si estamos en registration-view sin isViewingSession pero con la vista de sesión todavía montada
             // forzar también la vista de sesiones (caso reportado por el usuario)
             if (!isViewingSession) {
@@ -4442,9 +4439,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const tb = document.getElementById('session-top-bar');
                     if (tb) { tb.remove(); }
-                } catch {}
-                try { sessionsView.style.display = 'block'; } catch {}
-                try { registrationView.style.display = 'none'; } catch {}
+                } catch { }
+                try { sessionsView.style.display = 'flex'; } catch { }
+                try { registrationView.style.display = 'none'; } catch { }
                 updateToggleViewBtnLabel();
                 // Normalizar flags de vista
                 isReadOnly = false;
@@ -4453,9 +4450,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 appState.isViewingSession = false;
                 currentSessionKey = null;
                 appState.currentSessionKey = null;
-                try { laps = []; appState.laps = laps; renderLaps(); updateSummary(); } catch {}
+                try { laps = []; appState.laps = laps; renderLaps(); updateSummary(); } catch { }
             }
-            
+
             // Renderizar la lista actualizada
             renderSessions();
             updateToggleViewBtnLabel();
@@ -4504,12 +4501,24 @@ document.addEventListener('DOMContentLoaded', () => {
             shareText += `  Descans: ${formatDurationPlain(totalRestSeconds)}\n`;
             shareText += `  Total: ${formatDurationPlain(totalTimeSeconds)}\n`;
 
-            if (navigator.share) {
+            // Cordova: Usar plugin de social sharing
+            if (window.cordova && window.plugins && window.plugins.socialsharing) {
+                window.plugins.socialsharing.share(
+                    shareText,
+                    `Sesión: ${sessionName}`,
+                    null,
+                    null
+                );
+            }
+            // Web: Usar Web Share API
+            else if (navigator.share) {
                 navigator.share({
                     title: `Sesión: ${sessionName}`,
                     text: shareText,
-                }).catch(() => {});
-            } else {
+                }).catch(() => { });
+            }
+            // Fallback
+            else {
                 alert("La función de compartir no está disponible en este navegador. Puedes copiar el texto manualmente.");
                 prompt("Copia este texto:", shareText);
             }
@@ -4554,24 +4563,70 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Verificar si se debe exportar como archivo o como texto
         if (appState.settings.csvExportAsFile) {
-            // Generar archivo CSV para descargar
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
             const fileName = `${sessionName}_${startDateStr}.csv`;
-            
-            link.setAttribute('href', url);
-            link.setAttribute('download', fileName);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+
+            // Cordova: Guardar archivo con plugin File
+            if (window.cordova && window.resolveLocalFileSystemURL && cordova.file) {
+                const dirPath = cordova.file.externalDataDirectory || cordova.file.dataDirectory;
+                window.resolveLocalFileSystemURL(dirPath, function (dir) {
+                    dir.getFile(fileName, { create: true }, function (file) {
+                        file.createWriter(function (fileWriter) {
+                            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                            fileWriter.write(blob);
+                            fileWriter.onwriteend = function () {
+                                // Compartir el archivo si está disponible el plugin
+                                if (window.plugins && window.plugins.socialsharing) {
+                                    window.plugins.socialsharing.share(
+                                        `CSV exportat: ${sessionName}`,
+                                        sessionName,
+                                        file.toURL(),
+                                        null
+                                    );
+                                } else {
+                                    alert(`Arxiu guardat: ${fileName}`);
+                                }
+                            };
+                        }, function (err) {
+                            console.error('Error creant writer:', err);
+                            prompt('Error guardant arxiu. Copia el CSV:', csv);
+                        });
+                    }, function (err) {
+                        console.error('Error obtenint arxiu:', err);
+                        prompt('Error guardant arxiu. Copia el CSV:', csv);
+                    });
+                }, function (err) {
+                    console.error('Error accedint directori:', err);
+                    prompt('Error guardant arxiu. Copia el CSV:', csv);
+                });
+            }
+            // Web: Descargar archivo normalmente
+            else {
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+
+                link.setAttribute('href', url);
+                link.setAttribute('download', fileName);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
         } else {
             // Compartir como texto
-            if (navigator.share && navigator.canShare && navigator.canShare({ text: csv })) {
+            if (window.cordova && window.plugins && window.plugins.socialsharing) {
+                // Cordova: Plugin social sharing
+                window.plugins.socialsharing.share(
+                    csv,
+                    `Sesión CSV: ${sessionName}`,
+                    null,
+                    null
+                );
+            } else if (navigator.share && navigator.canShare && navigator.canShare({ text: csv })) {
+                // Web: Share API
                 navigator.share({ title: `Sesión CSV: ${sessionName}`, text: csv })
-                    .catch(() => {});
+                    .catch(() => { });
             } else {
                 // Fallback: prompt para copiar
                 prompt('Copia el CSV:', csv);
@@ -4617,24 +4672,70 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Verificar si se debe exportar como archivo o como texto
         if (appState.settings.csvExportAsFile) {
-            // Generar archivo CSV para descargar
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
             const fileName = `${sessionName}_${startDateStr}_coma.csv`;
-            
-            link.setAttribute('href', url);
-            link.setAttribute('download', fileName);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+
+            // Cordova: Guardar archivo con plugin File
+            if (window.cordova && window.resolveLocalFileSystemURL && cordova.file) {
+                const dirPath = cordova.file.externalDataDirectory || cordova.file.dataDirectory;
+                window.resolveLocalFileSystemURL(dirPath, function (dir) {
+                    dir.getFile(fileName, { create: true }, function (file) {
+                        file.createWriter(function (fileWriter) {
+                            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                            fileWriter.write(blob);
+                            fileWriter.onwriteend = function () {
+                                // Compartir el archivo si está disponible el plugin
+                                if (window.plugins && window.plugins.socialsharing) {
+                                    window.plugins.socialsharing.share(
+                                        `CSV exportat (coma): ${sessionName}`,
+                                        sessionName,
+                                        file.toURL(),
+                                        null
+                                    );
+                                } else {
+                                    alert(`Arxiu guardat: ${fileName}`);
+                                }
+                            };
+                        }, function (err) {
+                            console.error('Error creant writer:', err);
+                            prompt('Error guardant arxiu. Copia el CSV (Coma):', csv);
+                        });
+                    }, function (err) {
+                        console.error('Error obtenint arxiu:', err);
+                        prompt('Error guardant arxiu. Copia el CSV (Coma):', csv);
+                    });
+                }, function (err) {
+                    console.error('Error accedint directori:', err);
+                    prompt('Error guardant arxiu. Copia el CSV (Coma):', csv);
+                });
+            }
+            // Web: Descargar archivo normalmente
+            else {
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+
+                link.setAttribute('href', url);
+                link.setAttribute('download', fileName);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
         } else {
             // Compartir como texto
-            if (navigator.share && navigator.canShare && navigator.canShare({ text: csv })) {
+            if (window.cordova && window.plugins && window.plugins.socialsharing) {
+                // Cordova: Plugin social sharing
+                window.plugins.socialsharing.share(
+                    csv,
+                    `Sesión CSV (Coma): ${sessionName}`,
+                    null,
+                    null
+                );
+            } else if (navigator.share && navigator.canShare && navigator.canShare({ text: csv })) {
+                // Web: Share API
                 navigator.share({ title: `Sesión CSV (Coma): ${sessionName}`, text: csv })
-                    .catch(() => {});
+                    .catch(() => { });
             } else {
                 // Fallback: prompt para copiar
                 prompt('Copia el CSV (Coma):', csv);
@@ -4645,7 +4746,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const copySessionToClipboard = (sessionKey) => {
         const savedLaps = JSON.parse(localStorage.getItem(sessionKey));
         if (!savedLaps) return;
-        
+
         const info = parseSessionKey(sessionKey);
         const sessionName = info.name; // Usar solo el nombre limpio
         const startDate = new Date(savedLaps[0].time);
@@ -4714,30 +4815,31 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- PWA: Service Worker + Install prompt ---
-    (function setupPWA(){
+    (function setupPWA() {
         try {
-            if ('serviceWorker' in navigator) {
+            // Service Worker solo para Web/PWA, no para Cordova
+            if ('serviceWorker' in navigator && !window.cordova) {
                 window.addEventListener('load', () => {
                     // Detectar si estamos en GitHub Pages o en local
                     const isGitHubPages = window.location.hostname.includes('github.io');
                     const swPath = isGitHubPages ? '/ControlVoltes/sw.js' : 'sw.js';
                     const swScope = isGitHubPages ? '/ControlVoltes/' : './';
-                    
+
                     navigator.serviceWorker.register(swPath, { scope: swScope })
                         .then((reg) => {
-                            
+
                             // Actualización automática silenciosa
                             // Si hay un SW esperando, activarlo inmediatamente
                             if (reg.waiting) {
                                 reg.waiting.postMessage({ type: 'SKIP_WAITING' });
                             }
-                            
+
                             // Detectar cuando se encuentra una nueva versión
                             reg.addEventListener('updatefound', () => {
                                 const newWorker = reg.installing;
                                 if (!newWorker) return;
-                                
-                                
+
+
                                 newWorker.addEventListener('statechange', () => {
                                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                                         // Nueva versión instalada, activar automáticamente
@@ -4745,24 +4847,24 @@ document.addEventListener('DOMContentLoaded', () => {
                                     }
                                 });
                             });
-                            
+
                             // Cuando el nuevo SW toma control, recargar automáticamente
                             navigator.serviceWorker.addEventListener('controllerchange', () => {
                                 window.location.reload();
                             });
-                            
+
                             // Verificar actualizaciones cada vez que se inicia la app
-                            reg.update().catch((e) => {});
-                            
+                            reg.update().catch((e) => { });
+
                             // Verificar actualizaciones periódicamente (cada 30 segundos)
                             setInterval(() => {
-                                reg.update().catch(() => {});
+                                reg.update().catch(() => { });
                             }, 30000);
                         })
-                        .catch((e) => {});
+                        .catch((e) => { });
                 });
             }
-        } catch {}
+        } catch { }
         // beforeinstallprompt
         let deferredPrompt = null;
         try {
@@ -4779,9 +4881,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 installBtn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
             }
             window.addEventListener('beforeinstallprompt', (e) => {
-                // Prevenir el mini-infobar automático del navegador
-                // Esto es CORRECTO e INTENCIONAL - permite controlar cuándo mostrar el prompt
-                // El aviso en consola es informativo, no un error
                 e.preventDefault();
                 deferredPrompt = e;
                 if (installBtn) installBtn.style.display = 'flex';
@@ -4791,11 +4890,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 installBtn.disabled = true;
                 try {
                     const result = await deferredPrompt.prompt();
-                } catch {}
+                } catch { }
                 installBtn.style.display = 'none';
                 deferredPrompt = null;
             });
-        } catch {}
+        } catch { }
 
         // Force install button logic
         try {
@@ -4815,7 +4914,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (forceInstallBtn) forceInstallBtn.style.display = 'block';
                         // installBtn solo se muestra cuando hay deferredPrompt (ya gestionado arriba)
                     }
-                } catch {}
+                } catch { }
             };
 
             // Initial visibility
@@ -4825,7 +4924,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.addEventListener('appinstalled', () => {
                 try {
                     deferredPrompt = null;
-                } catch {}
+                } catch { }
                 updateInstallButtonsVisibility();
             });
 
@@ -4837,7 +4936,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (typeof mql.addListener === 'function') {
                     mql.addListener(updateInstallButtonsVisibility);
                 }
-            } catch {}
+            } catch { }
 
             if (forceInstallBtn) {
                 forceInstallBtn.addEventListener('click', async () => {
@@ -4846,11 +4945,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         const alreadyInstalled = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
                         if (alreadyInstalled) {
                             showToast('La app ya está instalada', [
-                                { label: 'Cerrar', onClick: () => { try { document.getElementById('pwa-toast')?.remove(); } catch {} }, variant: 'secondary' }
+                                { label: 'Cerrar', onClick: () => { try { document.getElementById('pwa-toast')?.remove(); } catch { } }, variant: 'secondary' }
                             ]);
                             return;
                         }
-                    } catch {}
+                    } catch { }
 
                     if (deferredPrompt) {
                         // Chrome/Android - use deferred prompt
@@ -4867,16 +4966,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         // iOS/Safari - show instructions
                         if (!installInstructionsDismissed) {
                             showToast('Para instalar: Pulsa el botón compartir → "Añadir a pantalla de inicio"', [
-                                { label: 'Cerrar', onClick: () => { 
-                                    try { document.getElementById('pwa-toast')?.remove(); } catch {}
-                                    installInstructionsDismissed = true; 
-                                }, variant: 'secondary' }
+                                {
+                                    label: 'Cerrar', onClick: () => {
+                                        try { document.getElementById('pwa-toast')?.remove(); } catch { }
+                                        installInstructionsDismissed = true;
+                                    }, variant: 'secondary'
+                                }
                             ]);
                         }
                     }
                 });
             }
-        } catch {}
+        } catch { }
     })();
 
     // Toast simple para avisos (instalación/actualización)
@@ -4914,20 +5015,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.style.padding = '4px 8px';
                 btn.style.borderRadius = '6px';
                 btn.style.cursor = 'pointer';
-                btn.addEventListener('click', () => { 
-                    try { 
+                btn.addEventListener('click', () => {
+                    try {
                         if (onClick) {
-                            onClick(); 
+                            onClick();
                         } else {
                             // Si no hay onClick definido, cerrar el toast
                             toast.remove();
                         }
-                    } catch {} 
+                    } catch { }
                 });
                 toast.appendChild(btn);
             });
-            setTimeout(() => { try { toast.remove(); } catch {} }, 8000);
-        } catch {}
+            setTimeout(() => { try { toast.remove(); } catch { } }, 8000);
+        } catch { }
     }
 
 
@@ -4963,373 +5064,130 @@ document.addEventListener('DOMContentLoaded', () => {
             addLap();
         }
     });
-    
-    // ========================================
-    // MEDIA SESSION API + BOTONES DE VOLUMEN FÍSICOS
-    // ========================================
-    
-    let silentAudio = null;
-    let mediaSessionActive = false;
-    let isChronoPaused = false;
-    let pausedTime = null;
-    
-    // Función para inicializar audio silencioso
-    const initSilentAudio = () => {
-        try {
-            silentAudio = document.getElementById('silent-audio');
-            if (silentAudio) {
-                silentAudio.volume = 0.01;
-                silentAudio.loop = true;
-            }
-        } catch (e) {
-            console.warn('Error inicializando audio silencioso:', e);
-        }
-    };
-    
-    // Función para iniciar audio silencioso (requiere interacción del usuario)
-    const startSilentAudio = async () => {
-        if (!silentAudio) {
-            console.error('❌ Audio silencioso no encontrado');
-            return false;
-        }
-        
-        if (!appState.settings.volumeButtonsEnabled) {
-            console.warn('⚠️ Botones de volumen NO habilitados en configuración');
-            return false;
-        }
-        
-        try {
-            console.log('🔊 Intentando iniciar audio silencioso...');
-            
-            // Asegurar que el audio está configurado correctamente
-            silentAudio.volume = 0.01;
-            silentAudio.loop = true;
-            
-            // Intentar reproducir
-            const playPromise = silentAudio.play();
-            
-            if (playPromise !== undefined) {
-                await playPromise;
-                console.log('✅ Audio silencioso iniciado correctamente');
-                console.log('📊 Estado del audio:', {
-                    paused: silentAudio.paused,
-                    readyState: silentAudio.readyState,
-                    volume: silentAudio.volume
-                });
-                return true;
-            }
-            
-            return false;
-        } catch (e) {
-            console.error('❌ Error reproduciendo audio silencioso:', e.name, e.message);
-            console.error('📋 Detalles:', e);
-            
-            // Mostrar mensaje al usuario
-            if (e.name === 'NotAllowedError') {
-                console.error('🚫 El navegador bloqueó la reproducción automática');
-                console.error('💡 Solución: Asegúrate de pulsar el reloj con el dedo directamente');
-            }
-            
-            return false;
-        }
-    };
-    
-    // Función para detener audio silencioso
-    const stopSilentAudio = () => {
-        if (!silentAudio) return;
-        
-        try {
-            silentAudio.pause();
-            silentAudio.currentTime = 0;
-            console.log('Audio silencioso detenido');
-        } catch (e) {
-            console.warn('Error deteniendo audio silencioso:', e);
-        }
-    };
-    
-    // Función para pausar/reanudar cronómetro
-    const toggleChronoPause = () => {
-        if (!isRecording) return;
-        
-        isChronoPaused = !isChronoPaused;
-        
-        if (isChronoPaused) {
-            // Pausar cronómetro
-            pausedTime = new Date();
-            
-            // Cambiar color del reloj a naranja para indicar pausa
-            clockContainer.style.backgroundColor = '#FF9800';
-            clockElement.style.color = '#000';
-            
-            // Feedback háptico
-            if (navigator.vibrate) {
-                navigator.vibrate([50, 50, 50]); // Vibración de pausa
-            }
-            
-            console.log('Cronómetro pausado');
-        } else {
-            // Reanudar cronómetro
-            if (pausedTime) {
-                const pauseDuration = new Date() - pausedTime;
-                
-                // Ajustar todos los tiempos de las vueltas
-                laps.forEach(lap => {
-                    lap.time = new Date(lap.time.getTime() + pauseDuration);
-                });
-                
-                pausedTime = null;
-            }
-            
-            // Restaurar color verde
-            clockContainer.style.backgroundColor = '#2E7D32';
-            clockElement.style.color = '#fff';
-            
-            // Feedback háptico
-            if (navigator.vibrate) {
-                navigator.vibrate(100); // Vibración de reanudación
-            }
-            
-            console.log('Cronómetro reanudado');
-        }
-        
-        renderLaps();
-        updateSummary();
-    };
-    
-    // Función para configurar Media Session API
-    const setupMediaSession = () => {
-        console.log('⚙️ setupMediaSession() - Configurando Media Session...');
-        
-        if (!('mediaSession' in navigator)) {
-            console.error('❌ Media Session API NO soportada en este navegador');
-            return false;
-        }
-        
-        try {
-            // Configurar metadata
-            console.log('📝 Configurando metadata...');
-            navigator.mediaSession.metadata = new MediaMetadata({
-                title: 'Cronómetro de Entrenamiento',
-                artist: 'Sesión Activa',
-                album: 'Entrenamiento'
-            });
-            console.log('✅ Metadata configurada');
-            
-            // Botón VOLUMEN ARRIBA (Vol+) → Registrar nueva vuelta
-            console.log('🔧 Configurando handler Vol+ (seekforward)...');
-            navigator.mediaSession.setActionHandler('seekforward', () => {
-                console.log('🔊 ¡BOTÓN VOL+ PULSADO! - Registrar vuelta');
-                if (registrationView.style.display === 'block' && !isReadOnly) {
-                    addLap();
-                    
-                    // Feedback visual
-                    const originalBg = clockContainer.style.backgroundColor;
-                    clockContainer.style.backgroundColor = '#FFD700';
-                    setTimeout(() => {
-                        clockContainer.style.backgroundColor = originalBg;
-                    }, 150);
-                    
-                    // Feedback háptico
-                    if (navigator.vibrate) {
-                        navigator.vibrate(50);
-                    }
-                } else {
-                    console.warn('⚠️ No se puede registrar vuelta (vista no activa o bloqueada)');
-                }
-            });
-            
-            // Botón VOLUMEN ABAJO (Vol-) → Pausar/Reanudar cronómetro
-            console.log('🔧 Configurando handler Vol- (seekbackward)...');
-            navigator.mediaSession.setActionHandler('seekbackward', () => {
-                console.log('🔊 ¡BOTÓN VOL- PULSADO! - Pausar/Reanudar');
-                if (registrationView.style.display === 'block' && !isReadOnly) {
-                    toggleChronoPause();
-                } else {
-                    console.warn('⚠️ No se puede pausar (vista no activa o bloqueada)');
-                }
-            });
-            
-            // Handlers adicionales para controles de notificación
-            console.log('🔧 Configurando handlers Play/Pause...');
-            navigator.mediaSession.setActionHandler('play', () => {
-                console.log('▶️ Media Session: play - Reanudar');
-                if (isChronoPaused) {
-                    toggleChronoPause();
-                }
-            });
-            
-            navigator.mediaSession.setActionHandler('pause', () => {
-                console.log('⏸️ Media Session: pause - Pausar');
-                if (!isChronoPaused && isRecording) {
-                    toggleChronoPause();
-                }
-            });
-            
-            console.log('✅✅✅ Media Session API configurada correctamente ✅✅✅');
-            mediaSessionActive = true;
-            return true;
-        } catch (e) {
-            console.error('❌ Error configurando Media Session API:', e);
-            return false;
-        }
-    };
-    
-    // Función para activar botones de volumen
-    const activateVolumeButtons = async () => {
-        console.log('🎯 activateVolumeButtons() llamada');
-        
-        if (!appState.settings.volumeButtonsEnabled) {
-            console.warn('⚠️ Botones de volumen NO habilitados - abortando');
-            return false;
-        }
-        
-        console.log('✅ Botones de volumen habilitados - continuando...');
-        
-        // Verificar soporte de Media Session
-        if (!('mediaSession' in navigator)) {
-            console.error('❌ Media Session API NO soportada en este navegador');
-            return false;
-        }
-        
-        console.log('✅ Media Session API soportada');
-        
-        // Inicializar audio
-        console.log('🔊 Iniciando audio silencioso...');
-        const audioStarted = await startSilentAudio();
-        
-        if (audioStarted) {
-            console.log('✅ Audio iniciado - configurando Media Session...');
-            
-            // Configurar Media Session
-            const mediaSessionConfigured = setupMediaSession();
-            
-            if (mediaSessionConfigured) {
-                console.log('✅ Media Session configurada correctamente');
-                
-                // Mostrar indicador
-                const indicator = document.getElementById('volume-buttons-indicator');
-                if (indicator) {
-                    indicator.style.display = 'block';
-                    console.log('✅ Indicador visual mostrado');
-                    
-                    // Vibración de confirmación
-                    if (navigator.vibrate) {
-                        navigator.vibrate([100, 50, 100]);
-                    }
-                } else {
-                    console.error('❌ No se encontró el elemento indicador');
-                }
-                
-                return true;
-            } else {
-                console.error('❌ Error configurando Media Session');
-                return false;
-            }
-        } else {
-            console.error('❌ No se pudo iniciar el audio silencioso');
-            console.error('💡 Posibles causas:');
-            console.error('   - Navegador bloqueó reproducción automática');
-            console.error('   - Falta interacción directa del usuario');
-            console.error('   - Permisos de audio denegados');
-            console.error('💡 Solución: Asegúrate de activar los botones en configuración Y pulsar el reloj directamente');
-            
-            return false;
-        }
-    };
-    
-    // Función para desactivar botones de volumen
-    const deactivateVolumeButtons = () => {
-        stopSilentAudio();
-        mediaSessionActive = false;
-        
-        // Ocultar indicador
-        const indicator = document.getElementById('volume-buttons-indicator');
-        if (indicator) {
-            indicator.style.display = 'none';
-        }
-        
-        // Limpiar handlers de Media Session
-        if ('mediaSession' in navigator) {
-            try {
-                navigator.mediaSession.setActionHandler('seekforward', null);
-                navigator.mediaSession.setActionHandler('seekbackward', null);
-                navigator.mediaSession.setActionHandler('play', null);
-                navigator.mediaSession.setActionHandler('pause', null);
-            } catch (e) {
-                console.warn('Error limpiando Media Session handlers:', e);
-            }
-        }
-    };
-    
-    // Inicializar audio al cargar la página
-    initSilentAudio();
-    
-    // Modificar la función addLap para activar botones de volumen al iniciar
-    const originalAddLap = addLap;
-    window.addLapWithVolumeButtons = function() {
-        const wasRecording = isRecording;
-        originalAddLap.call(this);
-        
-        // Si acabamos de iniciar grabación, activar botones de volumen
-        if (!wasRecording && isRecording && appState.settings.volumeButtonsEnabled) {
-            setTimeout(() => activateVolumeButtons(), 100);
-        }
-    };
-    
-    // Reemplazar la función addLap
-    const addLapOriginal = addLap;
-    
+
     // --- Capturar botones físicos del móvil (volumen) para marcar vueltas ---
     let lastVolumeKeyTime = 0;
     const volumeKeyDebounce = 300; // ms para evitar registros duplicados
-    
+
+    // Función para manejar la pulsación de botones de volumen (ambos marcan vuelta)
+    const handleVolumeButtonPress = () => {
+        const now = Date.now();
+
+        // Debounce para evitar múltiples registros
+        if (now - lastVolumeKeyTime < volumeKeyDebounce) {
+            return;
+        }
+
+        lastVolumeKeyTime = now;
+
+        // Solo marcar vuelta si estamos en la vista de registro
+        if (registrationView.style.display === 'block') {
+            addLap();
+
+            // Feedback visual/háptico opcional
+            if (navigator.vibrate) {
+                navigator.vibrate(50); // Vibración corta de confirmación
+            }
+
+            // Feedback visual en el reloj
+            const originalBg = clockContainer.style.backgroundColor;
+            clockContainer.style.backgroundColor = '#FFD700'; // Amarillo dorado
+            setTimeout(() => {
+                clockContainer.style.backgroundColor = originalBg;
+            }, 150);
+        }
+    };
+
+    // Web: Escuchar eventos de teclado
     document.addEventListener('keydown', (e) => {
         // Solo funcionar si la funcionalidad está activada
         if (!appState.settings.volumeButtonsEnabled) return;
-        
+
         // Capturar botones de volumen (VolumeUp/VolumeDown) y otras teclas útiles
         const validKeys = ['VolumeUp', 'VolumeDown', 'MediaTrackNext', 'MediaTrackPrevious'];
-        
+
         if (validKeys.includes(e.key)) {
-            // Prevenir el comportamiento por defecto INMEDIATAMENTE
-            e.preventDefault();
-            
-            const now = Date.now();
-            
-            // Debounce para evitar múltiples registros
-            if (now - lastVolumeKeyTime < volumeKeyDebounce) {
-                return;
-            }
-            
-            lastVolumeKeyTime = now;
-            
-            // Solo marcar vuelta si estamos en la vista de registro
-            if (registrationView.style.display === 'block') {
-                addLap();
-                
-                // Feedback visual/háptico opcional
-                if (navigator.vibrate) {
-                    navigator.vibrate(50); // Vibración corta de confirmación
-                }
-                
-                // Feedback visual en el reloj
-                const originalBg = clockContainer.style.backgroundColor;
-                clockContainer.style.backgroundColor = '#FFD700'; // Amarillo dorado
-                setTimeout(() => {
-                    clockContainer.style.backgroundColor = originalBg;
-                }, 150);
-            }
+            e.preventDefault(); // Evitar que cambie el volumen
+            handleVolumeButtonPress();
         }
     }, true); // useCapture=true para capturar antes que otros handlers
-    
+
+    // Cordova: Escuchar eventos nativos de botones de volumen
+    if (window.cordova) {
+        document.addEventListener('volumeupbutton', () => {
+            if (appState.settings.volumeButtonsEnabled) {
+                handleVolumeButtonPress();
+            }
+        }, false);
+
+        document.addEventListener('volumedownbutton', () => {
+            if (appState.settings.volumeButtonsEnabled) {
+                handleVolumeButtonPress();
+            }
+        }, false);
+    }
+
+    const handleExitAttempt = async () => {
+        if (exitConfirmationInProgress) return;
+        exitConfirmationInProgress = true;
+        try {
+            // Guardar estado actual antes de pedir confirmación
+            persistActiveRecordingState();
+
+            const ok = await showModal({
+                id: 'modal-exit-app-confirm',
+                title: 'Sortir de l’app',
+                message: 'Vols tancar l’aplicació? La sessió en curs quedarà guardada per reprendre-la en tornar a obrir.',
+                type: 'confirm',
+                okText: 'SORTIR',
+                cancelText: 'CANCEL·LAR',
+                buttonLayout: 'horizontal',
+                okButtonStyle: 'background: #dc3545; color: white; border: 1px solid #dc3545;',
+                cancelButtonStyle: 'background: #4CAF50; color: white; border: 1px solid #4CAF50;'
+            });
+
+            if (ok) {
+                persistActiveRecordingState();
+                if (window.cordova && navigator.app && navigator.app.exitApp) {
+                    navigator.app.exitApp();
+                } else if (window.close) {
+                    window.close();
+                }
+            }
+        } catch (err) {
+        } finally {
+            exitConfirmationInProgress = false;
+        }
+    };
+
+    // Confirmar salida al pulsar atrás en dispositivo
+    if (window.cordova) {
+        document.addEventListener('backbutton', (e) => {
+            e.preventDefault();
+            handleExitAttempt();
+        }, false);
+
+        // Guardar automáticamente al pausar la app
+        document.addEventListener('pause', persistActiveRecordingState, false);
+    }
+
+    // Web/PWA: confirmar antes de cerrar si hay grabación en curso
+    window.addEventListener('beforeunload', (event) => {
+        if (isRecording && laps.length > 0) {
+            persistActiveRecordingState();
+            event.preventDefault();
+            event.returnValue = '';
+        }
+    });
+
     finalizeBtn.addEventListener('click', async () => {
         await finalizeSession();
     });
-    
+
     // Inicializar vistas: mostrar registration-view, ocultar sessions-view
     registrationView.style.display = 'block';
     sessionsView.style.display = 'none';
-    
+
     startClock();
     renderSessions();
 
@@ -5337,17 +5195,17 @@ document.addEventListener('DOMContentLoaded', () => {
     (function initMultiSelectMode() {
         const multiselectToggleBtn = document.getElementById('multiselect-toggle-btn');
         const multiselectActionsBar = document.getElementById('multiselect-actions-bar');
-        
+
         if (!multiselectToggleBtn || !multiselectActionsBar) return;
-        
+
         // Añadir icono al botón toggle
         const checkSquareIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>`;
         multiselectToggleBtn.innerHTML = checkSquareIcon;
         multiselectToggleBtn.style.color = '#888';
-        
+
         // Añadir evento click
         multiselectToggleBtn.addEventListener('click', toggleMultiSelectMode);
-        
+
         // Crear contenido de la barra de acciones
         multiselectActionsBar.style.display = 'none';
         multiselectActionsBar.style.flexDirection = 'row';
@@ -5358,7 +5216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         multiselectActionsBar.style.borderRadius = '8px';
         multiselectActionsBar.style.alignItems = 'center';
         multiselectActionsBar.style.justifyContent = 'space-between';
-        
+
         // Botón CANCEL.LAR
         const cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
@@ -5383,7 +5241,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cancelBtn.style.borderColor = '#666';
         });
         cancelBtn.addEventListener('click', cancelMultiSelect);
-        
+
         // Span para contador
         const countSpan = document.createElement('span');
         countSpan.id = 'multiselect-count';
@@ -5391,7 +5249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         countSpan.style.fontSize = '1rem';
         countSpan.style.fontWeight = '600';
         countSpan.textContent = '';
-        
+
         // Botón ELIMINAR TOTS
         const deleteAllBtn = document.createElement('button');
         deleteAllBtn.type = 'button';
@@ -5416,7 +5274,7 @@ document.addEventListener('DOMContentLoaded', () => {
             deleteAllBtn.style.borderColor = '#dc3545';
         });
         deleteAllBtn.addEventListener('click', deleteSelectedSessions);
-        
+
         // Añadir botones a la barra
         multiselectActionsBar.appendChild(cancelBtn);
         multiselectActionsBar.appendChild(countSpan);
@@ -5434,7 +5292,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateWakeLockUI(isActive) {
         const toggle = wakeIndicator?.querySelector('span');
         if (!toggle) return;
-        
+
         if (isActive) {
             wakeToggle.setAttribute('aria-checked', 'true');
             wakeIndicator.style.background = '#0d6efd';
@@ -5530,75 +5388,70 @@ document.addEventListener('DOMContentLoaded', () => {
         if (document.getElementById('info-modal-overlay')) {
             return;
         }
-        
-        // ⚠️⚠️⚠️ ACTUALIZAR VERSIÓN AQUÍ EN CADA CAMBIO ⚠️⚠️⚠️
-        // Esta versión se muestra en el modal de información de la app
-        // DEBE coincidir con: sw.js, manifest.json e index.html
-        const appVersion = '1.2.5'; // ⬅️ CAMBIAR AQUÍ la versión
-        
+
+        const appVersion = '2.0.0'; // Versión desde manifest.json
+        const appDateVersion = '2025-12-15'; // Versión desde manifest.json
+
         // Crear contenedor del modal con opciones
         const modalContent = document.createElement('div');
         modalContent.style.textAlign = 'left';
         modalContent.style.width = '100%';
-        
+
         const infoText = document.createElement('div');
         infoText.innerHTML = `
-            <div style="text-align: center; margin-bottom: 15px;">
+            <div style="text-align: center; margin-bottom: 8px;">
                 
-                <strong style="font-size: 1.9rem; border: 3px solid black; padding: 8px 16px; display: block; border-radius: 6px; background-color: yellow; color: black;">CONTROL DE VOLTES</strong>
+                <strong style="font-size: 1.9rem; border: 3px solid black; padding: 6px 12px; display: block; border-radius: 6px; background-color: yellow; color: black;">CONTROL VOLTES</strong>
             </div>
-            <div style="text-align: center; margin-bottom: 15px; line-height: 1.6;">
-                <span style="opacity: 0.8;">Versió: ${appVersion}</span>
+            <div style="text-align: center; margin-bottom: 6px; line-height: 1.3;">
+                <span style="opacity: 0.8;">Versió: ${appVersion} ( ${appDateVersion} )</span>
             </div>
-            <div style="text-align: center; margin-bottom: 15px; line-height: 1.6;">
+            <div style="text-align: center; margin-bottom: 8px; line-height: 1.3;">
                 <strong>© 2025 - Albert Ruiz Pujol</strong><br>
                 <a href="mailto:ruiggi@gmail.com" style="color:rgb(255, 255, 255); text-decoration: none;">ruiggi@gmail.com</a><br>
-                <a href="https://ruiggi.github.io/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://ruiggi.github.io/ControlVoltes/</a>
+                <u><a href="https://ruiggi.github.io/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://ruiggi.github.io/ControlVoltes/</a></u>
             </div>
         `;
         modalContent.appendChild(infoText);
-        
+
         // Botones de acción
         const actionsContainer = document.createElement('div');
         actionsContainer.style.display = 'flex';
-        actionsContainer.style.flexDirection = 'row'; // Botones lado a lado
-        actionsContainer.style.gap = '10px';
-        actionsContainer.style.marginTop = '20px';
-        actionsContainer.style.flexWrap = 'wrap'; // Permite apilar en pantallas pequeñas
-        
+        actionsContainer.style.flexDirection = 'row';
+        actionsContainer.style.gap = '8px';
+        actionsContainer.style.marginTop = '10px';
+
         // Botón Forzar instalación
         const forceInstallBtn = document.createElement('button');
-        forceInstallBtn.textContent = '📲 INSTAL·LAR';
-        forceInstallBtn.style.padding = '12px';
+        forceInstallBtn.textContent = '📲  INSTAL·LAR';
+        forceInstallBtn.style.padding = '10px';
         forceInstallBtn.style.backgroundColor = '#0d6efd';
         forceInstallBtn.style.color = '#fff';
         forceInstallBtn.style.border = 'none';
         forceInstallBtn.style.borderRadius = '6px';
         forceInstallBtn.style.fontWeight = '700';
         forceInstallBtn.style.cursor = 'pointer';
-        forceInstallBtn.style.fontSize = '1rem';
-        forceInstallBtn.style.flex = '1 1 200px'; // Ocupar mismo espacio, min 200px
-        forceInstallBtn.style.minWidth = '0'; // Permitir reducción
+        forceInstallBtn.style.fontSize = '0.9rem';
+        forceInstallBtn.style.flex = '1';
         forceInstallBtn.addEventListener('click', () => {
             const forceBtn = document.getElementById('force-install-btn');
             if (forceBtn) forceBtn.click();
             // Cerrar modal
             document.getElementById('info-modal-overlay')?.remove();
         });
-        
+
         // Botón Actualizar aplicación
         const updateBtn = document.createElement('button');
-        updateBtn.textContent = '🔄 ACTUALITZAR';
-        updateBtn.style.padding = '12px';
+        updateBtn.textContent = '🔄  ACTUALITZAR';
+        updateBtn.style.padding = '10px';
         updateBtn.style.backgroundColor = '#0d6efd';
         updateBtn.style.color = '#fff';
         updateBtn.style.border = 'none';
         updateBtn.style.borderRadius = '6px';
         updateBtn.style.fontWeight = '700';
         updateBtn.style.cursor = 'pointer';
-        updateBtn.style.fontSize = '1rem';
-        updateBtn.style.flex = '1 1 200px'; // Ocupar mismo espacio, min 200px
-        updateBtn.style.minWidth = '0'; // Permitir reducción
+        updateBtn.style.fontSize = '0.9rem';
+        updateBtn.style.flex = '1';
         updateBtn.addEventListener('click', async () => {
             try {
                 const registration = await navigator.serviceWorker.getRegistration();
@@ -5610,11 +5463,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('Error actualitzant l\'aplicació');
             }
         });
-        
+
         actionsContainer.appendChild(forceInstallBtn);
         actionsContainer.appendChild(updateBtn);
         modalContent.appendChild(actionsContainer);
-        
+
         // Mostrar modal personalizado
         const overlay = document.createElement('div');
         overlay.id = 'info-modal-overlay';
@@ -5631,38 +5484,38 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay.style.justifyContent = 'center';
         overlay.style.padding = '20px';
         overlay.style.boxSizing = 'border-box';
-        
+
         const modal = document.createElement('div');
         modal.className = 'info-modal';
         modal.style.backgroundColor = 'var(--card-bg-color)';
         modal.style.borderRadius = '12px';
-        modal.style.padding = '24px';
+        modal.style.padding = '16px';
         modal.style.maxWidth = '500px';
         modal.style.width = '95vw';
         modal.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
         modal.style.border = '1px solid var(--accent-color)';
-        
+
         modal.appendChild(modalContent);
-        
+
         // Switch para el orden de las vueltas
         const orderSwitchContainer = document.createElement('div');
         orderSwitchContainer.style.display = 'flex';
         orderSwitchContainer.style.alignItems = 'center';
         orderSwitchContainer.style.justifyContent = 'space-between';
         orderSwitchContainer.style.gap = '10px';
-        orderSwitchContainer.style.padding = '12px';
-        orderSwitchContainer.style.marginTop = '20px';
+        orderSwitchContainer.style.padding = '8px';
+        orderSwitchContainer.style.marginTop = '12px';
         orderSwitchContainer.style.borderRadius = '8px';
         orderSwitchContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
         orderSwitchContainer.style.border = '1px solid var(--accent-color)';
-        
+
         const orderLabel = document.createElement('span');
         orderLabel.textContent = 'ORDRE VOLTES:';
         orderLabel.style.fontWeight = '600';
         orderLabel.style.fontSize = '0.9rem';
         orderLabel.style.color = 'var(--text-color)';
         orderLabel.style.whiteSpace = 'nowrap';
-        
+
         const orderSwitch = document.createElement('div');
         orderSwitch.role = 'switch';
         orderSwitch.tabIndex = 0;
@@ -5678,7 +5531,7 @@ document.addEventListener('DOMContentLoaded', () => {
         orderSwitch.style.boxSizing = 'border-box';
         orderSwitch.style.background = lapsOrderDescending ? '#0d6efd' : '#666';
         orderSwitch.style.flexShrink = '0';
-        
+
         const orderDot = document.createElement('span');
         orderDot.style.width = '16px';
         orderDot.style.height = '16px';
@@ -5686,34 +5539,35 @@ document.addEventListener('DOMContentLoaded', () => {
         orderDot.style.background = '#fff';
         orderDot.style.transition = 'transform 0.2s';
         orderDot.style.transform = lapsOrderDescending ? 'translateX(14px)' : 'translateX(0)';
-        
+
         orderSwitch.appendChild(orderDot);
-        
+
         const orderStateText = document.createElement('span');
-        orderStateText.textContent = lapsOrderDescending ? '(DESCENDENT: Més recent a dalt)' : '(ASCENDENT: més recent al final)';
+        orderStateText.innerHTML = lapsOrderDescending ? 'DESCENDENT<br>(Més recent a dalt)' : 'ASCENDENT<br>(Més recent al final)';
         orderStateText.style.fontWeight = '500';
         orderStateText.style.fontSize = '0.85rem';
         orderStateText.style.color = 'var(--text-color)';
         orderStateText.style.opacity = '0.9';
         orderStateText.style.textAlign = 'right';
-        
+        orderStateText.style.lineHeight = '1.3';
+
         // Event listener para el switch
         orderSwitch.addEventListener('click', () => {
             const newValue = !lapsOrderDescending;
             saveLapsOrderPreference(newValue);
-            
+
             // Actualizar UI del switch
             orderSwitch.style.background = newValue ? '#0d6efd' : '#666';
             orderDot.style.transform = newValue ? 'translateX(14px)' : 'translateX(0)';
             orderSwitch.setAttribute('aria-checked', String(newValue));
-            
+
             // Actualizar texto del estado
-            orderStateText.textContent = newValue ? '(DESCENDENT: Més recent a dalt)' : '(ASCENDENT: més recent al final)';
-            
+            orderStateText.innerHTML = newValue ? 'DESCENDENT<br>(Més recent a dalt)' : 'ASCENDENT<br>(Més recent al final)';
+
             // Re-renderizar las vueltas con el nuevo orden
             renderLaps();
         });
-        
+
         // Agregar soporte de teclado
         orderSwitch.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -5721,31 +5575,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 orderSwitch.click();
             }
         });
-        
+
         orderSwitchContainer.appendChild(orderLabel);
         orderSwitchContainer.appendChild(orderSwitch);
         orderSwitchContainer.appendChild(orderStateText);
         modal.appendChild(orderSwitchContainer);
-        
+
         // --- Switch para botones de volumen ---
         const volumeButtonsSwitchContainer = document.createElement('div');
         volumeButtonsSwitchContainer.style.display = 'flex';
         volumeButtonsSwitchContainer.style.alignItems = 'center';
         volumeButtonsSwitchContainer.style.justifyContent = 'space-between';
         volumeButtonsSwitchContainer.style.gap = '10px';
-        volumeButtonsSwitchContainer.style.padding = '12px';
-        volumeButtonsSwitchContainer.style.marginTop = '10px';
+        volumeButtonsSwitchContainer.style.padding = '8px';
+        volumeButtonsSwitchContainer.style.marginTop = '6px';
         volumeButtonsSwitchContainer.style.borderRadius = '8px';
         volumeButtonsSwitchContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
         volumeButtonsSwitchContainer.style.border = '1px solid var(--accent-color)';
-        
+
         const volumeButtonsLabel = document.createElement('span');
         volumeButtonsLabel.textContent = '🎚️ BOTONS VOLUM:';
         volumeButtonsLabel.style.fontWeight = '600';
         volumeButtonsLabel.style.fontSize = '0.9rem';
         volumeButtonsLabel.style.color = 'var(--text-color)';
         volumeButtonsLabel.style.whiteSpace = 'nowrap';
-        
+
         const volumeButtonsSwitch = document.createElement('div');
         volumeButtonsSwitch.role = 'switch';
         volumeButtonsSwitch.tabIndex = 0;
@@ -5761,7 +5615,7 @@ document.addEventListener('DOMContentLoaded', () => {
         volumeButtonsSwitch.style.boxSizing = 'border-box';
         volumeButtonsSwitch.style.background = appState.settings.volumeButtonsEnabled ? '#28a745' : '#666';
         volumeButtonsSwitch.style.flexShrink = '0';
-        
+
         const volumeButtonsDot = document.createElement('span');
         volumeButtonsDot.style.width = '16px';
         volumeButtonsDot.style.height = '16px';
@@ -5769,37 +5623,38 @@ document.addEventListener('DOMContentLoaded', () => {
         volumeButtonsDot.style.background = '#fff';
         volumeButtonsDot.style.transition = 'transform 0.2s';
         volumeButtonsDot.style.transform = appState.settings.volumeButtonsEnabled ? 'translateX(14px)' : 'translateX(0)';
-        
+
         volumeButtonsSwitch.appendChild(volumeButtonsDot);
-        
+
         const volumeButtonsStateText = document.createElement('span');
-        volumeButtonsStateText.textContent = appState.settings.volumeButtonsEnabled ? '(Marcar voltes amb botons)' : '(Desactivat)';
+        volumeButtonsStateText.innerHTML = appState.settings.volumeButtonsEnabled ? 'ACTIVAT<br>(Marcar voltes)' : 'DESACTIVAT<br>(No usar botons)';
         volumeButtonsStateText.style.fontWeight = '500';
         volumeButtonsStateText.style.fontSize = '0.85rem';
         volumeButtonsStateText.style.color = 'var(--text-color)';
         volumeButtonsStateText.style.opacity = '0.9';
         volumeButtonsStateText.style.textAlign = 'right';
-        
+        volumeButtonsStateText.style.lineHeight = '1.3';
+
         // Event listener para el switch
         volumeButtonsSwitch.addEventListener('click', () => {
             const newValue = !appState.settings.volumeButtonsEnabled;
             appState.settings.volumeButtonsEnabled = newValue;
             saveSettings();
-            
+
             // Actualizar UI del switch
             volumeButtonsSwitch.style.background = newValue ? '#28a745' : '#666';
             volumeButtonsDot.style.transform = newValue ? 'translateX(14px)' : 'translateX(0)';
             volumeButtonsSwitch.setAttribute('aria-checked', String(newValue));
-            
+
             // Actualizar texto del estado
-            volumeButtonsStateText.textContent = newValue ? '(Marcar voltes amb botons)' : '(Desactivat)';
-            
+            volumeButtonsStateText.innerHTML = newValue ? 'ACTIVAT<br>(Marcar voltes)' : 'DESACTIVAT<br>(No usar botons)';
+
             // Mostrar mensaje de confirmación
             if (newValue && navigator.vibrate) {
                 navigator.vibrate([50, 100, 50]); // Patrón de vibración de confirmación
             }
         });
-        
+
         // Agregar soporte de teclado
         volumeButtonsSwitch.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -5807,59 +5662,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 volumeButtonsSwitch.click();
             }
         });
-        
+
         volumeButtonsSwitchContainer.appendChild(volumeButtonsLabel);
         volumeButtonsSwitchContainer.appendChild(volumeButtonsSwitch);
         volumeButtonsSwitchContainer.appendChild(volumeButtonsStateText);
         modal.appendChild(volumeButtonsSwitchContainer);
-        
-        // --- Mensaje de ayuda para botones de volumen ---
-        const volumeButtonsHelp = document.createElement('div');
-        volumeButtonsHelp.style.padding = '12px';
-        volumeButtonsHelp.style.marginTop = '8px';
-        volumeButtonsHelp.style.borderRadius = '8px';
-        volumeButtonsHelp.style.backgroundColor = 'rgba(0, 170, 255, 0.1)';
-        volumeButtonsHelp.style.border = '1px solid rgba(0, 170, 255, 0.3)';
-        volumeButtonsHelp.style.fontSize = '0.85rem';
-        volumeButtonsHelp.style.lineHeight = '1.6';
-        volumeButtonsHelp.style.color = 'var(--text-color)';
-        volumeButtonsHelp.innerHTML = `
-            <div style="font-weight: 600; margin-bottom: 8px; color: #00aaff;">ℹ️ Com utilitzar:</div>
-            <div style="opacity: 0.9;">
-                1. Activa aquest switch (☝️ dalt)<br>
-                2. Tanca aquest modal<br>
-                3. <strong>Prem el rellotge</strong> per iniciar una sessió<br>
-                4. Veuràs un indicador verd "✅ Botones físicos activos"<br>
-                5. Ara pots usar <strong>Vol+</strong> i <strong>Vol-</strong> en el teu mòbil!
-            </div>
-            <div style="margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 6px;">
-                <strong>Vol+</strong> = Marcar volta | <strong>Vol-</strong> = Pausar/Reanudar
-            </div>
-            <div style="margin-top: 8px; opacity: 0.7; font-size: 0.75rem;">
-                💡 Per diagnosticar problemes, connecta el mòbil al PC i obre la consola del navegador
-            </div>
-        `;
-        modal.appendChild(volumeButtonsHelp);
-        
+
         // --- Switch para exportación CSV como archivo ---
         const csvExportSwitchContainer = document.createElement('div');
         csvExportSwitchContainer.style.display = 'flex';
         csvExportSwitchContainer.style.alignItems = 'center';
         csvExportSwitchContainer.style.justifyContent = 'space-between';
         csvExportSwitchContainer.style.gap = '10px';
-        csvExportSwitchContainer.style.padding = '12px';
-        csvExportSwitchContainer.style.marginTop = '10px';
+        csvExportSwitchContainer.style.padding = '8px';
+        csvExportSwitchContainer.style.marginTop = '6px';
         csvExportSwitchContainer.style.borderRadius = '8px';
         csvExportSwitchContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
         csvExportSwitchContainer.style.border = '1px solid var(--accent-color)';
-        
+
         const csvExportLabel = document.createElement('span');
         csvExportLabel.textContent = '📄 EXPORTAR CSV:';
         csvExportLabel.style.fontWeight = '600';
         csvExportLabel.style.fontSize = '0.9rem';
         csvExportLabel.style.color = 'var(--text-color)';
         csvExportLabel.style.whiteSpace = 'nowrap';
-        
+
         const csvExportSwitch = document.createElement('div');
         csvExportSwitch.role = 'switch';
         csvExportSwitch.tabIndex = 0;
@@ -5875,7 +5702,7 @@ document.addEventListener('DOMContentLoaded', () => {
         csvExportSwitch.style.boxSizing = 'border-box';
         csvExportSwitch.style.background = appState.settings.csvExportAsFile ? '#28a745' : '#666';
         csvExportSwitch.style.flexShrink = '0';
-        
+
         const csvExportDot = document.createElement('span');
         csvExportDot.style.width = '16px';
         csvExportDot.style.height = '16px';
@@ -5883,32 +5710,33 @@ document.addEventListener('DOMContentLoaded', () => {
         csvExportDot.style.background = '#fff';
         csvExportDot.style.transition = 'transform 0.2s';
         csvExportDot.style.transform = appState.settings.csvExportAsFile ? 'translateX(14px)' : 'translateX(0)';
-        
+
         csvExportSwitch.appendChild(csvExportDot);
-        
+
         const csvExportStateText = document.createElement('span');
-        csvExportStateText.textContent = appState.settings.csvExportAsFile ? '(Generar arxiu)' : '(Compartir text)';
+        csvExportStateText.innerHTML = appState.settings.csvExportAsFile ? 'ARXIU<br>(Generar arxiu)' : 'TEXT<br>(Compartir text)';
         csvExportStateText.style.fontWeight = '500';
         csvExportStateText.style.fontSize = '0.85rem';
         csvExportStateText.style.color = 'var(--text-color)';
         csvExportStateText.style.opacity = '0.9';
         csvExportStateText.style.textAlign = 'right';
-        
+        csvExportStateText.style.lineHeight = '1.3';
+
         // Event listener para el switch
         csvExportSwitch.addEventListener('click', () => {
             const newValue = !appState.settings.csvExportAsFile;
             appState.settings.csvExportAsFile = newValue;
             saveSettings();
-            
+
             // Actualizar UI del switch
             csvExportSwitch.style.background = newValue ? '#28a745' : '#666';
             csvExportDot.style.transform = newValue ? 'translateX(14px)' : 'translateX(0)';
             csvExportSwitch.setAttribute('aria-checked', String(newValue));
-            
+
             // Actualizar texto del estado
-            csvExportStateText.textContent = newValue ? '(Generar arxiu)' : '(Compartir text)';
+            csvExportStateText.innerHTML = newValue ? 'ARXIU<br>(Generar arxiu)' : 'TEXT<br>(Compartir text)';
         });
-        
+
         // Agregar soporte de teclado
         csvExportSwitch.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -5916,32 +5744,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 csvExportSwitch.click();
             }
         });
-        
+
         csvExportSwitchContainer.appendChild(csvExportLabel);
         csvExportSwitchContainer.appendChild(csvExportSwitch);
         csvExportSwitchContainer.appendChild(csvExportStateText);
         modal.appendChild(csvExportSwitchContainer);
-        
+
         // Botón ACEPTAR
         const okButton = document.createElement('button');
         okButton.textContent = 'TANCAR';
         okButton.style.width = '100%';
-        okButton.style.padding = '14px';
-        okButton.style.marginTop = '12px';
+        okButton.style.padding = '10px';
+        okButton.style.marginTop = '10px';
         okButton.style.backgroundColor = '#28a745';
         okButton.style.color = '#fff';
         okButton.style.border = 'none';
         okButton.style.borderRadius = '6px';
         okButton.style.fontWeight = '700';
         okButton.style.cursor = 'pointer';
-        okButton.style.fontSize = '1.1rem';
+        okButton.style.fontSize = '1rem';
         okButton.style.textTransform = 'uppercase';
         okButton.addEventListener('click', () => overlay.remove());
-        
+
         modal.appendChild(okButton);
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
-        
+
         // Cerrar al hacer clic fuera del modal
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) overlay.remove();
@@ -5970,7 +5798,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const lockBtn = document.getElementById('lock-btn');
     const lockLabel = document.getElementById('lock-label');
     const lockToggle = document.getElementById('lock-toggle');
-    
+
     if (lockBtn && lockLabel && lockToggle) {
         // Establecer estado inicial
         lockBtn.innerHTML = appState.settings.isLocked ? lockIcon : unlockIcon;
@@ -5978,10 +5806,10 @@ document.addEventListener('DOMContentLoaded', () => {
         lockBtn.style.color = appState.settings.isLocked ? '#dc3545' : '#28a745';
         lockLabel.style.color = appState.settings.isLocked ? '#dc3545' : '#28a745';
         lockToggle.style.borderColor = appState.settings.isLocked ? '#dc3545' : '#28a745';
-        
+
         // Event listener
         lockToggle.addEventListener('click', toggleLock);
-        
+
         // Aplicar estado inicial
         applyLockState();
     }
@@ -6033,13 +5861,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add instruction text
     const instructionText = document.createElement('div');
     instructionText.textContent = 'PREM AQUÍ PER COMENÇAR A REGISTRAR UNA SESSIÓ';
-    instructionText.style.fontSize = '1.1em'; // Más grande y visible
-    instructionText.style.opacity = '1'; // Completamente visible
+    instructionText.style.fontSize = '0.8em';
+    instructionText.style.opacity = '0.7';
     instructionText.style.marginTop = '10px';
-    instructionText.style.fontWeight = '700'; // Negrita para más visibilidad
-    instructionText.style.letterSpacing = '0.5px'; // Mejor legibilidad
-    instructionText.style.lineHeight = '1.2'; // Compacto para no aumentar altura
     clockContainer.appendChild(instructionText);
+
+    // Reanudar grabación si quedó activa al salir
+    const restoredActiveRecording = restoreActiveRecordingState();
+    if (restoredActiveRecording) {
+        registrationView.style.display = 'flex';
+        sessionsView.style.display = 'none';
+    }
 
     // Afegir estils al clock container
     // Fondo por defecto (no en grabación)
@@ -6050,8 +5882,8 @@ document.addEventListener('DOMContentLoaded', () => {
     clockContainer.style.transition = 'background-color 0.2s ease';
 
     // Desactivar cambios de fondo por hover para no interferir con grabación
-    try { clockContainer.addEventListener && clockContainer.addEventListener('mouseover', () => {}); } catch {}
-    try { clockContainer.addEventListener && clockContainer.addEventListener('mouseout', () => {}); } catch {}
+    try { clockContainer.addEventListener && clockContainer.addEventListener('mouseover', () => { }); } catch { }
+    try { clockContainer.addEventListener && clockContainer.addEventListener('mouseout', () => { }); } catch { }
 
     // In the initialization section, modify summary container texts
     const summaryContainer = document.getElementById('summary-container');
@@ -6060,7 +5892,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { icon: restIcon, text: 'DESCANS' },
         { icon: totalIcon, text: 'TOTAL' }
     ];
-    
+
     summaryLabels.forEach((label, index) => {
         const span = summaryContainer.querySelector(`.summary-item:nth-child(${index + 1}) span`);
         span.innerHTML = `${label.icon} ${label.text}`;
@@ -6096,4 +5928,65 @@ document.addEventListener('DOMContentLoaded', () => {
     clockContainer.style.boxSizing = 'border-box';
 
     // Note: Modal styles are now in styles.css - no need to create them dynamically
-});
+
+    // CRITICAL: Initialize registration-view with flex display to ensure scrolling works
+    // This must be done after DOM is ready to override any inline styles from HTML
+    if (registrationView) {
+        registrationView.style.display = 'flex';
+    }
+    if (sessionsView) {
+        sessionsView.style.display = 'none';
+    }
+
+    // CRITICAL: Dynamic height calculation for laps container
+    // This ensures the laps container fills all available vertical space
+    const updateLapsContainerHeight = () => {
+        try {
+            if (!lapsContainer) return;
+
+            // Get the heights of all fixed elements
+            const appTitle = document.getElementById('app-title');
+            const clockContainer = document.getElementById('clock-container');
+            const summaryContainer = document.getElementById('summary-container');
+            const controlsContainer = document.getElementById('controls-container');
+
+            // Calculate total height of fixed elements
+            let fixedHeight = 0;
+            if (appTitle) fixedHeight += appTitle.offsetHeight;
+            if (clockContainer) fixedHeight += clockContainer.offsetHeight;
+            if (summaryContainer) fixedHeight += summaryContainer.offsetHeight;
+            if (controlsContainer) fixedHeight += controlsContainer.offsetHeight;
+
+            // Add gaps and padding (2px gap between elements, 5px padding on main-container)
+            const gaps = 2 * 3; // 3 gaps between 4 elements
+            const padding = 10; // 5px top + 5px bottom on main-container
+            const extraSpace = 20; // Safety margin
+
+            // Calculate available height for laps container
+            const availableHeight = window.innerHeight - fixedHeight - gaps - padding - extraSpace;
+
+            // Set the height (minimum 200px)
+            const finalHeight = Math.max(200, availableHeight);
+            lapsContainer.style.height = `${finalHeight}px`;
+            lapsContainer.style.minHeight = `${finalHeight}px`;
+            lapsContainer.style.maxHeight = `${finalHeight}px`;
+        } catch (e) {
+            console.error('Error updating laps container height:', e);
+        }
+    };
+
+    // Call on initialization
+    setTimeout(updateLapsContainerHeight, 100);
+
+    // Update on window resize
+    window.addEventListener('resize', updateLapsContainerHeight);
+}
+
+// Detectar entorno y inicializar aplicación
+if (window.cordova) {
+    // Cordova: Esperar evento deviceready
+    document.addEventListener('deviceready', initApp, false);
+} else {
+    // Web/PWA: Usar DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', initApp);
+}

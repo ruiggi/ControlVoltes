@@ -2,7 +2,7 @@
   "_comment": "⚠️ ACTUALIZAR 'version' aquí cuando modifiques el código (debe coincidir con sw.js e index.html)",
   "name": "Control de Voltes",
   "short_name": "Voltes",
-  "version": "1.2.5",
+  "version": "2.0.0",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
