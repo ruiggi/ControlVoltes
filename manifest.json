@@ -1,0 +1,32 @@
+{
+  "_comment": "⚠️ ACTUALIZAR 'version' aquí cuando modifiques el código (debe coincidir con sw.js e index.html)",
+  "name": "Control de Voltes",
+  "short_name": "Voltes",
+  "version": "2.0.0",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#333333",
+  "theme_color": "#333333",
+  "description": "Croometro de voletes amb gravació de sessions.",
+  "icons": [
+    {
+      "src": "icons/crono-512.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/crono-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/crono-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

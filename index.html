@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VOLTES</title>
+    <link rel="stylesheet" href="styles.css?v=1.2.1">
+    <link rel="manifest" href="manifest.json?v=1.2.1">
+    <meta name="theme-color" content="#333">
+    <link rel="icon" type="image/png" href="icons/crono-512.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icons/crono-512.png">
+</head>
+
+<body>
+    <div id="main-container" style="position: relative;">
+        <div id="app-title">
+            <div id="title-left" class="title-left">
+                <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="display: block;">
+                    <!-- Botón superior -->
+                    <circle cx="256" cy="60" r="40" fill="#e0e0e0" stroke="#999" stroke-width="8" />
+                    <rect x="236" y="60" width="40" height="80" fill="#5f7684" rx="8" />
+
+                    <!-- Botones laterales -->
+                    <path d="M 120 180 L 80 140 L 140 120 L 160 180 Z" fill="#5f7684" />
+                    <path d="M 392 180 L 432 140 L 372 120 L 352 180 Z" fill="#5f7684" />
+
+                    <!-- Cuerpo del cronómetro -->
+                    <circle cx="256" cy="300" r="180" fill="#5f7684" stroke="#3d4f5c" stroke-width="12" />
+                    <circle cx="256" cy="300" r="150" fill="#f0f0f0" stroke="#ddd" stroke-width="8" />
+
+                    <!-- Marcas de hora -->
+                    <rect x="250" y="160" width="12" height="30" fill="#2c3e50" />
+                    <rect x="380" y="294" width="30" height="12" fill="#2c3e50" />
+                    <rect x="250" y="410" width="12" height="30" fill="#2c3e50" />
+                    <rect x="138" y="294" width="30" height="12" fill="#2c3e50" />
+
+                    <!-- Marcas secundarias -->
+                    <rect x="325" y="195" width="8" height="20" fill="#2c3e50" transform="rotate(45 329 205)" />
+                    <rect x="355" y="225" width="8" height="20" fill="#2c3e50" transform="rotate(65 359 235)" />
+                    <rect x="355" y="365" width="8" height="20" fill="#2c3e50" transform="rotate(-65 359 375)" />
+                    <rect x="325" y="395" width="8" height="20" fill="#2c3e50" transform="rotate(-45 329 405)" />
+                    <rect x="179" y="195" width="8" height="20" fill="#2c3e50" transform="rotate(-45 183 205)" />
+                    <rect x="149" y="225" width="8" height="20" fill="#2c3e50" transform="rotate(-65 153 235)" />
+                    <rect x="149" y="365" width="8" height="20" fill="#2c3e50" transform="rotate(65 153 375)" />
+                    <rect x="179" y="395" width="8" height="20" fill="#2c3e50" transform="rotate(45 183 405)" />
+
+                    <!-- Sector rojo (cuarto de círculo) -->
+                    <path d="M 256 300 L 256 150 A 150 150 0 0 1 406 300 Z" fill="#ff6b6b" opacity="0.8" />
+
+                    <!-- Manecillas -->
+                    <line x1="256" y1="300" x2="256" y2="180" stroke="#2c3e50" stroke-width="8"
+                        stroke-linecap="round" />
+                    <line x1="256" y1="300" x2="340" y2="360" stroke="#2c3e50" stroke-width="10"
+                        stroke-linecap="round" />
+
+                    <!-- Centro -->
+                    <circle cx="256" cy="300" r="20" fill="#2c3e50" />
+                </svg>
+            </div>
+            <div id="header-actions" style="display:flex; align-items:center; gap:8px;">
+                <button id="install-btn"
+                    style="display:none; align-items:center; gap:6px; padding:4px 8px; border-radius:6px; border:1px solid #0d6efd; background:#0d6efd; color:#fff; font-weight:700; cursor:pointer;">INSTALAR</button>
+                <div id="lock-toggle"
+                    style="display:flex; align-items:center; gap:4px; cursor:pointer; padding:4px 8px; border-radius:6px; border:1px solid #28a745; background:transparent; transition:all 0.2s;">
+                    <button id="lock-btn"
+                        style="display:flex; align-items:center; justify-content:center; background:transparent; border:none; color:#28a745; cursor:pointer; padding:0;"></button>
+                    <span id="lock-label"
+                        style="font-size:0.75rem; font-weight:700; color:#28a745; white-space:nowrap;">OBERT</span>
+                </div>
+                <div id="wake-toggle" role="switch" aria-checked="false" tabindex="0" title="Mantener pantalla activa">
+                    <span id="wake-label"></span>
+                    <span id="wake-indicator"
+                        style="width:34px; height:20px; display:inline-flex; align-items:center; padding:2px; border-radius:999px; background:#666; box-sizing:border-box;">
+                        <span id="wake-indicator-dot"
+                            style="width:16px; height:16px; border-radius:50%; background:#bbb; transform: translateX(0); transition: transform .2s, background .2s;"></span>
+                    </span>
+                </div>
+                <div id="toggle-view-btn"></div>
+            </div>
+        </div>
+        <div id="registration-view">
+            <div id="clock-container">
+                <div id="clock" aria-live="polite" aria-atomic="true">00:00:00.000</div>
+            </div>
+            <div id="summary-container">
+                <div id="summary-work" class="summary-item">
+                    <span id="summary-work-label">Trabajo</span>
+                    <strong id="total-work" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
+                </div>
+                <div id="summary-rest" class="summary-item">
+                    <span id="summary-rest-label">Reposo</span>
+                    <strong id="total-rest" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
+                </div>
+                <div id="summary-total" class="summary-item">
+                    <span id="summary-total-label">Total</span>
+                    <strong id="total-time" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
+                </div>
+            </div>
+            <div id="controls-container">
+                <button id="finalize-btn" class="control-btn">PREM EL RELLOTGE PER COMENÇAR</button>
+                <!--  <button id="force-install-btn" class="control-btn" style="display:none;">Instalar app</button>
+                -->
+            </div>
+            <div id="laps-container">
+                <!-- Las vueltas se añadirán aquí dinámicamente -->
+            </div>
+        </div>
+        <div id="sessions-view">
+            <div id="sessions-container">
+                <div id="sessions-header"
+                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                    <h2 id="sessions-title" style="margin: 0;">SESSIONS GUARDADES</h2>
+                    <button id="multiselect-toggle-btn" type="button" aria-label="Activar mode multiselecci贸"
+                        title="Mode multiselecci贸"
+                        style="background: transparent; border: none; cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center;">
+                        <!-- Icono se añadirá dinámicamente desde scripts.js -->
+                    </button>
+                </div>
+                <div id="multiselect-actions-bar" style="display: none;">
+                    <!-- Barra de acciones se añadirá dinámicamente desde scripts.js -->
+                </div>
+                <div id="sessions-list">
+                    <!-- Las sesiones guardadas se añadirán aquí -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Cordova (solo tendrá efecto dentro de la app nativa) -->
+    <script src="cordova.js"></script>
+    <script src="scripts.js?v=1.2.1"></script>
+</body>
+
+</html>
