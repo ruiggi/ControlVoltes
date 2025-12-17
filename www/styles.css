@@ -351,7 +351,7 @@ button:focus-visible,
   display: flex;
   flex-direction: column;
   gap: 5px;
-  padding: 2px !important;
+  padding: 2px 2px 50px 2px !important;
   flex: 1 1 0;
   /* Height will be set dynamically by JavaScript */
   overflow-y: auto !important;
@@ -361,6 +361,14 @@ button:focus-visible,
   touch-action: pan-y !important;
   position: relative;
   will-change: scroll-position;
+}
+
+/* Espaciador al final del contenedor de vueltas para asegurar que la última vuelta se vea completa */
+#laps-container::after {
+  content: '';
+  display: block;
+  height: 30px;
+  flex-shrink: 0;
 }
 
 .lap-item {
@@ -1314,7 +1322,6 @@ button:focus-visible,
 }
 
 .order-switch {
-  role: switch;
   display: inline-flex;
   align-items: center;
   padding: 2px;

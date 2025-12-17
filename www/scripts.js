@@ -482,8 +482,8 @@ function initApp() {
                     align: 'center',
                     backgroundColor: 'var(--card-bg-color)',
                     borderRadius: '12px',
-                    padding: '16px', // Padding más reducido
-                    gap: '8px' // Gap más reducido entre elementos
+                    padding: '4px', // Padding base del modal
+                    gap: '2px' // Gap base entre elementos
                 });
 
                 Object.assign(modal.style, {
@@ -502,6 +502,27 @@ function initApp() {
                     boxSizing: 'border-box',
                     margin: '0 auto' // Centrar horizontalmente
                 });
+
+                // Detectar si es el modal de GUARDAR SESSIÓ o un modal de confirmación simple
+                const normalizedTitle = String(title || '').toUpperCase();
+                const isSaveSessionModal = /GUARDAR\s+SESSI(Ó|O)/.test(normalizedTitle);
+
+                // Para el modal de GUARDAR SESSIÓ, ocupar todo el alto disponible
+                if (isSaveSessionModal) {
+                    // Overlay sin padding para que el modal ocupe todo el espacio
+                    overlay.style.padding = '0';
+                    overlay.style.alignItems = 'stretch';
+                    overlay.style.justifyContent = 'stretch';
+                    // Modal ocupa toda la altura disponible
+                    modal.style.width = '100vw';
+                    modal.style.maxWidth = '100vw';
+                    modal.style.height = '100vh';
+                    modal.style.maxHeight = '100vh';
+                    modal.style.borderRadius = '0';
+                    modal.style.padding = '20px';
+                    modal.style.gap = '334px';
+                    modal.style.margin = '0';
+                }
 
                 modal.setAttribute('role', type === 'alert' ? 'alertdialog' : 'dialog');
                 modal.setAttribute('aria-modal', 'true');
@@ -563,13 +584,16 @@ function initApp() {
                     inputEl.style.color = '#000'; // Texto negro
                     inputEl.style.fontWeight = '600'; // Texto grueso
                     inputEl.style.textShadow = 'none'; // Sin sombra de texto
+
+                    // Para el modal de GUARDAR SESSIÓ, hacer el input más bajo sin cambiar el tamaño de texto
+                    if (isSaveSessionModal) {
+                        inputEl.style.padding = '4px 10px';
+                        inputEl.style.marginBottom = '2px';
+                    }
+
                     modal.appendChild(inputEl);
                     setTimeout(() => { inputEl.focus(); inputEl.select(); }, 0);
                 }
-
-                // Detectar si es el modal de GUARDAR SESSIÓ o un modal de confirmación simple
-                const normalizedTitle = String(title || '').toUpperCase();
-                const isSaveSessionModal = /GUARDAR\s+SESSI(Ó|O)/.test(normalizedTitle);
                 const isDeleteSessionModal = id === 'modal-delete-session-confirm' || id === 'modal-delete-lap-confirm';
                 const isHorizontalLayout = buttonLayout === 'horizontal' || isDeleteSessionModal;
 
@@ -577,7 +601,8 @@ function initApp() {
                 const buttonsContainer = createContainer({
                     direction: isHorizontalLayout ? 'row' : 'column',
                     justify: 'center',
-                    gap: '6px' // Gap entre botones
+                    // Reducimos el espacio vertical entre botones, y aún más para el modal de guardar sesión
+                    gap: isSaveSessionModal ? '1.5px' : '6px'
                 });
                 buttonsContainer.id = `${id}-buttons-container`;
                 buttonsContainer.className = 'modal-buttons';
@@ -661,14 +686,15 @@ function initApp() {
                         });
                         okBtn.id = `${id}-ok-btn`;
                         okBtn.style.width = '100%';
-                        okBtn.style.fontSize = '1.05rem';
-                        okBtn.style.padding = '8px 16px';
+                        okBtn.style.fontSize = '0.95rem';
+                        okBtn.style.lineHeight = '1.1';
+                        okBtn.style.padding = isSaveSessionModal ? '1px 10px' : '8px 16px';
                         okBtn.style.position = 'relative';
                         okBtn.style.zIndex = '10';
                         okBtn.style.cursor = 'pointer';
                         if (okBtn.querySelector('svg')) {
-                            okBtn.querySelector('svg').style.width = '20px';
-                            okBtn.querySelector('svg').style.height = '20px';
+                            okBtn.querySelector('svg').style.width = '18px';
+                            okBtn.querySelector('svg').style.height = '18px';
                         }
                         buttonsContainer.appendChild(okBtn);
 
@@ -690,18 +716,19 @@ function initApp() {
                             });
                             continueBtn.id = `${id}-continue-btn`;
                             continueBtn.style.width = '100%';
-                            continueBtn.style.fontSize = '1.05rem';
-                            continueBtn.style.padding = '8px 16px';
+                            continueBtn.style.fontSize = '0.95rem';
+                            continueBtn.style.lineHeight = '1.1';
+                            continueBtn.style.padding = '1px 10px';
                             if (continueBtn.querySelector('svg')) {
-                                continueBtn.querySelector('svg').style.width = '20px';
-                                continueBtn.querySelector('svg').style.height = '20px';
+                                continueBtn.querySelector('svg').style.width = '18px';
+                                continueBtn.querySelector('svg').style.height = '18px';
                             }
                             buttonsContainer.appendChild(continueBtn);
                         }
 
                         // Cancel button (bottom)
                         const cancelBtn = createButton({
-                            text: cancelText,
+                            text: isSaveSessionModal ? 'CANCEL.LAR GRAVACIÓ' : cancelText,
                             icon: xIcon,
                             variant: 'danger',
                             size: 'large',
@@ -712,28 +739,12 @@ function initApp() {
                         });
                         cancelBtn.id = `${id}-cancel-btn`;
                         cancelBtn.style.width = '100%';
-                        cancelBtn.style.fontSize = '1.05rem';
-                        cancelBtn.style.padding = '8px 16px';
+                        cancelBtn.style.fontSize = '0.95rem';
+                        cancelBtn.style.lineHeight = '1.1';
+                        cancelBtn.style.padding = isSaveSessionModal ? '1px 10px' : '8px 16px';
                         if (cancelBtn.querySelector('svg')) {
-                            cancelBtn.querySelector('svg').style.width = '20px';
-                            cancelBtn.querySelector('svg').style.height = '20px';
-                        }
-                        // subtitle under cancel - only for GUARDAR SESSIÓ modal
-                        if (isSaveSessionModal) {
-                            try {
-                                const subtitle = document.createElement('div');
-                                subtitle.id = `${id}-cancel-subtitle`;
-                                subtitle.textContent = '(CANCEL.LAR LA GRAVACIÓ ACTUAL)';
-                                subtitle.style.fontSize = '0.75rem';
-                                subtitle.style.opacity = '.85';
-                                subtitle.style.fontWeight = '600';
-                                subtitle.style.lineHeight = '1.1';
-                                subtitle.style.marginTop = '2px';
-                                subtitle.style.textAlign = 'center';
-                                cancelBtn.style.flexDirection = 'column';
-                                cancelBtn.style.gap = '2px';
-                                cancelBtn.appendChild(subtitle);
-                            } catch { }
+                            cancelBtn.querySelector('svg').style.width = '18px';
+                            cancelBtn.querySelector('svg').style.height = '18px';
                         }
                         buttonsContainer.appendChild(cancelBtn);
                     }
@@ -2910,6 +2921,19 @@ function initApp() {
             }
         });
 
+        // Añadir espaciador al final para asegurar que la última vuelta se vea completamente
+        const spacer = document.createElement('div');
+        spacer.style.height = '50px'; // Aumentado a 50px para más espacio
+        spacer.style.flexShrink = '0';
+        spacer.style.width = '100%';
+        spacer.id = 'laps-container-spacer';
+        // Eliminar espaciador anterior si existe
+        const existingSpacer = document.getElementById('laps-container-spacer');
+        if (existingSpacer) {
+            existingSpacer.remove();
+        }
+        lapsContainer.appendChild(spacer);
+
         // Si el orden es ascendente, hacer scroll automático hacia las últimas vueltas (solo en el contenedor)
         if (!lapsOrderDescending && lapsContainer.lastChild) {
             // Usar doble requestAnimationFrame para asegurar que el DOM se haya actualizado y el layout recalculado
@@ -4162,22 +4186,25 @@ function initApp() {
             sessionInfoContainer.style.textAlign = 'center';
             sessionInfoContainer.style.marginBottom = '5px';
             sessionInfoContainer.style.backgroundColor = '#d3d3d3'; // Gris claro
-            sessionInfoContainer.style.padding = '10px';
-            sessionInfoContainer.style.borderRadius = '8px';
+            sessionInfoContainer.style.padding = '5px';
+            sessionInfoContainer.style.borderRadius = '5px';
 
             const sessionDate = laps.length > 0 ? new Date(laps[0].time) : new Date();
             const dateText = document.createElement('div');
             dateText.id = 'session-info-date';
             dateText.textContent = formatDate(sessionDate);
-            dateText.style.fontSize = '1.8em';
-            dateText.style.marginBottom = '10px';
+            dateText.style.fontSize = '1.5em';
+            dateText.style.marginBottom = '5px';
             dateText.style.color = '#000000'; // Texto negro
+            // Fecha en negrita
+            dateText.style.fontWeight = '700';
 
             const timeText = document.createElement('div');
             timeText.id = 'session-info-time';
-            const sessionTime = laps.length > 0 ? new Date(laps[0].time) : new Date();
-            timeText.innerHTML = `Hora d'inici: ${formatTime(sessionTime)}`;
-            timeText.style.fontSize = '1.5em';
+            const sessionStartTime = laps.length > 0 ? new Date(laps[0].time) : new Date();
+            const sessionEndTime = laps.length > 0 ? new Date(laps[laps.length - 1].time) : sessionStartTime;
+            timeText.innerHTML = `Horari: ${formatTime(sessionStartTime)} - ${formatTime(sessionEndTime)}`;
+            timeText.style.fontSize = '1.4em';
             timeText.style.color = '#000000'; // Texto negro
 
             sessionInfoContainer.appendChild(dateText);
@@ -4270,6 +4297,12 @@ function initApp() {
             try { renderLaps(); } catch (e) { }
             try { updateSummary(); } catch (e) { }
             try { lapsContainer.style.display = 'flex'; } catch { }
+            // Recalcular altura del contenedor de vueltas después de añadir la barra superior
+            setTimeout(() => {
+                if (typeof window.updateLapsContainerHeight === 'function') {
+                    window.updateLapsContainerHeight();
+                }
+            }, 200);
             // Fallback: if nothing rendered but there are laps, render minimal rows
             try {
                 if (laps.length > 0 && lapsContainer.childElementCount === 0) {
@@ -4288,9 +4321,28 @@ function initApp() {
                     } else {
                         lapsContainer.appendChild(frag);
                     }
+                    // Añadir espaciador al final también en el fallback
+                    const spacer = document.createElement('div');
+                    spacer.style.height = '50px'; // Mismo tamaño que en renderLaps()
+                    spacer.style.flexShrink = '0';
+                    spacer.style.width = '100%';
+                    spacer.id = 'laps-container-spacer';
+                    const existingSpacer = document.getElementById('laps-container-spacer');
+                    if (existingSpacer) {
+                        existingSpacer.remove();
+                    }
+                    lapsContainer.appendChild(spacer);
                 }
             } catch { }
-            try { lapsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch { }
+            // Evitar que, al abrir una sessió guardada, la pantalla haga scroll automático
+            // hacia la zona de vueltas ocultando la parte superior (botones y nombre).
+            // En su lugar, dejamos la posición actual o, si se requiere, podemos forzar
+            // un scroll suave al inicio de la página.
+            try {
+                if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            } catch { }
         }
     };
 
@@ -5071,17 +5123,25 @@ function initApp() {
 
     // Función para manejar la pulsación de botones de volumen (ambos marcan vuelta)
     const handleVolumeButtonPress = () => {
+        console.log('[DEBUG] handleVolumeButtonPress() llamado');
         const now = Date.now();
 
         // Debounce para evitar múltiples registros
         if (now - lastVolumeKeyTime < volumeKeyDebounce) {
+            console.log('[DEBUG] handleVolumeButtonPress: bloqueado por debounce');
             return;
         }
 
         lastVolumeKeyTime = now;
 
         // Solo marcar vuelta si estamos en la vista de registro
-        if (registrationView.style.display === 'block') {
+        // La vista puede estar con display 'block' o 'flex', pero no 'none'
+        const displayValue = registrationView.style.display;
+        const isRegistrationViewVisible = displayValue !== 'none' && displayValue !== '';
+        console.log('[DEBUG] handleVolumeButtonPress: registrationView.display =', displayValue, 'isVisible =', isRegistrationViewVisible);
+        
+        if (isRegistrationViewVisible) {
+            console.log('[DEBUG] handleVolumeButtonPress: llamando a addLap()');
             addLap();
 
             // Feedback visual/háptico opcional
@@ -5112,7 +5172,28 @@ function initApp() {
         }
     }, true); // useCapture=true para capturar antes que otros handlers
 
-    // Cordova: Escuchar eventos nativos de botones de volumen
+    // Escuchar eventos de botones de volumen
+    // MainActivity dispara eventos DOM "volumeup" y "volumedown" directamente
+    // También escuchamos eventos estándar de Cordova si están disponibles
+    document.addEventListener('volumeup', () => {
+        console.log('[DEBUG] Listener volumeup ejecutado, volumeButtonsEnabled =', appState.settings.volumeButtonsEnabled);
+        if (appState.settings.volumeButtonsEnabled) {
+            handleVolumeButtonPress();
+        } else {
+            console.log('[DEBUG] Listener volumeup: bloqueado porque volumeButtonsEnabled = false');
+        }
+    }, false);
+
+    document.addEventListener('volumedown', () => {
+        console.log('[DEBUG] Listener volumedown ejecutado, volumeButtonsEnabled =', appState.settings.volumeButtonsEnabled);
+        if (appState.settings.volumeButtonsEnabled) {
+            handleVolumeButtonPress();
+        } else {
+            console.log('[DEBUG] Listener volumedown: bloqueado porque volumeButtonsEnabled = false');
+        }
+    }, false);
+
+    // Eventos estándar de Cordova (si están disponibles)
     if (window.cordova) {
         document.addEventListener('volumeupbutton', () => {
             if (appState.settings.volumeButtonsEnabled) {
@@ -5126,6 +5207,313 @@ function initApp() {
             }
         }, false);
     }
+
+    // Punto de entrada directo desde código nativo (MainActivity)
+    // para garantizar que siempre podamos marcar vueltas desde los
+    // botones de volumen aunque falle algún plugin/evento intermedio.
+    window.__voltesHandleNativeVolume = () => {
+        console.log('[DEBUG] __voltesHandleNativeVolume() llamado, volumeButtonsEnabled =', appState.settings.volumeButtonsEnabled);
+        if (appState.settings.volumeButtonsEnabled) {
+            handleVolumeButtonPress();
+        } else {
+            console.log('[DEBUG] __voltesHandleNativeVolume: bloqueado porque volumeButtonsEnabled = false');
+        }
+    };
+
+    // Variables globales para el test de botones físicos
+    let volumeTestEventCount = 0;
+    let volumeTestLogs = [];
+
+    // Función para mostrar modal de prueba de botones físicos
+    window.showVolumeButtonsTestModal = function() {
+        // Crear overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            backdrop-filter: blur(3px);
+        `;
+        
+        // Crear modal
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background: white;
+            border-radius: 12px;
+            padding: 16px 18px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        `;
+        
+        // Título
+        const title = document.createElement('h2');
+        title.textContent = '🧪 Test de Botones Físicos';
+        title.style.cssText = `
+            margin: 0 0 10px 0;
+            font-size: 1.2rem;
+            color: #333;
+            text-align: center;
+        `;
+        modal.appendChild(title);
+        
+        // Contenedor compacto para estados de Plugin y Cordova
+        const statusContainer = document.createElement('div');
+        statusContainer.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 10px;
+        `;
+        modal.appendChild(statusContainer);
+
+        // Estado del Plugin
+        const pluginStatus = document.createElement('div');
+        pluginStatus.style.cssText = `
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        `;
+        
+        const pluginAvailable = typeof VolumeButtons !== 'undefined';
+        const cordovaAvailable = typeof cordova !== 'undefined';
+        
+        if (pluginAvailable) {
+            pluginStatus.style.background = '#d4edda';
+            pluginStatus.style.color = '#155724';
+            pluginStatus.innerHTML = '✅ Plugin VolumeButtons: <strong>DETECTADO</strong>';
+        } else {
+            pluginStatus.style.background = '#f8d7da';
+            pluginStatus.style.color = '#721c24';
+            pluginStatus.innerHTML = '❌ Plugin VolumeButtons: <strong>NO DETECTADO</strong>';
+        }
+        statusContainer.appendChild(pluginStatus);
+        
+        // Estado de Cordova
+        const cordovaStatus = document.createElement('div');
+        cordovaStatus.style.cssText = `
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        `;
+        
+        if (cordovaAvailable) {
+            cordovaStatus.style.background = '#d4edda';
+            cordovaStatus.style.color = '#155724';
+            cordovaStatus.innerHTML = '✅ Cordova: <strong>DETECTADO</strong>';
+        } else {
+            cordovaStatus.style.background = '#fff3cd';
+            cordovaStatus.style.color = '#856404';
+            cordovaStatus.innerHTML = '⚠️ Cordova: <strong>NO DETECTADO</strong><br><small>Estás en navegador web</small>';
+        }
+        statusContainer.appendChild(cordovaStatus);
+        
+        // Contador de eventos
+        const eventCounter = document.createElement('div');
+        eventCounter.id = 'volume-test-counter';
+        eventCounter.style.cssText = `
+            padding: 12px 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            transition: transform 0.2s, background 0.2s;
+        `;
+        eventCounter.innerHTML = `
+            <div style="font-size: 0.8rem; opacity: 0.9; margin-bottom: 4px; line-height: 1.1;">Eventos Detectados</div>
+            <div id="volume-test-count" style="font-size: 2.4rem; line-height: 1.1;">0</div>
+            <div style="font-size: 0.75rem; opacity: 0.8; margin-top: 4px; line-height: 1.1;">Presiona Vol+ o Vol-</div>
+        `;
+        modal.appendChild(eventCounter);
+        
+        // Botón de test manual
+        const testButton = document.createElement('button');
+        testButton.textContent = '🧪 Disparar Evento de Prueba';
+        testButton.style.cssText = `
+            width: 100%;
+            padding: 10px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-bottom: 12px;
+        `;
+        testButton.addEventListener('click', () => {
+            if (typeof VolumeButtons !== 'undefined' && typeof VolumeButtons._fireEvent === 'function') {
+                VolumeButtons._fireEvent('volumeup');
+                addTestLog('🧪 Test manual: volumeup disparado', '#28a745');
+            } else {
+                addTestLog('❌ No se puede disparar evento: Plugin no disponible', '#dc3545');
+            }
+        });
+        modal.appendChild(testButton);
+        
+        // Botón limpiar logs
+        const clearButton = document.createElement('button');
+        clearButton.textContent = '🗑️ Limpiar Logs';
+        clearButton.style.cssText = `
+            width: 100%;
+            padding: 8px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 12px;
+        `;
+        clearButton.addEventListener('click', () => {
+            volumeTestEventCount = 0;
+            volumeTestLogs = [];
+            document.getElementById('volume-test-count').textContent = '0';
+            document.getElementById('volume-test-logs').innerHTML = '<div style="color: #6c757d; font-style: italic;">Logs limpiados...</div>';
+        });
+        modal.appendChild(clearButton);
+
+        // Logs de eventos (al final del contenido del modal)
+        const logsContainer = document.createElement('div');
+        logsContainer.style.cssText = `
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 6px 0 10px 0;
+            max-height: 160px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+        `;
+        
+        const logsTitle = document.createElement('div');
+        logsTitle.textContent = '📋 Log de Eventos:';
+        logsTitle.style.cssText = `
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #495057;
+            font-family: system-ui;
+        `;
+        logsContainer.appendChild(logsTitle);
+        
+        const logsList = document.createElement('div');
+        logsList.id = 'volume-test-logs';
+        logsList.style.cssText = `
+            color: #212529;
+        `;
+        logsList.innerHTML = '<div style="color: #6c757d; font-style: italic;">Esperando eventos...</div>';
+        logsContainer.appendChild(logsList);
+        modal.appendChild(logsContainer);
+        
+        // Botón cerrar
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '❌ Cerrar';
+        closeButton.style.cssText = `
+            width: 100%;
+            padding: 10px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+        `;
+        closeButton.addEventListener('click', () => {
+            document.removeEventListener('volumeup', testVolumeUpHandler);
+            document.removeEventListener('volumedown', testVolumeDownHandler);
+            document.body.removeChild(overlay);
+        });
+        modal.appendChild(closeButton);
+        
+        // Función para agregar log
+        function addTestLog(message, color = '#333') {
+            const now = new Date();
+            const time = now.toLocaleTimeString('es-ES', { hour12: false });
+            const logEntry = document.createElement('div');
+            logEntry.style.cssText = `
+                padding: 4px 0;
+                border-bottom: 1px solid #e9ecef;
+                color: ${color};
+            `;
+            logEntry.innerHTML = `<strong>${time}</strong> → ${message}`;
+            
+            const logsList = document.getElementById('volume-test-logs');
+            if (logsList.querySelector('[style*="italic"]')) {
+                logsList.innerHTML = '';
+            }
+            logsList.insertBefore(logEntry, logsList.firstChild);
+            
+            // Mantener solo los últimos 10 logs
+            while (logsList.children.length > 10) {
+                logsList.removeChild(logsList.lastChild);
+            }
+        }
+        
+        // Listeners temporales para el test
+        const testVolumeUpHandler = function() {
+            volumeTestEventCount++;
+            document.getElementById('volume-test-count').textContent = volumeTestEventCount;
+            addTestLog('🔊 VOLUMEN+ detectado', '#FFD700');
+            
+            // Animación del contador
+            const counter = document.getElementById('volume-test-counter');
+            counter.style.transform = 'scale(1.05)';
+            counter.style.background = 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)';
+            setTimeout(() => {
+                counter.style.transform = 'scale(1)';
+                counter.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            }, 200);
+        };
+        
+        const testVolumeDownHandler = function() {
+            volumeTestEventCount++;
+            document.getElementById('volume-test-count').textContent = volumeTestEventCount;
+            addTestLog('🔉 VOLUMEN- detectado', '#00BFFF');
+            
+            // Animación del contador
+            const counter = document.getElementById('volume-test-counter');
+            counter.style.transform = 'scale(1.05)';
+            counter.style.background = 'linear-gradient(135deg, #00BFFF 0%, #0080FF 100%)';
+            setTimeout(() => {
+                counter.style.transform = 'scale(1)';
+                counter.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            }, 200);
+        };
+        
+        document.addEventListener('volumeup', testVolumeUpHandler);
+        document.addEventListener('volumedown', testVolumeDownHandler);
+        
+        // Limpiar listeners al cerrar haciendo click fuera del modal
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                document.removeEventListener('volumeup', testVolumeUpHandler);
+                document.removeEventListener('volumedown', testVolumeDownHandler);
+                document.body.removeChild(overlay);
+            }
+        });
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        addTestLog('✅ Modal de test iniciado', '#28a745');
+    };
 
     const handleExitAttempt = async () => {
         if (exitConfirmationInProgress) return;
@@ -5599,6 +5987,29 @@ function initApp() {
         volumeButtonsLabel.style.fontSize = '0.9rem';
         volumeButtonsLabel.style.color = 'var(--text-color)';
         volumeButtonsLabel.style.whiteSpace = 'nowrap';
+        volumeButtonsLabel.style.cursor = 'pointer';
+        volumeButtonsLabel.style.userSelect = 'none';
+        volumeButtonsLabel.style.transition = 'all 0.2s';
+        volumeButtonsLabel.title = 'Click para abrir test de botones físicos';
+        
+        // Efecto hover
+        volumeButtonsLabel.addEventListener('mouseenter', () => {
+            volumeButtonsLabel.style.color = '#0d6efd';
+            volumeButtonsLabel.style.transform = 'scale(1.05)';
+        });
+        volumeButtonsLabel.addEventListener('mouseleave', () => {
+            volumeButtonsLabel.style.color = 'var(--text-color)';
+            volumeButtonsLabel.style.transform = 'scale(1)';
+        });
+        
+        // Abrir modal de test al hacer click
+        volumeButtonsLabel.addEventListener('click', () => {
+            if (typeof window.showVolumeButtonsTestModal === 'function') {
+                window.showVolumeButtonsTestModal();
+            } else {
+                console.error('Modal de test no disponible');
+            }
+        });
 
         const volumeButtonsSwitch = document.createElement('div');
         volumeButtonsSwitch.role = 'switch';
@@ -5940,7 +6351,8 @@ function initApp() {
 
     // CRITICAL: Dynamic height calculation for laps container
     // This ensures the laps container fills all available vertical space
-    const updateLapsContainerHeight = () => {
+    // Hacerla global para poder llamarla desde viewSession
+    window.updateLapsContainerHeight = () => {
         try {
             if (!lapsContainer) return;
 
@@ -5949,10 +6361,12 @@ function initApp() {
             const clockContainer = document.getElementById('clock-container');
             const summaryContainer = document.getElementById('summary-container');
             const controlsContainer = document.getElementById('controls-container');
+            const sessionTopBar = document.getElementById('session-top-bar'); // Barra superior cuando se visualiza una sesión guardada
 
             // Calculate total height of fixed elements
             let fixedHeight = 0;
             if (appTitle) fixedHeight += appTitle.offsetHeight;
+            if (sessionTopBar) fixedHeight += sessionTopBar.offsetHeight; // Incluir la barra superior si existe
             if (clockContainer) fixedHeight += clockContainer.offsetHeight;
             if (summaryContainer) fixedHeight += summaryContainer.offsetHeight;
             if (controlsContainer) fixedHeight += controlsContainer.offsetHeight;
@@ -5961,9 +6375,10 @@ function initApp() {
             const gaps = 2 * 3; // 3 gaps between 4 elements
             const padding = 10; // 5px top + 5px bottom on main-container
             const extraSpace = 20; // Safety margin
+            const bottomPadding = 50; // Padding-bottom del contenedor de vueltas para que la última vuelta se vea completa
 
             // Calculate available height for laps container
-            const availableHeight = window.innerHeight - fixedHeight - gaps - padding - extraSpace;
+            const availableHeight = window.innerHeight - fixedHeight - gaps - padding - extraSpace - bottomPadding;
 
             // Set the height (minimum 200px)
             const finalHeight = Math.max(200, availableHeight);
@@ -5976,10 +6391,10 @@ function initApp() {
     };
 
     // Call on initialization
-    setTimeout(updateLapsContainerHeight, 100);
+    setTimeout(window.updateLapsContainerHeight, 100);
 
     // Update on window resize
-    window.addEventListener('resize', updateLapsContainerHeight);
+    window.addEventListener('resize', window.updateLapsContainerHeight);
 }
 
 // Detectar entorno y inicializar aplicación

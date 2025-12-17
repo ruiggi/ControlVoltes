@@ -1,0 +1,35 @@
+# Archivos de firma de APK (NUNCA SUBIR A GIT)
+*.keystore
+*.jks
+release-signing.properties
+keystore-info.txt
+
+# APKs y AABs compilados
+*.apk
+*.aab
+*.ap_
+
+# Archivos de Cordova
+platforms/
+plugins/
+node_modules/
+
+# Archivos de logs
+*.log
+npm-debug.log*
+
+# Archivos temporales del sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Archivos de IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Archivos de configuración local
+local.properties
+
