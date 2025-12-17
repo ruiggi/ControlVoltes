@@ -65,5 +65,7 @@ Qualsevol suggeriment o millora és benvingut!
 2025-12-15 - v2.0.0
 - solicita confirmació abans de tancar l'aplicació desde els botons físics.
 - al tornar a obrir l'aplicació, continua amb la grabació en procés
----
 
+2025-10-29 - v1.3.0
+- ús dels botons físics per afegir voltes
+- edició de gravacions anteriors
