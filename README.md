@@ -69,3 +69,8 @@ Qualsevol suggeriment o millora és benvingut!
 2025-10-29 - v1.3.0
 - ús dels botons físics per afegir voltes
 - edició de gravacions anteriors
+
+2025-10-16 - v.1.0.0
+- inicial només pwa
+
+
