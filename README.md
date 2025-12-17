@@ -4,20 +4,24 @@
 
 ---
 
+## 🧑‍💻 Desenvolupament
+Projecte creat i mantingut per **Ruiggi**.  
+Qualsevol suggeriment o millora és benvingut!
+
+---
+
 ## 📱 Formats disponibles
+
+### 🤖 Format App (Android)
+- Versió **instal·lable** per a dispositius Android.  
+- Ofereix **tota la funcionalitat completa**, incloent el suport per als **botons físics** per marcar voltes.  
+- 🔗 **Enllaç de descàrrega:** [[https://github.com/ruiggi/ControlVoltes/releases/download/APKv200/ControlVoltes-v2.0.0.apk](https://github.com/ruiggi/ControlVoltes/releases/download/APKv200/ControlVoltes-v2.0.0.apk)]
 
 ### 🌐 Format PWA (Progressive Web App)
 - Es pot executar directament des del **navegador web**.  
 - Permet **afegir un accés directe** a la pantalla d'inici per a un ús més còmode.  
 - **Limitació:** no admet l'ús dels **botons físics del dispositiu mòbil** per marcar voltes.  
 - 🔗 **Prova-la aquí:** [https://ruiggi.github.io/ControlVoltes/](https://ruiggi.github.io/ControlVoltes/)
-
----
-
-### 🤖 Format App (Android)
-- Versió **instal·lable** per a dispositius Android.  
-- Ofereix **tota la funcionalitat completa**, incloent el suport per als **botons físics** per marcar voltes.  
-- 🔗 **Enllaç de descàrrega:** [[https://github.com/ruiggi/ControlVoltes/releases/download/APKv200/ControlVoltes-v2.0.0.apk](https://github.com/ruiggi/ControlVoltes/releases/download/APKv200/ControlVoltes-v2.0.0.apk)]
 
 ---
 
@@ -52,13 +56,6 @@
 - Possibilitat de desar i revisar resultats.  
 - Funciona tant des del navegador com com a aplicació nativa.  
 
----
-
-## 🧑‍💻 Desenvolupament
-Projecte creat i mantingut per **Ruiggi**.  
-Qualsevol suggeriment o millora és benvingut!
-
-
 --- 
 
 ## Changelog
@@ -72,5 +69,6 @@ Qualsevol suggeriment o millora és benvingut!
 
 2025-10-16 - v.1.0.0
 - inicial només pwa
+
 
 
