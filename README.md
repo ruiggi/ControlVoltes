@@ -59,6 +59,11 @@ Qualsevol suggeriment o millora és benvingut!
 --- 
 
 ## Changelog
+
+2026-03-31 - v3.0.0
+- corregit error d'scroll a llistat de sesions guardades
+- afegit possibilitat d'importar i exportar sessions
+  
 2025-12-15 - v2.0.0
 - solicita confirmació abans de tancar l'aplicació desde els botons físics.
 - al tornar a obrir l'aplicació, continua amb la grabació en procés
