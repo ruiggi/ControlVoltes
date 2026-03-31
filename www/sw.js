@@ -16,7 +16,7 @@
 // ║  PRÓXIMA VERSIÓN: 2.0.1 (incrementar al hacer cambios)                  ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
-const CACHE_NAME = 'control-voltes-cache-v2.0.0';
+const CACHE_NAME = 'control-voltes-cache-v3.0.0';
 
 // Detectar si estamos en GitHub Pages o local
 const isGitHubPages = self.location.hostname.includes('github.io');

@@ -74,27 +74,50 @@ button:focus-visible,
   left: 0;
   right: 0;
   bottom: 0;
+  /* No usar position:relative inline en HTML: trenca top/bottom i la cadena flex. */
   display: flex;
   flex-direction: column;
   align-items: center;
   max-width: 500px;
   margin: 0 auto;
   width: 100%;
+  min-height: 0;
+  /* Alçada explícita per PWA / Safari quan cal (100dvh > 100vh amb barres del sistema) */
+  height: calc(100vh - 49px);
+  height: calc(100dvh - 49px);
+  max-height: calc(100vh - 49px);
+  max-height: calc(100dvh - 49px);
   padding: 5px;
+  padding-bottom: calc(5px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
+  isolation: isolate;
+  /* El scroll va dins #registration-view o #sessions-list, no aquí */
   overflow: hidden;
+  overflow-x: hidden;
 }
 
 #registration-view,
 #sessions-view {
   width: 100%;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding-top: 1px;
-  flex: 1 1 auto;
+  /* Omple l’alçada útil sota la capçalera (mateixa finestra que #main-container) */
+  flex: 1 1 0%;
   min-height: 0 !important;
-  max-height: 100%;
+  /* Base 0 + flex-grow: necessari en WebKit per limitar alçada i activar overflow als fills */
+  height: 0;
+  overflow-x: hidden;
+}
+
+/* El listado de sesiones gestiona su scroll; el cronómetro sigue pudiendo desplazarse en la vista de registro */
+#registration-view {
+  overflow-y: auto;
+}
+
+#sessions-view {
   overflow: hidden;
 }
 
@@ -542,25 +565,48 @@ button:focus-visible,
 }
 
 /* Sessions */
-#sessions-container {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 0;
-  min-height: 0;
-  overflow: hidden;
+#sessions-header,
+#multiselect-actions-bar {
+  flex-shrink: 0;
 }
 
-#sessions-list {
+#sessions-container {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 5px;
-  flex: 1 1 auto !important;
+  padding: 2px 2px 50px 2px !important;
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 0;
+  overflow: hidden;
+  overflow-x: hidden;
+  position: relative;
+}
+
+#sessions-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  /* Creix fins a ocupar tot l’espai sota la capçalera de sessions; min 0 permet scroll intern */
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  min-height: 100px !important;
-  height: auto !important;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   touch-action: pan-y;
+  position: relative;
+  will-change: scroll-position;
+}
+
+#sessions-list::after {
+  content: '';
+  display: block;
+  height: 30px;
+  flex-shrink: 0;
 }
 
 /* Disposición más compacta en pantallas muy estrechas */
@@ -589,6 +635,7 @@ button:focus-visible,
 
   #main-container {
     padding: 2px;
+    padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px));
     max-width: none;
   }
 
@@ -1874,4 +1921,10 @@ textarea:focus,
     width: 28px !important;
     height: 28px !important;
   }
+}
+
+#import-sessions-btn:hover,
+#export-sessions-btn:hover,
+#multiselect-toggle-btn:hover {
+  background-color: #003366 !important;
 }

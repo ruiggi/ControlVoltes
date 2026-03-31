@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ╔════════════════════════════════════════════════════════════════╗
-echo ║         Compilación VOLTES v2.0.0 Release                     ║
+echo ║         Compilación VOLTES v3.0.0 Release                     ║
 echo ╚════════════════════════════════════════════════════════════════╝
 echo.
 
@@ -101,7 +101,7 @@ if "%APKSIGNER_PATH%"=="" (
 echo Usando: %APKSIGNER_PATH%
 echo.
 
-call "%APKSIGNER_PATH%" sign --ks control-voltes.keystore --ks-key-alias control-voltes --ks-pass pass:SultanSultanSultan --key-pass pass:SultanSultanSultan --out ControlVoltes-v2.0.0.apk platforms\android\app\build\outputs\apk\release\app-release-unsigned.apk
+call "%APKSIGNER_PATH%" sign --ks control-voltes.keystore --ks-key-alias control-voltes --ks-pass pass:SultanSultanSultan --key-pass pass:SultanSultanSultan --out ControlVoltes-v3.0.0.apk platforms\android\app\build\outputs\apk\release\app-release-unsigned.apk
 if errorlevel 1 (
     echo ❌ Error al firmar el APK
     pause
@@ -112,7 +112,7 @@ echo.
 echo ════════════════════════════════════════════════════════════════
 echo [5/5] ✅ Verificando firma del APK...
 echo ════════════════════════════════════════════════════════════════
-call "%APKSIGNER_PATH%" verify --verbose ControlVoltes-v2.0.0.apk
+call "%APKSIGNER_PATH%" verify --verbose ControlVoltes-v3.0.0.apk
 if errorlevel 1 (
     echo ❌ El APK NO está correctamente firmado
     pause
@@ -124,14 +124,14 @@ echo ╔════════════════════════
 echo ║                    ✅ COMPILACIÓN EXITOSA                      ║
 echo ╚════════════════════════════════════════════════════════════════╝
 echo.
-echo 📦 APK generado: ControlVoltes-v2.0.0.apk
-echo 📍 Ubicación: %CD%\ControlVoltes-v2.0.0.apk
+echo 📦 APK generado: ControlVoltes-v3.0.0.apk
+echo 📍 Ubicación: %CD%\ControlVoltes-v3.0.0.apk
 echo.
 echo 📊 Información del APK:
-for %%I in (ControlVoltes-v2.0.0.apk) do echo    Tamaño: %%~zI bytes
+for %%I in (ControlVoltes-v3.0.0.apk) do echo    Tamaño: %%~zI bytes
 echo.
 echo 🚀 Próximos pasos:
-echo    1. Prueba el APK en un dispositivo: adb install -r ControlVoltes-v2.0.0.apk
+echo    1. Prueba el APK en un dispositivo: adb install -r ControlVoltes-v3.0.0.apk
 echo    2. Verifica que los botones físicos funcionen correctamente
 echo    3. Si todo está bien, ¡ya puedes distribuir la app!
 echo.

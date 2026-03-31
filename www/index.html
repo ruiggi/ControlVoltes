@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VOLTES</title>
-    <link rel="stylesheet" href="styles.css?v=1.2.1">
+    <link rel="stylesheet" href="styles.css?v=1.2.6">
     <link rel="manifest" href="manifest.json?v=1.2.1">
     <meta name="theme-color" content="#333">
     <link rel="icon" type="image/png" href="icons/crono-512.png">
@@ -15,7 +15,7 @@
 </head>
 
 <body>
-    <div id="main-container" style="position: relative;">
+    <div id="main-container">
         <div id="app-title">
             <div id="title-left" class="title-left">
                 <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="display: block;">
@@ -111,13 +111,40 @@
         <div id="sessions-view">
             <div id="sessions-container">
                 <div id="sessions-header"
-                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; margin-left: 10px; margin-right: 10px;">
                     <h2 id="sessions-title" style="margin: 0;">SESSIONS GUARDADES</h2>
-                    <button id="multiselect-toggle-btn" type="button" aria-label="Activar mode multiselecci贸"
-                        title="Mode multiselecci贸"
-                        style="background: transparent; border: none; cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center;">
-                        <!-- Icono se añadirá dinámicamente desde scripts.js -->
-                    </button>
+                    <div style="display: flex; gap: 2px;">
+                        <button id="import-sessions-btn" type="button" aria-label="Importar sessions"
+                            title="Importar"
+                            style="background: transparent; border: 1px solid white; border-radius: 4px; cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center; color: white;">
+                            <!-- Icono se añadirá dinámicamente desde scripts.js -->
+                        </button>
+                        <button id="export-sessions-btn" type="button" aria-label="Exportar sessions"
+                            title="Exportar"
+                            style="background: transparent; border: 1px solid white; border-radius: 4px; cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center; color: white;">
+                            <!-- Icono se añadirá dinámicamente desde scripts.js -->
+                        </button>
+                        <button id="multiselect-select-all-btn" type="button" aria-label="Marcar totes les sessions"
+                            title="Marcar totes"
+                            style="background: transparent; border: 1px solid white; border-radius: 4px; cursor: pointer; padding: 8px; display: none; align-items: center; justify-content: center; color: white;">
+                            <!-- Icono se añadirá dinámicamente desde scripts.js -->
+                        </button>
+                        <button id="multiselect-toggle-btn" type="button" aria-label="Activar mode multiselecci贸"
+                            title="Mode multiselecci贸"
+                            style="background: transparent; border: 1px solid white; border-radius: 4px; cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center; color: white;">
+                            <!-- Icono se añadirá dinámicamente desde scripts.js -->
+                        </button>
+                        <button id="multiselect-cancel-btn" type="button" aria-label="Cancelar selección"
+                            title="Cancelar"
+                            style="background: transparent; border: 1px solid white; border-radius: 4px; cursor: pointer; padding: 8px; display: none; align-items: center; justify-content: center; color: white;">
+                            <!-- Icono se añadirá dinámicamente desde scripts.js -->
+                        </button>
+                        <button id="multiselect-delete-btn" type="button" aria-label="Eliminar seleccionadas"
+                            title="Eliminar"
+                            style="background: transparent; border: 1px solid white; border-radius: 4px; cursor: pointer; padding: 8px; display: none; align-items: center; justify-content: center; color: white;">
+                            <!-- Icono se añadirá dinámicamente desde scripts.js -->
+                        </button>
+                    </div>
                 </div>
                 <div id="multiselect-actions-bar" style="display: none;">
                     <!-- Barra de acciones se añadirá dinámicamente desde scripts.js -->
@@ -130,7 +157,7 @@
     </div>
     <!-- Cordova (solo tendrá efecto dentro de la app nativa) -->
     <script src="cordova.js"></script>
-    <script src="scripts.js?v=1.2.1"></script>
+    <script src="scripts.js?v=1.2.6"></script>
 </body>
 
 </html>

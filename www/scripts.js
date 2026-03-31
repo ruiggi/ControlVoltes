@@ -1,3 +1,6 @@
+const appVersion = '3.0.0'; // Versión desde manifest.json
+const appDateVersion = '2026-03-31'; // Versión desde manifest.json
+
 // Función principal de inicialización
 function initApp() {
     // Estado centralizado de la aplicación
@@ -57,6 +60,10 @@ function initApp() {
             sessionsView: document.getElementById('sessions-view'),
             sessionsList: document.getElementById('sessions-list'),
             sessionsContainer: document.getElementById('sessions-container'),
+
+            // Import/Export
+            importSessionsBtn: document.getElementById('import-sessions-btn'),
+            exportSessionsBtn: document.getElementById('export-sessions-btn'),
 
             // Header
             toggleViewBtn: document.getElementById('toggle-view-btn'),
@@ -2351,6 +2358,32 @@ function initApp() {
         }
     };
 
+    // Omple l’alçada del viewport sota #app-title; tot el desplaçament vertical del llistat és dins #sessions-list
+    const applySessionsViewLayout = () => {
+        if (!sessionsView || !sessionsContainer || !sessionsList) { return; }
+        sessionsView.style.setProperty('display', 'flex', 'important');
+        sessionsView.style.flexDirection = 'column';
+        sessionsView.style.flex = '1 1 0%';
+        sessionsView.style.minHeight = '0';
+        sessionsView.style.height = '0';
+        sessionsView.style.removeProperty('overflow-y');
+
+        sessionsContainer.style.display = 'flex';
+        sessionsContainer.style.flexDirection = 'column';
+        sessionsContainer.style.flex = '1 1 0%';
+        sessionsContainer.style.minHeight = '0';
+        sessionsContainer.style.height = '0';
+        sessionsContainer.style.removeProperty('overflow-y');
+
+        sessionsList.style.display = 'flex';
+        sessionsList.style.flexDirection = 'column';
+        sessionsList.style.flex = '1 1 0%';
+        sessionsList.style.minHeight = '0';
+        sessionsList.style.height = '0';
+        sessionsList.style.overflowY = 'auto';
+        sessionsList.style.removeProperty('max-height');
+    };
+
     // --- Lògica de vistes ---
 
     const toggleView = async () => {
@@ -2363,45 +2396,17 @@ function initApp() {
             // Si estamos viendo una sesión guardada, ir directamente al listado
             await closeSessionView(false);
             registrationView.style.display = 'none';
-            // Forzar visibilidad y estilos flexbox correctos
-            sessionsView.style.setProperty('display', 'flex', 'important');
-            sessionsView.style.flexDirection = 'column';
-            sessionsView.style.flex = '1 1 auto';
-            sessionsView.style.minHeight = '0';
-            sessionsView.style.overflow = 'hidden';
-            sessionsContainer.style.display = 'flex';
-            sessionsContainer.style.flexDirection = 'column';
-            sessionsContainer.style.flex = '1 1 0';
-            sessionsContainer.style.minHeight = '0';
-            sessionsContainer.style.overflow = 'hidden';
-            sessionsList.style.display = 'flex';
-            sessionsList.style.flexDirection = 'column';
-            sessionsList.style.flex = '1 1 0';
-            sessionsList.style.minHeight = '0';
-            sessionsList.style.overflowY = 'auto';
+            applySessionsViewLayout();
             updateToggleViewBtnLabel();
+            applySessionsHeaderMultiselectUI();
             renderSessions();
         } else if (isReadOnly) {
             // En mode lectura, tancar vista de sessió amb confirmació i anar a sessions
             await closeSessionView(false);
             registrationView.style.display = 'none';
-            // Forzar visibilidad y estilos flexbox correctos
-            sessionsView.style.setProperty('display', 'flex', 'important');
-            sessionsView.style.flexDirection = 'column';
-            sessionsView.style.flex = '1 1 auto';
-            sessionsView.style.minHeight = '0';
-            sessionsView.style.overflow = 'hidden';
-            sessionsContainer.style.display = 'flex';
-            sessionsContainer.style.flexDirection = 'column';
-            sessionsContainer.style.flex = '1 1 0';
-            sessionsContainer.style.minHeight = '0';
-            sessionsContainer.style.overflow = 'hidden';
-            sessionsList.style.display = 'flex';
-            sessionsList.style.flexDirection = 'column';
-            sessionsList.style.flex = '1 1 0';
-            sessionsList.style.minHeight = '0';
-            sessionsList.style.overflowY = 'auto';
+            applySessionsViewLayout();
             updateToggleViewBtnLabel();
+            applySessionsHeaderMultiselectUI();
             renderSessions();
         } else {
             const isSessionsView = (() => {
@@ -2411,6 +2416,11 @@ function initApp() {
                 } catch { return sessionsView.style.display !== 'none'; }
             })();
             if (isSessionsView) {
+                if (isMultiSelectMode) {
+                    selectedSessions.clear();
+                    isMultiSelectMode = false;
+                    applySessionsHeaderMultiselectUI();
+                }
                 sessionsView.style.display = 'none';
                 registrationView.style.display = 'flex';
                 clockContainer.style.display = 'flex';
@@ -2422,23 +2432,9 @@ function initApp() {
                 updateInstructionText();
             } else {
                 registrationView.style.display = 'none';
-                // Forzar visibilidad y estilos flexbox correctos
-                sessionsView.style.setProperty('display', 'flex', 'important');
-                sessionsView.style.flexDirection = 'column';
-                sessionsView.style.flex = '1 1 auto';
-                sessionsView.style.minHeight = '0';
-                sessionsView.style.overflow = 'hidden';
-                sessionsContainer.style.display = 'flex';
-                sessionsContainer.style.flexDirection = 'column';
-                sessionsContainer.style.flex = '1 1 0';
-                sessionsContainer.style.minHeight = '0';
-                sessionsContainer.style.overflow = 'hidden';
-                sessionsList.style.display = 'flex';
-                sessionsList.style.flexDirection = 'column';
-                sessionsList.style.flex = '1 1 0';
-                sessionsList.style.minHeight = '0';
-                sessionsList.style.overflowY = 'auto';
+                applySessionsViewLayout();
                 updateToggleViewBtnLabel();
+                applySessionsHeaderMultiselectUI();
 
                 // Renderizar DESPUÉS de aplicar estilos
                 renderSessions();
@@ -3344,26 +3340,8 @@ function initApp() {
             // Forzar reflow para asegurar que el layout se recalcula
             void registrationView.offsetHeight;
 
-            // Luego mostrar sessions-view con estilos forzados
-            sessionsView.style.setProperty('display', 'flex', 'important');
-            sessionsView.style.flexDirection = 'column';
-            sessionsView.style.flex = '1 1 auto';
-            sessionsView.style.minHeight = '0';
-            sessionsView.style.overflow = 'hidden';
-
-            // Asegurar que sessions-container también tenga los estilos correctos
-            sessionsContainer.style.display = 'flex';
-            sessionsContainer.style.flexDirection = 'column';
-            sessionsContainer.style.flex = '1 1 0';
-            sessionsContainer.style.minHeight = '0';
-            sessionsContainer.style.overflow = 'hidden';
-
-            // Y sessions-list
-            sessionsList.style.display = 'flex';
-            sessionsList.style.flexDirection = 'column';
-            sessionsList.style.flex = '1 1 0';
-            sessionsList.style.minHeight = '0';
-            sessionsList.style.overflowY = 'auto';
+            applySessionsViewLayout();
+            applySessionsHeaderMultiselectUI();
 
             // Forzar reflow
             void sessionsView.offsetHeight;
@@ -3378,28 +3356,82 @@ function initApp() {
     };
 
     // --- Funciones de modo multiselección ---
-    const toggleMultiSelectMode = () => {
-        isMultiSelectMode = !isMultiSelectMode;
-        selectedSessions.clear();
 
+    const SESSIONS_MULTISELECT_TOGGLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>`;
+
+    const applySessionsHeaderMultiselectUI = () => {
+        const importBtn = document.getElementById('import-sessions-btn');
+        const exportBtn = document.getElementById('export-sessions-btn');
         const multiselectToggleBtn = document.getElementById('multiselect-toggle-btn');
+        const selectAllToggleBtn = document.getElementById('multiselect-select-all-btn');
+        const cancelBtn = document.getElementById('multiselect-cancel-btn');
+        const deleteBtn = document.getElementById('multiselect-delete-btn');
         const multiselectActionsBar = document.getElementById('multiselect-actions-bar');
+        if (multiselectActionsBar) multiselectActionsBar.style.display = 'none';
 
         if (isMultiSelectMode) {
-            // Activar modo multiselección
-            multiselectToggleBtn.style.color = '#0d6efd';
-            multiselectToggleBtn.setAttribute('aria-label', 'Desactivar mode multiselecció');
-            multiselectToggleBtn.title = 'Desactivar mode multiselecció';
-            multiselectActionsBar.style.display = 'flex';
+            if (importBtn) importBtn.style.display = 'none';
+            if (exportBtn) exportBtn.style.display = 'flex';
+            if (multiselectToggleBtn) multiselectToggleBtn.style.display = 'none';
+            if (selectAllToggleBtn) selectAllToggleBtn.style.display = 'flex';
+            if (cancelBtn) cancelBtn.style.display = 'flex';
+            if (deleteBtn) deleteBtn.style.display = 'flex';
         } else {
-            // Desactivar modo multiselección
-            multiselectToggleBtn.style.color = '#888';
-            multiselectToggleBtn.setAttribute('aria-label', 'Activar mode multiselecció');
-            multiselectToggleBtn.title = 'Activar mode multiselecció';
-            multiselectActionsBar.style.display = 'none';
+            if (importBtn) importBtn.style.display = 'flex';
+            if (exportBtn) exportBtn.style.display = 'flex';
+            if (multiselectToggleBtn) {
+                multiselectToggleBtn.style.display = 'flex';
+                multiselectToggleBtn.innerHTML = SESSIONS_MULTISELECT_TOGGLE_ICON;
+                multiselectToggleBtn.style.color = 'white';
+                multiselectToggleBtn.setAttribute('aria-label', 'Activar mode multiselecció');
+                multiselectToggleBtn.title = 'Activar mode multiselecció';
+            }
+            if (selectAllToggleBtn) selectAllToggleBtn.style.display = 'none';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            if (deleteBtn) deleteBtn.style.display = 'none';
         }
+    };
 
-        // Re-renderizar sesiones para mostrar/ocultar checkboxes
+    const updateMultiselectSelectAllButtonUI = () => {
+        const btn = document.getElementById('multiselect-select-all-btn');
+        if (!btn || !isMultiSelectMode) return;
+        const sessionKeys = Object.keys(localStorage).filter(key => key.startsWith(sessionPrefix));
+        const total = sessionKeys.length;
+        const allAreSelected = total > 0 && selectedSessions.size === total;
+
+        if (allAreSelected) {
+            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg><span style="font-size: 0.7rem; font-weight: 700; margin-left: 2px;">CAP</span>`;
+            btn.setAttribute('aria-label', 'Desmarcar totes les sessions');
+            btn.title = 'Desmarcar totes';
+            btn.style.color = '#0d6efd';
+        } else {
+            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg><span style="font-size: 0.7rem; font-weight: 700; margin-left: 2px;">TOTES</span>`;
+            btn.setAttribute('aria-label', 'Marcar totes les sessions');
+            btn.title = 'Marcar totes';
+            btn.style.color = 'white';
+        }
+    };
+
+    /** Activa el modo multiselección (salida solo con cancelar o eliminar). */
+    const enterMultiSelectMode = () => {
+        if (isMultiSelectMode) return;
+        isMultiSelectMode = true;
+        selectedSessions.clear();
+        applySessionsHeaderMultiselectUI();
+        updateMultiselectSelectAllButtonUI();
+        renderSessions();
+    };
+
+    const toggleSelectAll = () => {
+        if (!isMultiSelectMode) return;
+        const sessionKeys = Object.keys(localStorage).filter(key => key.startsWith(sessionPrefix));
+        const total = sessionKeys.length;
+        const allAreSelected = total > 0 && selectedSessions.size === total;
+        if (allAreSelected) {
+            selectedSessions.clear();
+        } else {
+            sessionKeys.forEach(key => selectedSessions.add(key));
+        }
         renderSessions();
     };
 
@@ -3418,16 +3450,31 @@ function initApp() {
             checkbox.checked = selectedSessions.has(sessionKey);
         }
 
-        // Actualizar contador en la barra de acciones
         updateMultiselectActionBar();
+        updateMultiselectSelectAllButtonUI();
     };
 
     const updateMultiselectActionBar = () => {
         const countSpan = document.getElementById('multiselect-count');
         if (countSpan) {
             const count = selectedSessions.size;
-            countSpan.textContent = count > 0 ? `(${count} seleccionades)` : '';
+            countSpan.textContent = count > 0 ? `( ${count} seleccionades )` : '';
         }
+    };
+
+    const selectAllSessions = () => {
+        const sessions = Object.keys(localStorage)
+            .filter(key => key.startsWith(sessionPrefix));
+        
+        sessions.forEach(sessionKey => {
+            selectedSessions.add(sessionKey);
+            const checkbox = document.getElementById(`checkbox-${sessionKey}`);
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+        });
+        
+        updateMultiselectActionBar();
     };
 
     const deleteSelectedSessions = async () => {
@@ -3462,38 +3509,15 @@ function initApp() {
             selectedSessions.clear();
             isMultiSelectMode = false;
 
-            // Re-renderizar lista
+            applySessionsHeaderMultiselectUI();
             renderSessions();
-
-            // Ocultar barra de acciones
-            const multiselectActionsBar = document.getElementById('multiselect-actions-bar');
-            const multiselectToggleBtn = document.getElementById('multiselect-toggle-btn');
-            if (multiselectActionsBar) multiselectActionsBar.style.display = 'none';
-            if (multiselectToggleBtn) {
-                multiselectToggleBtn.style.color = '#888';
-                multiselectToggleBtn.setAttribute('aria-label', 'Activar mode multiselecció');
-                multiselectToggleBtn.title = 'Activar mode multiselecció';
-            }
         }
     };
 
     const cancelMultiSelect = () => {
         selectedSessions.clear();
         isMultiSelectMode = false;
-
-        const multiselectToggleBtn = document.getElementById('multiselect-toggle-btn');
-        const multiselectActionsBar = document.getElementById('multiselect-actions-bar');
-
-        if (multiselectToggleBtn) {
-            multiselectToggleBtn.style.color = '#888';
-            multiselectToggleBtn.setAttribute('aria-label', 'Activar mode multiselecció');
-            multiselectToggleBtn.title = 'Activar mode multiselecció';
-        }
-        if (multiselectActionsBar) {
-            multiselectActionsBar.style.display = 'none';
-        }
-
-        // Re-renderizar para ocultar checkboxes
+        applySessionsHeaderMultiselectUI();
         renderSessions();
     };
 
@@ -3529,9 +3553,8 @@ function initApp() {
                 return infoA.name.localeCompare(infoB.name);
             });
 
-        // Mantener visible el contenedor y el título aunque no haya sesiones
-        sessionsContainer.parentElement.style.display = 'block';
-
+        // La visibilidad de #sessions-view la controlan toggleView / init;
+        // no forzar display:block aquí: rompe flex/altura y anula display:none al iniciar.
 
         // Rest of renderSessions remains the same
         // Mostrar mensaje vacío cuando no haya sesiones
@@ -3543,6 +3566,7 @@ function initApp() {
             emptyMsg.style.textAlign = 'center';
             emptyMsg.style.padding = '10px 0';
             sessionsList.appendChild(emptyMsg);
+            if (isMultiSelectMode) updateMultiselectSelectAllButtonUI();
             return;
         }
 
@@ -3668,7 +3692,7 @@ function initApp() {
                         const sessionsViewEl = document.getElementById('sessions-view');
                         const registrationViewEl = document.getElementById('registration-view');
                         if (sessionsViewEl && registrationViewEl) {
-                            sessionsViewEl.style.display = 'flex';
+                            applySessionsViewLayout();
                             registrationViewEl.style.display = 'none';
                         }
                     }
@@ -3715,6 +3739,7 @@ function initApp() {
             sessionItem.appendChild(buttonsContainer);
             sessionsList.appendChild(sessionItem);
         });
+        if (isMultiSelectMode) updateMultiselectSelectAllButtonUI();
     };
 
     const viewSession = (sessionKey) => {
@@ -4469,7 +4494,7 @@ function initApp() {
                     const tb = document.getElementById('session-top-bar');
                     if (tb) { tb.remove(); }
                 } catch { }
-                try { sessionsView.style.display = 'flex'; } catch { }
+                try { applySessionsViewLayout(); } catch { }
                 try { registrationView.style.display = 'none'; } catch { }
                 updateToggleViewBtnLabel();
                 // Normalizar flags de vista
@@ -4492,7 +4517,7 @@ function initApp() {
                     const tb = document.getElementById('session-top-bar');
                     if (tb) { tb.remove(); }
                 } catch { }
-                try { sessionsView.style.display = 'flex'; } catch { }
+                try { applySessionsViewLayout(); } catch { }
                 try { registrationView.style.display = 'none'; } catch { }
                 updateToggleViewBtnLabel();
                 // Normalizar flags de vista
@@ -5579,94 +5604,18 @@ function initApp() {
     startClock();
     renderSessions();
 
-    // --- Inicialización modo multiselección ---
+    // --- Inicialización modo multiselección (acciones en el header de sessions-header) ---
     (function initMultiSelectMode() {
         const multiselectToggleBtn = document.getElementById('multiselect-toggle-btn');
         const multiselectActionsBar = document.getElementById('multiselect-actions-bar');
 
         if (!multiselectToggleBtn || !multiselectActionsBar) return;
 
-        // Añadir icono al botón toggle
-        const checkSquareIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>`;
-        multiselectToggleBtn.innerHTML = checkSquareIcon;
-        multiselectToggleBtn.style.color = '#888';
+        multiselectToggleBtn.innerHTML = SESSIONS_MULTISELECT_TOGGLE_ICON;
+        multiselectToggleBtn.style.color = 'white';
+        multiselectToggleBtn.addEventListener('click', enterMultiSelectMode);
 
-        // Añadir evento click
-        multiselectToggleBtn.addEventListener('click', toggleMultiSelectMode);
-
-        // Crear contenido de la barra de acciones
         multiselectActionsBar.style.display = 'none';
-        multiselectActionsBar.style.flexDirection = 'row';
-        multiselectActionsBar.style.gap = '10px';
-        multiselectActionsBar.style.marginBottom = '16px';
-        multiselectActionsBar.style.padding = '12px';
-        multiselectActionsBar.style.backgroundColor = 'rgba(51, 51, 51, 0.5)';
-        multiselectActionsBar.style.borderRadius = '8px';
-        multiselectActionsBar.style.alignItems = 'center';
-        multiselectActionsBar.style.justifyContent = 'space-between';
-
-        // Botón CANCEL.LAR
-        const cancelBtn = document.createElement('button');
-        cancelBtn.type = 'button';
-        cancelBtn.textContent = 'CANCEL.LAR';
-        cancelBtn.style.flex = '1';
-        cancelBtn.style.padding = '12px 16px';
-        cancelBtn.style.backgroundColor = '#666';
-        cancelBtn.style.color = '#fff';
-        cancelBtn.style.border = '2px solid #666';
-        cancelBtn.style.borderRadius = '8px';
-        cancelBtn.style.fontSize = '1rem';
-        cancelBtn.style.fontWeight = '700';
-        cancelBtn.style.cursor = 'pointer';
-        cancelBtn.style.textTransform = 'uppercase';
-        cancelBtn.style.transition = 'all 0.2s';
-        cancelBtn.addEventListener('mouseover', () => {
-            cancelBtn.style.backgroundColor = '#777';
-            cancelBtn.style.borderColor = '#777';
-        });
-        cancelBtn.addEventListener('mouseout', () => {
-            cancelBtn.style.backgroundColor = '#666';
-            cancelBtn.style.borderColor = '#666';
-        });
-        cancelBtn.addEventListener('click', cancelMultiSelect);
-
-        // Span para contador
-        const countSpan = document.createElement('span');
-        countSpan.id = 'multiselect-count';
-        countSpan.style.color = '#fff';
-        countSpan.style.fontSize = '1rem';
-        countSpan.style.fontWeight = '600';
-        countSpan.textContent = '';
-
-        // Botón ELIMINAR TOTS
-        const deleteAllBtn = document.createElement('button');
-        deleteAllBtn.type = 'button';
-        deleteAllBtn.textContent = 'ELIMINAR SELECCIONATS';
-        deleteAllBtn.style.flex = '1';
-        deleteAllBtn.style.padding = '12px 16px';
-        deleteAllBtn.style.backgroundColor = '#dc3545';
-        deleteAllBtn.style.color = '#fff';
-        deleteAllBtn.style.border = '2px solid #dc3545';
-        deleteAllBtn.style.borderRadius = '8px';
-        deleteAllBtn.style.fontSize = '1rem';
-        deleteAllBtn.style.fontWeight = '700';
-        deleteAllBtn.style.cursor = 'pointer';
-        deleteAllBtn.style.textTransform = 'uppercase';
-        deleteAllBtn.style.transition = 'all 0.2s';
-        deleteAllBtn.addEventListener('mouseover', () => {
-            deleteAllBtn.style.backgroundColor = '#c82333';
-            deleteAllBtn.style.borderColor = '#c82333';
-        });
-        deleteAllBtn.addEventListener('mouseout', () => {
-            deleteAllBtn.style.backgroundColor = '#dc3545';
-            deleteAllBtn.style.borderColor = '#dc3545';
-        });
-        deleteAllBtn.addEventListener('click', deleteSelectedSessions);
-
-        // Añadir botones a la barra
-        multiselectActionsBar.appendChild(cancelBtn);
-        multiselectActionsBar.appendChild(countSpan);
-        multiselectActionsBar.appendChild(deleteAllBtn);
     })();
 
     // --- Wake Lock Integration ---
@@ -5733,6 +5682,436 @@ function initApp() {
         }
     }
 
+    // --- Import/Export de sesiones ---
+    function initImportExportButtons() {
+        const importBtn = document.getElementById('import-sessions-btn');
+        const exportBtn = document.getElementById('export-sessions-btn');
+        const selectAllHeaderBtn = document.getElementById('multiselect-select-all-btn');
+        const cancelBtn = document.getElementById('multiselect-cancel-btn');
+        const deleteBtn = document.getElementById('multiselect-delete-btn');
+
+        if (importBtn) {
+            importBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg><span style="font-size: 0.7rem; font-weight: 700; margin-left: 2px;">IMP</span>`;
+            importBtn.style.color = 'white';
+            importBtn.addEventListener('click', importSessions);
+        }
+
+        if (exportBtn) {
+            exportBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg><span style="font-size: 0.7rem; font-weight: 700; margin-left: 2px;">EXP</span>`;
+            exportBtn.style.color = 'white';
+            exportBtn.addEventListener('click', exportSessions);
+        }
+
+        if (selectAllHeaderBtn) {
+            selectAllHeaderBtn.addEventListener('click', toggleSelectAll);
+        }
+
+        if (cancelBtn) {
+            cancelBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg><span style="font-size: 0.7rem; font-weight: 700; margin-left: 2px;">CANCEL</span>`;
+            cancelBtn.style.color = 'white';
+            cancelBtn.addEventListener('click', cancelMultiSelect);
+        }
+
+        if (deleteBtn) {
+            deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg><span style="font-size: 0.7rem; font-weight: 700; margin-left: 2px;">ELIM</span>`;
+            deleteBtn.style.color = 'white';
+            deleteBtn.addEventListener('click', deleteSelectedSessions);
+        }
+    }
+
+    function exportSessions() {
+        let sessions;
+        
+        if (isMultiSelectMode && selectedSessions.size > 0) {
+            // Exportar solo las sesiones seleccionadas
+            sessions = Array.from(selectedSessions).map(key => {
+                try {
+                    const data = JSON.parse(localStorage.getItem(key));
+                    return { key, data };
+                } catch {
+                    return null;
+                }
+            }).filter(s => s !== null);
+        } else {
+            // Exportar todas las sesiones
+            sessions = Object.keys(localStorage)
+                .filter(key => key.startsWith(sessionPrefix))
+                .map(key => {
+                    try {
+                        const data = JSON.parse(localStorage.getItem(key));
+                        return { key, data };
+                    } catch {
+                        return null;
+                    }
+                })
+                .filter(s => s !== null);
+        }
+
+        if (sessions.length === 0) {
+            alert('No hi ha sessions per exportar');
+            return;
+        }
+
+        const exportData = {
+            version: '1.0',
+            exportDate: new Date().toISOString(),
+            sessions: sessions
+        };
+
+        const jsonStr = JSON.stringify(exportData, null, 2);
+        const fileName = `voltes-sessions-${new Date().toISOString().slice(0, 10)}.json`;
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const shareTitle = `Voltes — ${sessions.length} sessió(ns)`;
+
+        function downloadFallback() {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Sense plugin File: compartir el JSON com a text (al WebView de Cordova el "download" i share(files) sovint no fan res)
+        function cordovaShareJsonText(onFail) {
+            if (!(window.cordova && window.plugins && window.plugins.socialsharing)) {
+                if (onFail) onFail();
+                return;
+            }
+            try {
+                window.plugins.socialsharing.share(
+                    jsonStr,
+                    shareTitle,
+                    null,
+                    null,
+                    function () { },
+                    function () { if (onFail) onFail(); }
+                );
+            } catch (e) {
+                if (onFail) onFail();
+            }
+        }
+
+        async function runWebExportFallbacks() {
+            // 1) Fitxer adjunt (navegador/PWA; molts WebViews no)
+            if (navigator.share && typeof File !== 'undefined') {
+                try {
+                    const file = new File([blob], fileName, { type: 'application/json' });
+                    if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+                        await navigator.share({ files: [file], title: shareTitle });
+                        return;
+                    }
+                } catch (e) {
+                    if (e && e.name === 'AbortError') return;
+                }
+            }
+            // 2) Text complet (funciona en molts Android WebView igual que el CSV sense "arxiu")
+            if (navigator.share) {
+                try {
+                    await navigator.share({ title: shareTitle, text: jsonStr });
+                    return;
+                } catch (e) {
+                    if (e && e.name === 'AbortError') return;
+                }
+            }
+            // 3) Porta-retalls
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                try {
+                    await navigator.clipboard.writeText(jsonStr);
+                    alert('JSON copiat al porta-retalls. Pots enganxar-lo a Notes, un correu o desar-lo com a arxiu .json.');
+                    return;
+                } catch (e) { /* següent */ }
+            }
+            try {
+                downloadFallback();
+            } catch (e) { /* */ }
+            if (window.cordova) {
+                prompt('Si no s\'ha pogut compartir, copia el JSON:', jsonStr);
+            }
+        }
+
+        // Cordova: si hi ha plugin File, desar i compartir URI; si no, continuar
+        if (window.cordova && window.resolveLocalFileSystemURL && cordova.file) {
+            const dirPath = cordova.file.externalDataDirectory || cordova.file.dataDirectory;
+            window.resolveLocalFileSystemURL(dirPath, function (dir) {
+                dir.getFile(fileName, { create: true }, function (fileEntry) {
+                    fileEntry.createWriter(function (fileWriter) {
+                        fileWriter.onerror = function (ev) {
+                            console.error('FileWriter error (export JSON):', ev);
+                            cordovaShareJsonText(function () { runWebExportFallbacks(); });
+                        };
+                        fileWriter.onwriteend = function () {
+                            if (window.plugins && window.plugins.socialsharing) {
+                                window.plugins.socialsharing.share(
+                                    `Export JSON (${sessions.length} sessió(ns))`,
+                                    'Voltes',
+                                    fileEntry.toURL(),
+                                    null
+                                );
+                            } else {
+                                alert(`Arxiu guardat: ${fileName}`);
+                            }
+                        };
+                        fileWriter.write(jsonStr);
+                    }, function (err) {
+                        console.error('Error creant writer (export JSON):', err);
+                        cordovaShareJsonText(function () { runWebExportFallbacks(); });
+                    });
+                }, function (err) {
+                    console.error('Error obtenint arxiu (export JSON):', err);
+                    cordovaShareJsonText(function () { runWebExportFallbacks(); });
+                });
+            }, function (err) {
+                console.error('Error accedint directori (export JSON):', err);
+                cordovaShareJsonText(function () { runWebExportFallbacks(); });
+            });
+            return;
+        }
+
+        // APK sense plugin File: socialsharing amb text, o Web Share text / porta-retalls
+        if (window.cordova) {
+            cordovaShareJsonText(function () { runWebExportFallbacks(); });
+            return;
+        }
+
+        runWebExportFallbacks();
+    }
+
+    function normalizeImportLaps(raw) {
+        if (raw == null) return null;
+        if (Array.isArray(raw)) return raw;
+        return null;
+    }
+
+    /** ISO string o número -> ms desde epoch (para JSON exportat amb dates en string). */
+    function lapTimeToMs(time) {
+        if (typeof time === 'number' && Number.isFinite(time)) return time;
+        if (typeof time === 'string') {
+            const ms = Date.parse(time);
+            return Number.isFinite(ms) ? ms : NaN;
+        }
+        return NaN;
+    }
+
+    /** Retorna còpia de voltes amb `time` numèric; null si alguna data és invàlida. */
+    function normalizeSessionLapsForImport(rawData) {
+        const laps = normalizeImportLaps(rawData);
+        if (!laps || laps.length === 0) return null;
+        const out = [];
+        for (let i = 0; i < laps.length; i++) {
+            const lap = laps[i];
+            if (!lap || typeof lap !== 'object') return null;
+            const ms = lapTimeToMs(lap.time);
+            if (!Number.isFinite(ms)) return null;
+            out.push({ ...lap, time: ms });
+        }
+        return out;
+    }
+
+    function sessionFingerprintFromImportLaps(laps) {
+        if (!Array.isArray(laps) || laps.length === 0) return null;
+        const t0 = lapTimeToMs(laps[0].time);
+        const t1 = lapTimeToMs(laps[laps.length - 1].time);
+        if (!Number.isFinite(t0) || !Number.isFinite(t1)) return null;
+        return {
+            start: t0,
+            durationMs: t1 - t0,
+            lapCount: laps.length
+        };
+    }
+
+    function importFingerprintsMatch(a, b) {
+        return a.durationMs === b.durationMs && a.lapCount === b.lapCount;
+    }
+
+    function findLocalKeyBySessionStartMs(startMs) {
+        const keys = Object.keys(localStorage);
+        for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            if (!key.startsWith(sessionPrefix)) continue;
+            try {
+                const laps = normalizeImportLaps(JSON.parse(localStorage.getItem(key)));
+                const fp = sessionFingerprintFromImportLaps(laps);
+                if (fp && fp.start === startMs) return key;
+            } catch {
+            }
+        }
+        return null;
+    }
+
+    /** Missatge HTML per duplicat per hora d'inici (local vs import). */
+    function buildImportDuplicateByStartMessage({ startMs, localKey, importKey, exFp, impFp }) {
+        const startDate = new Date(startMs);
+        const dateStr = formatDate(startDate);
+        const timeStr = formatTime(startDate);
+        const localName = localKey.replace(sessionPrefix, '');
+        const importName = importKey.replace(sessionPrefix, '');
+        const exLapsStr = exFp ? String(exFp.lapCount) : '?';
+        const exDurStr = exFp ? formatDurationPlain(exFp.durationMs / 1000) : '?';
+        const impLapsStr = String(impFp.lapCount);
+        const impDurStr = formatDurationPlain(impFp.durationMs / 1000);
+        const identical = exFp && importFingerprintsMatch(exFp, impFp);
+        const identicalNote = identical
+            ? '<br><br><i>Mateixa durada i nombre de voltes en ambdues versions.</i>'
+            : '';
+        return (
+            `<b>Inici de sessió:</b> ${dateStr} — ${timeStr}<br><br>` +
+            `<b>Sessió desada (aquest dispositiu)</b><br>` +
+            `Clau: <b>${localName}</b><br>` +
+            `Voltes: <b>${exLapsStr}</b> · Durada: <b>${exDurStr}</b><br><br>` +
+            `<b>Sessió de l’import (fitxer)</b><br>` +
+            `Clau: <b>${importName}</b><br>` +
+            `Voltes: <b>${impLapsStr}</b> · Durada: <b>${impDurStr}</b>` +
+            identicalNote +
+            `<br><br><b>Substituir</b> la desada per la de l’import, o <b>conservar</b> la desada?`
+        );
+    }
+
+    function importSessions() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const importData = JSON.parse(event.target.result);
+                    if (!importData.sessions || !Array.isArray(importData.sessions)) {
+                        alert('Format de fitxer incorrecte');
+                        return;
+                    }
+
+                    let importedCount = 0;
+                    let skippedCount = 0;
+
+                    for (const session of importData.sessions) {
+                        if (!session.key || session.data == null) continue;
+
+                        const laps = normalizeSessionLapsForImport(session.data);
+                        if (!laps) continue;
+                        const impFp = sessionFingerprintFromImportLaps(laps);
+                        if (!impFp) continue;
+
+                        const keyByStart = findLocalKeyBySessionStartMs(impFp.start);
+
+                        if (keyByStart) {
+                            let exLaps = null;
+                            try {
+                                exLaps = normalizeImportLaps(JSON.parse(localStorage.getItem(keyByStart)));
+                            } catch {
+                            }
+                            const exFp = sessionFingerprintFromImportLaps(exLaps);
+
+                            const msg = buildImportDuplicateByStartMessage({
+                                startMs: impFp.start,
+                                localKey: keyByStart,
+                                importKey: session.key,
+                                exFp,
+                                impFp
+                            });
+
+                            const replace = await showModal({
+                                id: 'modal-import-session-conflict-start',
+                                title: 'Sessió amb la mateixa hora d\'inici',
+                                message: msg,
+                                okText: 'Substituir',
+                                cancelText: 'Conservar l\'anterior',
+                                type: 'confirm',
+                                buttonLayout: 'horizontal'
+                            });
+                            if (replace) {
+                                localStorage.setItem(keyByStart, JSON.stringify(laps));
+                                if (session.key !== keyByStart && localStorage.getItem(session.key)) {
+                                    try {
+                                        const other = normalizeImportLaps(JSON.parse(localStorage.getItem(session.key)));
+                                        const oFp = sessionFingerprintFromImportLaps(other);
+                                        if (oFp && oFp.start === impFp.start) {
+                                            localStorage.removeItem(session.key);
+                                        }
+                                    } catch {
+                                    }
+                                }
+                                importedCount++;
+                            } else {
+                                skippedCount++;
+                            }
+                            continue;
+                        }
+
+                        const rawAtKey = localStorage.getItem(session.key);
+                        if (rawAtKey != null) {
+                            let exLaps2 = null;
+                            try {
+                                exLaps2 = normalizeImportLaps(JSON.parse(rawAtKey));
+                            } catch {
+                            }
+                            const exFp2 = sessionFingerprintFromImportLaps(exLaps2);
+                            if (exFp2 && exFp2.start === impFp.start) {
+                                const msg = buildImportDuplicateByStartMessage({
+                                    startMs: impFp.start,
+                                    localKey: session.key,
+                                    importKey: session.key,
+                                    exFp: exFp2,
+                                    impFp
+                                });
+                                const replace2 = await showModal({
+                                    id: 'modal-import-session-conflict-key',
+                                    title: 'Sessió amb la mateixa hora d\'inici',
+                                    message: msg,
+                                    okText: 'Substituir',
+                                    cancelText: 'Conservar l\'anterior',
+                                    type: 'confirm',
+                                    buttonLayout: 'horizontal'
+                                });
+                                if (replace2) {
+                                    localStorage.setItem(session.key, JSON.stringify(laps));
+                                    importedCount++;
+                                } else {
+                                    skippedCount++;
+                                }
+                                continue;
+                            }
+
+                            const replace3 = await showModal({
+                                id: 'modal-import-session-key-collision',
+                                title: 'Clau en ús',
+                                message:
+                                    `La clau <b>${session.key.replace(sessionPrefix, '')}</b> ja existeix amb una altra hora d\'inici.<br><br>` +
+                                    `Vols <b>substituir</b> la sessió desada per la importada?`,
+                                okText: 'Substituir',
+                                cancelText: 'Conservar l\'anterior',
+                                type: 'confirm',
+                                buttonLayout: 'horizontal'
+                            });
+                            if (replace3) {
+                                localStorage.setItem(session.key, JSON.stringify(laps));
+                                importedCount++;
+                            } else {
+                                skippedCount++;
+                            }
+                            continue;
+                        }
+
+                        localStorage.setItem(session.key, JSON.stringify(laps));
+                        importedCount++;
+                    }
+
+                    alert(`Importació: ${importedCount} sessions noves o actualitzades; ${skippedCount} conservades o omeses.`);
+                    renderSessions();
+                } catch (err) {
+                    alert('Error en importar les sessions');
+                }
+            };
+            reader.readAsText(file);
+        });
+        input.click();
+    }
+
     // Toggle Wake Lock
     async function toggleWakeLock() {
         if (!wakeLockManager.isSupported) {
@@ -5777,8 +6156,6 @@ function initApp() {
             return;
         }
 
-        const appVersion = '2.0.0'; // Versión desde manifest.json
-        const appDateVersion = '2025-12-15'; // Versión desde manifest.json
 
         // Crear contenedor del modal con opciones
         const modalContent = document.createElement('div');
@@ -5795,11 +6172,18 @@ function initApp() {
                 <span style="opacity: 0.8;">Versió: ${appVersion} ( ${appDateVersion} )</span>
             </div>
             <div style="text-align: center; margin-bottom: 8px; line-height: 1.3;">
-                <strong>© 2025 - Albert Ruiz Pujol</strong><br>
-                <a href="mailto:ruiggi@gmail.com" style="color:rgb(255, 255, 255); text-decoration: none;">ruiggi@gmail.com</a><br>
-                <u><a href="https://ruiggi.github.io/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://ruiggi.github.io/ControlVoltes/</a></u>
+                <strong>© 2025 - Albert Ruiz Pujol</strong> 
+                ( <a href="mailto:ruiggi@gmail.com" style="color:rgb(255, 255, 255); text-decoration: none;">ruiggi@gmail.com</a> ) 
+                <p>
+                Repositori: <u><a href="https://github.com/ruiggi/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://github.com/ruiggi/ControlVoltes/</a></u>
+                <br>
+                Versió web: <u><a href="https://ruiggi.github.io/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://ruiggi.github.io/ControlVoltes/</a></u>
+                <br>
+                Descàrregues: <u><a href="https://github.com/ruiggi/ControlVoltes/releases" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://github.com/ruiggi/ControlVoltes/releases</a></u>
+                <br>
             </div>
-        `;
+
+            `;
         modalContent.appendChild(infoText);
 
         // Botones de acción
@@ -6196,6 +6580,9 @@ function initApp() {
 
     // Cargar configuración inicial
     loadSettings();
+
+    // Inicializar botones de import/export de sesiones
+    initImportExportButtons();
 
     // Inicializar Wake Lock
     // Establecer texto inicial por defecto
