@@ -15,7 +15,7 @@ Qualsevol suggeriment o millora és benvingut!
 ### 🤖 Format App (Android)
 - Versió **instal·lable** per a dispositius Android.  
 - Ofereix **tota la funcionalitat completa**, incloent el suport per als **botons físics** per marcar voltes.  
-- 🔗 **Enllaç de descàrrega:** [[https://github.com/ruiggi/ControlVoltes/releases/download/APKv200/ControlVoltes-v2.0.0.apk](https://github.com/ruiggi/ControlVoltes/releases/download/APKv200/ControlVoltes-v2.0.0.apk)]
+- 🔗 **Enllaç de descàrrega:** [[https://github.com/ruiggi/ControlVoltes/releases/download/APKv300/ControlVoltes-v3.0.0.apk](https://github.com/ruiggi/ControlVoltes/releases/download/APKv300/ControlVoltes-v3.0.0.apk)]
 
 ### 🌐 Format PWA (Progressive Web App)
 - Es pot executar directament des del **navegador web**.  
