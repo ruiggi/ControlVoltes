@@ -1,4 +1,4 @@
-const appVersion = '3.0.1'; // Versión desde manifest.json
+const appVersion = '4.0.0'; // Versión desde manifest.json
 const appDateVersion = '2026-09-07'; // Versión desde manifest.json
 
 // Función principal de inicialización
