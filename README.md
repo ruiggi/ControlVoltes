@@ -59,6 +59,10 @@ Qualsevol suggeriment o millora és benvingut!
 --- 
 
 ## Changelog
+2026-09-07 - v4.0.0
+- opció de mostrar Hora o Temps transcorregut al rellotge de marcatge
+- opció de marcar una fila com a "SERIE" (que actua com a temps de treball)
+- millores menors a l'interfase (titol, switch bloqueig pantalla, tamany rellotge...)
 
 2026-03-31 - v3.0.0
 - corregit error d'scroll a llistat de sesions guardades
