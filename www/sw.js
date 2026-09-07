@@ -12,11 +12,11 @@
 // ║  Después de CUALQUIER cambio de código, PREGUNTA al usuario:            ║
 // ║  "¿Quieres actualizar la versión para forzar actualización de la app?"  ║
 // ║                                                                           ║
-// ║  VERSIÓN ACTUAL: 2.0.0                                                   ║
-// ║  PRÓXIMA VERSIÓN: 2.0.1 (incrementar al hacer cambios)                  ║
+// ║  VERSIÓN ACTUAL: 3.0.1                                                   ║
+// ║  PRÓXIMA VERSIÓN: 3.0.2 (incrementar al hacer cambios)                  ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
-const CACHE_NAME = 'control-voltes-cache-v3.0.0';
+const CACHE_NAME = 'control-voltes-cache-v3.0.1';
 
 // Detectar si estamos en GitHub Pages o local
 const isGitHubPages = self.location.hostname.includes('github.io');

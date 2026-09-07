@@ -1,5 +1,5 @@
-const appVersion = '3.0.0'; // Versión desde manifest.json
-const appDateVersion = '2026-03-31'; // Versión desde manifest.json
+const appVersion = '3.0.1'; // Versión desde manifest.json
+const appDateVersion = '2026-09-07'; // Versión desde manifest.json
 
 // Función principal de inicialización
 function initApp() {
@@ -25,7 +25,9 @@ function initApp() {
             goToSessionsAfterFinalize: true,  // Por defecto ir al listado después de finalizar
             isLocked: false,  // Por defecto desbloqueado
             volumeButtonsEnabled: false,  // Por defecto desactivado (botones de volumen para marcar vueltas)
-            csvExportAsFile: false  // Por defecto exportar como texto (false = texto, true = archivo)
+            csvExportAsFile: false,  // Por defecto exportar como texto (false = texto, true = archivo)
+            clockMode: 'elapsed',  // 'elapsed' = tiempo transcurrido (defecto), 'time' = hora actual
+            seriesLapTypeEnabled: false  // Por defecto desactivado (solo TREBALL/DESCANS)
         },
 
         // Intervalos
@@ -86,6 +88,7 @@ function initApp() {
     // Aliases para compatibilidad con código existente
     const clockElement = appState.dom.clock;
     const clockContainer = appState.dom.clockContainer;
+    let clockSecondaryElement = null;
     const totalWorkElement = appState.dom.totalWork;
     const totalRestElement = appState.dom.totalRest;
     const totalTimeElement = appState.dom.totalTime;
@@ -139,6 +142,8 @@ function initApp() {
                 appState.settings.isLocked = settings.isLocked !== undefined ? settings.isLocked : false;
                 appState.settings.volumeButtonsEnabled = settings.volumeButtonsEnabled !== undefined ? settings.volumeButtonsEnabled : false;
                 appState.settings.csvExportAsFile = settings.csvExportAsFile !== undefined ? settings.csvExportAsFile : false;
+                appState.settings.clockMode = settings.clockMode === 'time' ? 'time' : 'elapsed';
+                appState.settings.seriesLapTypeEnabled = settings.seriesLapTypeEnabled === true;
             }
         } catch (e) {
             console.warn('Error cargando configuración:', e);
@@ -147,6 +152,8 @@ function initApp() {
             appState.settings.isLocked = false;
             appState.settings.volumeButtonsEnabled = false;
             appState.settings.csvExportAsFile = false;
+            appState.settings.clockMode = 'elapsed';
+            appState.settings.seriesLapTypeEnabled = false;
         }
     };
 
@@ -290,7 +297,7 @@ function initApp() {
         <!-- Centro -->
         <circle cx="256" cy="300" r="20" fill="#2c3e50"/>
     </svg>`;
-    const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" stroke-width="3" stroke="#f0f0f0" fill="none">
+    const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="56" viewBox="0 0 24 24" stroke-width="3" stroke="#f0f0f0" fill="none" preserveAspectRatio="none">
         <path d="M7 4v16l13 -8z" />
         </svg>`;
     const workIcon = `
@@ -312,6 +319,10 @@ function initApp() {
         <!-- Handle --> <path d="M15 11h2a2 2 0 1 1 0 4h-2" />
         <!-- Base --> <path d="M5 20h10" />
         <!-- Steam --> <path d="M7 4c0 1 1 1 1 2s-1 1-1 2" />  <path d="M11 4c0 1 1 1 1 2s-1 1-1 2" />
+        </svg>`;
+    const serieIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+        <path d="M21 3v6h-6" />
         </svg>`;
     const totalIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
         <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
@@ -374,6 +385,7 @@ function initApp() {
             this.wakeLock = null;
             this.isCordova = !!window.cordova;
             this._isActive = false;
+            this.onStateChange = null;
 
             // Detectar soporte según el entorno
             if (this.isCordova) {
@@ -394,6 +406,20 @@ function initApp() {
             }
         }
 
+        _notifyStateChange() {
+            if (typeof this.onStateChange === 'function') {
+                this.onStateChange(this.isActive());
+            }
+        }
+
+        _attachReleaseListener() {
+            if (!this.wakeLock || this.isCordova) return;
+            this.wakeLock.addEventListener('release', () => {
+                this._isActive = false;
+                this._notifyStateChange();
+            }, { once: true });
+        }
+
         async request() {
             if (!this.isSupported) {
                 return false;
@@ -405,6 +431,7 @@ function initApp() {
                     if (window.plugins && window.plugins.insomnia) {
                         window.plugins.insomnia.keepAwake();
                         this._isActive = true;
+                        this._notifyStateChange();
                         return true;
                     }
                     return false;
@@ -412,11 +439,14 @@ function initApp() {
                     // Web: Usar Wake Lock API
                     this.wakeLock = await navigator.wakeLock.request('screen');
                     this._isActive = true;
+                    this._attachReleaseListener();
+                    this._notifyStateChange();
                     return true;
                 }
             } catch (err) {
                 this.wakeLock = null;
                 this._isActive = false;
+                this._notifyStateChange();
                 return false;
             }
         }
@@ -428,6 +458,7 @@ function initApp() {
                     if (window.plugins && window.plugins.insomnia) {
                         window.plugins.insomnia.allowSleepAgain();
                         this._isActive = false;
+                        this._notifyStateChange();
                         return true;
                     }
                     return false;
@@ -437,6 +468,7 @@ function initApp() {
                         await this.wakeLock.release();
                         this.wakeLock = null;
                         this._isActive = false;
+                        this._notifyStateChange();
                         return true;
                     }
                     return true;
@@ -2444,6 +2476,40 @@ function initApp() {
 
     // --- Lògica principal ---
 
+    const isWorkLapType = (type) => type === 'work' || type === 'serie';
+
+    const getLapTypeIcon = (type) => {
+        if (type === 'rest') return restIcon;
+        if (type === 'serie') return serieIcon;
+        return workIcon;
+    };
+
+    const getLapTypeLabel = (type) => {
+        if (type === 'rest') return 'Descans';
+        if (type === 'serie') return 'Sèrie';
+        return 'Treball';
+    };
+
+    const getNextLapType = (currentType) => {
+        if (appState.settings.seriesLapTypeEnabled) {
+            const order = ['work', 'rest', 'serie'];
+            const idx = order.indexOf(currentType);
+            return order[((idx >= 0 ? idx : 0) + 1) % order.length];
+        }
+        if (currentType === 'rest') return 'work';
+        return 'rest';
+    };
+
+    const getLapTypeAriaLabel = (type) => {
+        if (appState.settings.seriesLapTypeEnabled) {
+            if (type === 'work') return 'Canvia a descans';
+            if (type === 'rest') return 'Canvia a sèrie';
+            return 'Canvia a treball';
+        }
+        if (type === 'work' || type === 'serie') return 'Canvia a descans';
+        return 'Canvia a treball';
+    };
+
     const updateSummary = () => {
         let totalWorkSeconds = 0;
         let totalRestSeconds = 0;
@@ -2451,7 +2517,7 @@ function initApp() {
         if (laps.length > 1) {
             for (let i = 0; i < laps.length - 1; i++) {
                 const duration = (laps[i + 1].time - laps[i].time) / 1000;
-                if (laps[i].type === 'work') {
+                if (isWorkLapType(laps[i].type)) {
                     totalWorkSeconds += duration;
                 } else {
                     totalRestSeconds += duration;
@@ -2521,7 +2587,7 @@ function initApp() {
             const lapTimeContainer = document.createElement('div');
             lapTimeContainer.style.display = 'flex';
             lapTimeContainer.style.alignItems = 'center';
-            lapTimeContainer.style.gap = '4px';
+            lapTimeContainer.style.gap = '2px';
             lapTimeContainer.style.flex = '0 0 auto';
 
             // Botón de editar tiempo
@@ -2532,7 +2598,7 @@ function initApp() {
             editTimeBtn.style.display = 'flex';
             editTimeBtn.style.alignItems = 'center';
             editTimeBtn.style.justifyContent = 'center';
-            editTimeBtn.style.padding = '2px';
+            editTimeBtn.style.padding = '1px';
             editTimeBtn.style.borderRadius = '4px';
             editTimeBtn.style.border = '1px solid var(--accent-color)';
             editTimeBtn.style.background = 'transparent';
@@ -2584,7 +2650,7 @@ function initApp() {
             const lapNameContainer = document.createElement('div');
             lapNameContainer.style.display = 'flex';
             lapNameContainer.style.alignItems = 'center';
-            lapNameContainer.style.gap = '6px';
+            lapNameContainer.style.gap = '2px';
             lapNameContainer.style.flex = '1';
 
             const lapNameInput = document.createElement('input');
@@ -2612,7 +2678,7 @@ function initApp() {
             editNameBtn.style.display = 'flex';
             editNameBtn.style.alignItems = 'center';
             editNameBtn.style.justifyContent = 'center';
-            editNameBtn.style.padding = '4px';
+            editNameBtn.style.padding = '1px';
             editNameBtn.style.borderRadius = '4px';
             editNameBtn.style.border = '1px solid var(--accent-color)';
             editNameBtn.style.background = 'transparent';
@@ -2688,22 +2754,18 @@ function initApp() {
             const lapTypeToggle = document.createElement('button');
             lapTypeToggle.className = `lap-type-toggle ${lap.type}`;
             lapTypeToggle.id = `lap-type-toggle-${index}`;
-            const isWork = lap.type === 'work';
-            lapTypeToggle.innerHTML = `${isWork ? workIcon : restIcon}`;
+            lapTypeToggle.innerHTML = getLapTypeIcon(lap.type);
             lapTypeToggle.style.display = 'flex';
             lapTypeToggle.style.alignItems = 'center';
-            lapTypeToggle.style.gap = '5px';
+            lapTypeToggle.style.gap = '2px';
             lapTypeToggle.setAttribute('role', 'button');
-            lapTypeToggle.setAttribute('aria-pressed', String(isWork));
+            lapTypeToggle.setAttribute('aria-pressed', String(isWorkLapType(lap.type)));
             lapTypeToggle.setAttribute('tabindex', '0');
-            lapTypeToggle.setAttribute('aria-label', isWork ? 'Canvia a descans' : 'Canvia a treball');
+            lapTypeToggle.setAttribute('aria-label', getLapTypeAriaLabel(lap.type));
             lapTypeToggle.addEventListener('click', () => {
                 // Permitir edición tanto en sesión activa como en sesión guardada
                 if (!isReadOnly || isViewingSession) {
-                    laps[index].type = laps[index].type === 'work' ? 'rest' : 'work';
-                    const nowIsWork = laps[index].type === 'work';
-                    lapTypeToggle.setAttribute('aria-pressed', String(nowIsWork));
-                    lapTypeToggle.setAttribute('aria-label', nowIsWork ? 'Canvia a descans' : 'Canvia a treball');
+                    laps[index].type = getNextLapType(laps[index].type);
 
                     // Marcar como modificado si estamos viendo una sesión guardada
                     if (isViewingSession) {
@@ -3137,12 +3199,28 @@ function initApp() {
         if (now - lastClockUpdate >= 50) {
             lastClockUpdate = now;
 
-            const time = new Date();
-            const formatted = formatTime(time);
+            const timeFormatted = formatTime(new Date());
+            const elapsedSeconds = laps.length > 0
+                ? (now - new Date(laps[0].time).getTime()) / 1000
+                : 0;
+            const elapsedFormatted = formatSummaryDurationHTML(elapsedSeconds);
+
+            const isElapsedMode = appState.settings.clockMode !== 'time';
+            const primaryFormatted = isElapsedMode ? elapsedFormatted : timeFormatted;
+            const secondaryFormatted = isElapsedMode ? timeFormatted : elapsedFormatted;
 
             // Solo actualizar DOM si cambió el contenido
-            if (clockElement.innerHTML !== formatted) {
-                clockElement.innerHTML = formatted;
+            if (clockElement.innerHTML !== primaryFormatted) {
+                const prevLen = clockElement.textContent.length;
+                clockElement.innerHTML = primaryFormatted;
+                // Reajustar si cambia la longitud del texto (p.ej. 9:59 → 10:00)
+                if (clockElement.textContent.length !== prevLen &&
+                    typeof appState.fitClockToAvailableWidth === 'function') {
+                    appState.fitClockToAvailableWidth();
+                }
+            }
+            if (clockSecondaryElement && clockSecondaryElement.innerHTML !== secondaryFormatted) {
+                clockSecondaryElement.innerHTML = secondaryFormatted;
             }
 
             // Actualizar duración de última vuelta si está grabando
@@ -4555,14 +4633,14 @@ function initApp() {
             savedLaps.forEach((lap, index) => {
                 const lapTime = new Date(lap.time);
                 const lapTimeStr = `${String(lapTime.getHours()).padStart(2, '0')}:${String(lapTime.getMinutes()).padStart(2, '0')}:${String(lapTime.getSeconds()).padStart(2, '0')}.${String(lapTime.getMilliseconds()).padStart(3, '0')}`;
-                const lapTypeLabel = lap.type === 'work' ? 'Treball' : 'Descans';
+                const lapTypeLabel = getLapTypeLabel(lap.type);
                 // Orden: #, HORA, DURADA, TIPUS, NOM
                 let line = `${index + 1}\t${lapTimeStr}`;
                 // Añadir duración
                 if (index < savedLaps.length - 1) {
                     const nextTime = new Date(savedLaps[index + 1].time);
                     const duration = (nextTime - lapTime) / 1000;
-                    if (lap.type === 'work') totalWorkSeconds += duration; else totalRestSeconds += duration;
+                    if (isWorkLapType(lap.type)) totalWorkSeconds += duration; else totalRestSeconds += duration;
                     line += `\t${formatDurationPlain(duration)}`;
                 } else {
                     line += `\t`;
@@ -4620,12 +4698,12 @@ function initApp() {
         savedLaps.forEach((lap, index) => {
             const lapTime = new Date(lap.time);
             const lapTimeStr = `${String(lapTime.getHours()).padStart(2, '0')}:${String(lapTime.getMinutes()).padStart(2, '0')}:${String(lapTime.getSeconds()).padStart(2, '0')}.${String(lapTime.getMilliseconds()).padStart(3, '0')}`;
-            const lapTypeLabel = lap.type === 'work' ? 'Treball' : 'Descans';
+            const lapTypeLabel = getLapTypeLabel(lap.type);
             let durationStr = '';
             if (index < savedLaps.length - 1) {
                 const nextTime = new Date(savedLaps[index + 1].time);
                 const duration = (nextTime - lapTime) / 1000;
-                if (lap.type === 'work') totalWorkSeconds += duration; else totalRestSeconds += duration;
+                if (isWorkLapType(lap.type)) totalWorkSeconds += duration; else totalRestSeconds += duration;
                 durationStr = formatDurationPlain(duration);
             }
             // Escapar comillas en nombre
@@ -4729,12 +4807,12 @@ function initApp() {
         savedLaps.forEach((lap, index) => {
             const lapTime = new Date(lap.time);
             const lapTimeStr = `${String(lapTime.getHours()).padStart(2, '0')}:${String(lapTime.getMinutes()).padStart(2, '0')}:${String(lapTime.getSeconds()).padStart(2, '0')}.${String(lapTime.getMilliseconds()).padStart(3, '0')}`;
-            const lapTypeLabel = lap.type === 'work' ? 'Treball' : 'Descans';
+            const lapTypeLabel = getLapTypeLabel(lap.type);
             let durationStr = '';
             if (index < savedLaps.length - 1) {
                 const nextTime = new Date(savedLaps[index + 1].time);
                 const duration = (nextTime - lapTime) / 1000;
-                if (lap.type === 'work') totalWorkSeconds += duration; else totalRestSeconds += duration;
+                if (isWorkLapType(lap.type)) totalWorkSeconds += duration; else totalRestSeconds += duration;
                 durationStr = formatDurationPlain(duration);
             }
             // Escapar comillas en nombre
@@ -4840,14 +4918,14 @@ function initApp() {
         savedLaps.forEach((lap, index) => {
             const lapTime = new Date(lap.time);
             const lapTimeStr = `${String(lapTime.getHours()).padStart(2, '0')}:${String(lapTime.getMinutes()).padStart(2, '0')}:${String(lapTime.getSeconds()).padStart(2, '0')}.${String(lapTime.getMilliseconds()).padStart(3, '0')}`;
-            const lapTypeLabel = lap.type === 'work' ? 'Treball' : 'Descans';
+            const lapTypeLabel = getLapTypeLabel(lap.type);
             // Orden: #, HORA, DURADA, TIPUS, NOM
             let line = `${index + 1}\t${lapTimeStr}`;
             // Añadir duración
             if (index < savedLaps.length - 1) {
                 const nextTime = new Date(savedLaps[index + 1].time);
                 const duration = (nextTime - lapTime) / 1000;
-                if (lap.type === 'work') totalWorkSeconds += duration; else totalRestSeconds += duration;
+                if (isWorkLapType(lap.type)) totalWorkSeconds += duration; else totalRestSeconds += duration;
                 line += `\t${formatDurationPlain(duration)}`;
             } else {
                 line += `\t`;
@@ -5627,23 +5705,28 @@ function initApp() {
 
     // Función para actualizar el estado visual del switch
     function updateWakeLockUI(isActive) {
-        const toggle = wakeIndicator?.querySelector('span');
-        if (!toggle) return;
+        const toggle = document.getElementById('wake-indicator-dot');
 
         if (isActive) {
-            wakeToggle.setAttribute('aria-checked', 'true');
-            wakeIndicator.style.background = '#0d6efd';
-            toggle.style.transform = 'translateX(14px)';
-            toggle.style.background = '#fff';
+            wakeToggle?.setAttribute('aria-checked', 'true');
+            if (wakeIndicator) wakeIndicator.style.background = '#0d6efd';
+            if (toggle) {
+                toggle.style.transform = 'translateX(14px)';
+                toggle.style.background = '#fff';
+            }
             if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} ON`;
         } else {
-            wakeToggle.setAttribute('aria-checked', 'false');
-            wakeIndicator.style.background = '#666';
-            toggle.style.transform = 'translateX(0)';
-            toggle.style.background = '#bbb';
+            wakeToggle?.setAttribute('aria-checked', 'false');
+            if (wakeIndicator) wakeIndicator.style.background = '#666';
+            if (toggle) {
+                toggle.style.transform = 'translateX(0)';
+                toggle.style.background = '#bbb';
+            }
             if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} OFF`;
         }
     }
+
+    wakeLockManager.onStateChange = updateWakeLockUI;
 
     // Cargar preferencia guardada
     async function loadWakeLockPreference() {
@@ -5651,9 +5734,14 @@ function initApp() {
             const saved = localStorage.getItem(WAKE_LOCK_PREF_KEY);
             if (saved === 'true' && wakeLockManager.isSupported) {
                 const success = await wakeLockManager.request();
-                updateWakeLockUI(success);
+                if (!success) {
+                    localStorage.setItem(WAKE_LOCK_PREF_KEY, 'false');
+                }
+            } else {
+                updateWakeLockUI(false);
             }
         } catch (err) {
+            updateWakeLockUI(false);
         }
     }
 
@@ -5758,125 +5846,15 @@ function initApp() {
             sessions: sessions
         };
 
-        const jsonStr = JSON.stringify(exportData, null, 2);
-        const fileName = `voltes-sessions-${new Date().toISOString().slice(0, 10)}.json`;
-        const blob = new Blob([jsonStr], { type: 'application/json' });
-        const shareTitle = `Voltes — ${sessions.length} sessió(ns)`;
-
-        function downloadFallback() {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        // Sense plugin File: compartir el JSON com a text (al WebView de Cordova el "download" i share(files) sovint no fan res)
-        function cordovaShareJsonText(onFail) {
-            if (!(window.cordova && window.plugins && window.plugins.socialsharing)) {
-                if (onFail) onFail();
-                return;
-            }
-            try {
-                window.plugins.socialsharing.share(
-                    jsonStr,
-                    shareTitle,
-                    null,
-                    null,
-                    function () { },
-                    function () { if (onFail) onFail(); }
-                );
-            } catch (e) {
-                if (onFail) onFail();
-            }
-        }
-
-        async function runWebExportFallbacks() {
-            // 1) Fitxer adjunt (navegador/PWA; molts WebViews no)
-            if (navigator.share && typeof File !== 'undefined') {
-                try {
-                    const file = new File([blob], fileName, { type: 'application/json' });
-                    if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-                        await navigator.share({ files: [file], title: shareTitle });
-                        return;
-                    }
-                } catch (e) {
-                    if (e && e.name === 'AbortError') return;
-                }
-            }
-            // 2) Text complet (funciona en molts Android WebView igual que el CSV sense "arxiu")
-            if (navigator.share) {
-                try {
-                    await navigator.share({ title: shareTitle, text: jsonStr });
-                    return;
-                } catch (e) {
-                    if (e && e.name === 'AbortError') return;
-                }
-            }
-            // 3) Porta-retalls
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                try {
-                    await navigator.clipboard.writeText(jsonStr);
-                    alert('JSON copiat al porta-retalls. Pots enganxar-lo a Notes, un correu o desar-lo com a arxiu .json.');
-                    return;
-                } catch (e) { /* següent */ }
-            }
-            try {
-                downloadFallback();
-            } catch (e) { /* */ }
-            if (window.cordova) {
-                prompt('Si no s\'ha pogut compartir, copia el JSON:', jsonStr);
-            }
-        }
-
-        // Cordova: si hi ha plugin File, desar i compartir URI; si no, continuar
-        if (window.cordova && window.resolveLocalFileSystemURL && cordova.file) {
-            const dirPath = cordova.file.externalDataDirectory || cordova.file.dataDirectory;
-            window.resolveLocalFileSystemURL(dirPath, function (dir) {
-                dir.getFile(fileName, { create: true }, function (fileEntry) {
-                    fileEntry.createWriter(function (fileWriter) {
-                        fileWriter.onerror = function (ev) {
-                            console.error('FileWriter error (export JSON):', ev);
-                            cordovaShareJsonText(function () { runWebExportFallbacks(); });
-                        };
-                        fileWriter.onwriteend = function () {
-                            if (window.plugins && window.plugins.socialsharing) {
-                                window.plugins.socialsharing.share(
-                                    `Export JSON (${sessions.length} sessió(ns))`,
-                                    'Voltes',
-                                    fileEntry.toURL(),
-                                    null
-                                );
-                            } else {
-                                alert(`Arxiu guardat: ${fileName}`);
-                            }
-                        };
-                        fileWriter.write(jsonStr);
-                    }, function (err) {
-                        console.error('Error creant writer (export JSON):', err);
-                        cordovaShareJsonText(function () { runWebExportFallbacks(); });
-                    });
-                }, function (err) {
-                    console.error('Error obtenint arxiu (export JSON):', err);
-                    cordovaShareJsonText(function () { runWebExportFallbacks(); });
-                });
-            }, function (err) {
-                console.error('Error accedint directori (export JSON):', err);
-                cordovaShareJsonText(function () { runWebExportFallbacks(); });
-            });
-            return;
-        }
-
-        // APK sense plugin File: socialsharing amb text, o Web Share text / porta-retalls
-        if (window.cordova) {
-            cordovaShareJsonText(function () { runWebExportFallbacks(); });
-            return;
-        }
-
-        runWebExportFallbacks();
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `voltes-sessions-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     function normalizeImportLaps(raw) {
@@ -6122,11 +6100,9 @@ function initApp() {
             if (wakeLockManager.isActive()) {
                 await wakeLockManager.release();
                 localStorage.setItem(WAKE_LOCK_PREF_KEY, 'false');
-                updateWakeLockUI(false);
             } else {
                 const success = await wakeLockManager.request();
                 localStorage.setItem(WAKE_LOCK_PREF_KEY, success ? 'true' : 'false');
-                updateWakeLockUI(success);
             }
         } catch (err) {
             updateWakeLockUI(false);
@@ -6172,18 +6148,11 @@ function initApp() {
                 <span style="opacity: 0.8;">Versió: ${appVersion} ( ${appDateVersion} )</span>
             </div>
             <div style="text-align: center; margin-bottom: 8px; line-height: 1.3;">
-                <strong>© 2025 - Albert Ruiz Pujol</strong> 
-                ( <a href="mailto:ruiggi@gmail.com" style="color:rgb(255, 255, 255); text-decoration: none;">ruiggi@gmail.com</a> ) 
-                <p>
-                Repositori: <u><a href="https://github.com/ruiggi/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://github.com/ruiggi/ControlVoltes/</a></u>
-                <br>
-                Versió web: <u><a href="https://ruiggi.github.io/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://ruiggi.github.io/ControlVoltes/</a></u>
-                <br>
-                Descàrregues: <u><a href="https://github.com/ruiggi/ControlVoltes/releases" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://github.com/ruiggi/ControlVoltes/releases</a></u>
-                <br>
+                <strong>© 2025 - Albert Ruiz Pujol</strong><br>
+                <a href="mailto:ruiggi@gmail.com" style="color:rgb(255, 255, 255); text-decoration: none;">ruiggi@gmail.com</a><br>
+                <u><a href="https://ruiggi.github.io/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://ruiggi.github.io/ControlVoltes/</a></u>
             </div>
-
-            `;
+        `;
         modalContent.appendChild(infoText);
 
         // Botones de acción
@@ -6352,6 +6321,178 @@ function initApp() {
         orderSwitchContainer.appendChild(orderSwitch);
         orderSwitchContainer.appendChild(orderStateText);
         modal.appendChild(orderSwitchContainer);
+
+        // --- Switch para modo del cronómetro (transcurrido / reloj) ---
+        const clockModeIsTime = appState.settings.clockMode === 'time';
+
+        const clockModeSwitchContainer = document.createElement('div');
+        clockModeSwitchContainer.style.display = 'flex';
+        clockModeSwitchContainer.style.alignItems = 'center';
+        clockModeSwitchContainer.style.justifyContent = 'space-between';
+        clockModeSwitchContainer.style.gap = '10px';
+        clockModeSwitchContainer.style.padding = '8px';
+        clockModeSwitchContainer.style.marginTop = '6px';
+        clockModeSwitchContainer.style.borderRadius = '8px';
+        clockModeSwitchContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
+        clockModeSwitchContainer.style.border = '1px solid var(--accent-color)';
+
+        const clockModeLabel = document.createElement('span');
+        clockModeLabel.textContent = 'CRONÓMETRO:';
+        clockModeLabel.style.fontWeight = '600';
+        clockModeLabel.style.fontSize = '0.9rem';
+        clockModeLabel.style.color = 'var(--text-color)';
+        clockModeLabel.style.whiteSpace = 'nowrap';
+
+        const clockModeSwitch = document.createElement('div');
+        clockModeSwitch.role = 'switch';
+        clockModeSwitch.tabIndex = 0;
+        clockModeSwitch.setAttribute('aria-checked', String(clockModeIsTime));
+        clockModeSwitch.style.display = 'inline-flex';
+        clockModeSwitch.style.alignItems = 'center';
+        clockModeSwitch.style.padding = '2px';
+        clockModeSwitch.style.width = '34px';
+        clockModeSwitch.style.height = '20px';
+        clockModeSwitch.style.borderRadius = '999px';
+        clockModeSwitch.style.cursor = 'pointer';
+        clockModeSwitch.style.transition = 'background 0.2s';
+        clockModeSwitch.style.boxSizing = 'border-box';
+        clockModeSwitch.style.background = clockModeIsTime ? '#0d6efd' : '#666';
+        clockModeSwitch.style.flexShrink = '0';
+
+        const clockModeDot = document.createElement('span');
+        clockModeDot.style.width = '16px';
+        clockModeDot.style.height = '16px';
+        clockModeDot.style.borderRadius = '50%';
+        clockModeDot.style.background = '#fff';
+        clockModeDot.style.transition = 'transform 0.2s';
+        clockModeDot.style.transform = clockModeIsTime ? 'translateX(14px)' : 'translateX(0)';
+
+        clockModeSwitch.appendChild(clockModeDot);
+
+        const clockModeStateText = document.createElement('span');
+        clockModeStateText.innerHTML = clockModeIsTime
+            ? 'RELOJ<br>(hora actual)'
+            : 'TRANSCURRIDO<br>(tiempo transcurrido)';
+        clockModeStateText.style.fontWeight = '500';
+        clockModeStateText.style.fontSize = '0.85rem';
+        clockModeStateText.style.color = 'var(--text-color)';
+        clockModeStateText.style.opacity = '0.9';
+        clockModeStateText.style.textAlign = 'right';
+        clockModeStateText.style.lineHeight = '1.3';
+
+        clockModeSwitch.addEventListener('click', () => {
+            const newIsTime = appState.settings.clockMode !== 'time';
+            appState.settings.clockMode = newIsTime ? 'time' : 'elapsed';
+            saveSettings();
+
+            clockModeSwitch.style.background = newIsTime ? '#0d6efd' : '#666';
+            clockModeDot.style.transform = newIsTime ? 'translateX(14px)' : 'translateX(0)';
+            clockModeSwitch.setAttribute('aria-checked', String(newIsTime));
+            clockModeStateText.innerHTML = newIsTime
+                ? 'RELOJ<br>(hora actual)'
+                : 'TRANSCURRIDO<br>(tiempo transcurrido)';
+
+            // Forzar refresco inmediato del reloj
+            lastClockUpdate = 0;
+            if (typeof appState.fitClockToAvailableWidth === 'function') {
+                requestAnimationFrame(() => appState.fitClockToAvailableWidth());
+            }
+        });
+
+        clockModeSwitch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                clockModeSwitch.click();
+            }
+        });
+
+        clockModeSwitchContainer.appendChild(clockModeLabel);
+        clockModeSwitchContainer.appendChild(clockModeSwitch);
+        clockModeSwitchContainer.appendChild(clockModeStateText);
+        modal.appendChild(clockModeSwitchContainer);
+
+        // --- Switch para opción SÈRIE ---
+        const seriesSwitchContainer = document.createElement('div');
+        seriesSwitchContainer.style.display = 'flex';
+        seriesSwitchContainer.style.alignItems = 'center';
+        seriesSwitchContainer.style.justifyContent = 'space-between';
+        seriesSwitchContainer.style.gap = '10px';
+        seriesSwitchContainer.style.padding = '8px';
+        seriesSwitchContainer.style.marginTop = '6px';
+        seriesSwitchContainer.style.borderRadius = '8px';
+        seriesSwitchContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
+        seriesSwitchContainer.style.border = '1px solid var(--accent-color)';
+
+        const seriesLabel = document.createElement('span');
+        seriesLabel.textContent = "OPCIÓ 'SÈRIE':";
+        seriesLabel.style.fontWeight = '600';
+        seriesLabel.style.fontSize = '0.9rem';
+        seriesLabel.style.color = 'var(--text-color)';
+        seriesLabel.style.whiteSpace = 'nowrap';
+
+        const seriesSwitch = document.createElement('div');
+        seriesSwitch.role = 'switch';
+        seriesSwitch.tabIndex = 0;
+        seriesSwitch.setAttribute('aria-checked', String(appState.settings.seriesLapTypeEnabled));
+        seriesSwitch.style.display = 'inline-flex';
+        seriesSwitch.style.alignItems = 'center';
+        seriesSwitch.style.padding = '2px';
+        seriesSwitch.style.width = '34px';
+        seriesSwitch.style.height = '20px';
+        seriesSwitch.style.borderRadius = '999px';
+        seriesSwitch.style.cursor = 'pointer';
+        seriesSwitch.style.transition = 'background 0.2s';
+        seriesSwitch.style.boxSizing = 'border-box';
+        seriesSwitch.style.background = appState.settings.seriesLapTypeEnabled ? '#0d6efd' : '#666';
+        seriesSwitch.style.flexShrink = '0';
+
+        const seriesDot = document.createElement('span');
+        seriesDot.style.width = '16px';
+        seriesDot.style.height = '16px';
+        seriesDot.style.borderRadius = '50%';
+        seriesDot.style.background = '#fff';
+        seriesDot.style.transition = 'transform 0.2s';
+        seriesDot.style.transform = appState.settings.seriesLapTypeEnabled ? 'translateX(14px)' : 'translateX(0)';
+
+        seriesSwitch.appendChild(seriesDot);
+
+        const seriesStateText = document.createElement('span');
+        seriesStateText.innerHTML = appState.settings.seriesLapTypeEnabled
+            ? 'ACTIVAT<br>(Treball, Descans, Sèrie)'
+            : 'DESACTIVAT<br>(Només Treball/Descans)';
+        seriesStateText.style.fontWeight = '500';
+        seriesStateText.style.fontSize = '0.85rem';
+        seriesStateText.style.color = 'var(--text-color)';
+        seriesStateText.style.opacity = '0.9';
+        seriesStateText.style.textAlign = 'right';
+        seriesStateText.style.lineHeight = '1.3';
+
+        seriesSwitch.addEventListener('click', () => {
+            const newValue = !appState.settings.seriesLapTypeEnabled;
+            appState.settings.seriesLapTypeEnabled = newValue;
+            saveSettings();
+
+            seriesSwitch.style.background = newValue ? '#0d6efd' : '#666';
+            seriesDot.style.transform = newValue ? 'translateX(14px)' : 'translateX(0)';
+            seriesSwitch.setAttribute('aria-checked', String(newValue));
+            seriesStateText.innerHTML = newValue
+                ? 'ACTIVAT<br>(Treball, Descans, Sèrie)'
+                : 'DESACTIVAT<br>(Només Treball/Descans)';
+
+            renderLaps();
+        });
+
+        seriesSwitch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                seriesSwitch.click();
+            }
+        });
+
+        seriesSwitchContainer.appendChild(seriesLabel);
+        seriesSwitchContainer.appendChild(seriesSwitch);
+        seriesSwitchContainer.appendChild(seriesStateText);
+        modal.appendChild(seriesSwitchContainer);
 
         // --- Switch para botones de volumen ---
         const volumeButtonsSwitchContainer = document.createElement('div');
@@ -6585,8 +6726,7 @@ function initApp() {
     initImportExportButtons();
 
     // Inicializar Wake Lock
-    // Establecer texto inicial por defecto
-    if (wakeLabel) wakeLabel.innerHTML = `${screenIcon} ON`;
+    updateWakeLockUI(false);
     loadWakeLockPreference();
 
     // Cargar preferencia de orden de vueltas
@@ -6627,42 +6767,106 @@ function initApp() {
     timeContainer.style.display = 'flex';
     timeContainer.style.alignItems = 'center';
     timeContainer.style.width = '100%';
-    timeContainer.style.justifyContent = 'center'; // Centrado para mejor distribución
-    timeContainer.style.padding = '0 5px'; // Reducido de 20px a 5px
-    timeContainer.style.gap = '5px'; // Pequeño gap entre elementos
+    timeContainer.style.justifyContent = 'flex-start';
+    timeContainer.style.padding = '0 5px';
+    timeContainer.style.gap = '8px';
+    timeContainer.style.minWidth = '0';
 
     const playIconSpan = document.createElement('span');
     playIconSpan.innerHTML = playIcon;
     playIconSpan.style.display = 'flex';
-    playIconSpan.style.alignItems = 'left';
+    playIconSpan.style.alignItems = 'center';
     playIconSpan.style.flexShrink = '0';
-    playIconSpan.style.marginRight = '150'; // Sin margen adicional
 
-    clockElement.style.fontSize = '4rem';
-    clockElement.style.flex = '1 1 auto'; // Permite que se ajuste
+    clockElement.style.flex = '1 1 auto';
+    clockElement.style.width = '100%';
+    clockElement.style.minWidth = '0';
     clockElement.style.textAlign = 'center';
-    clockElement.style.margin = '0'; // Sin márgenes
+    clockElement.style.margin = '0';
     clockElement.style.fontFamily = '"Arial Narrow", Arial, sans-serif';
-    clockElement.style.letterSpacing = '-0.08em'; // Más compacto (de -0.05em a -0.08em)
-    clockElement.style.minWidth = '0'; // Permite compresión si es necesario
+    clockElement.style.lineHeight = '1';
+    clockElement.style.fontWeight = 'bold';
+    clockElement.style.letterSpacing = '-0.02em';
+    clockElement.style.whiteSpace = 'nowrap';
+    clockElement.style.overflow = 'hidden';
 
     timeContainer.appendChild(playIconSpan);
     timeContainer.appendChild(clockElement);
     clockContainer.appendChild(timeContainer);
 
-    // Update clockElement styles
-    clockElement.style.fontSize = 'min(18vw, 5rem)';  // Larger responsive font
-    clockElement.style.lineHeight = '1';
-    clockElement.style.fontWeight = 'bold';
-    clockElement.style.letterSpacing = '-0.02em';
+    // Ajustar tamaño del reloj al ancho disponible (aprovechar todo el ancho)
+    const CLOCK_MIN_FONT_PX = 18;
+    const fitClockToAvailableWidth = () => {
+        if (!clockElement || clockElement.style.display === 'none') return;
+        const available = clockElement.clientWidth;
+        if (available <= 0) return;
 
-    // Add instruction text
+        // Medir a un tamaño grande de referencia para calcular la escala real
+        const measurePx = Math.max(available, 120);
+        clockElement.style.fontSize = `${measurePx}px`;
+        const needed = clockElement.scrollWidth;
+        if (needed <= 0) return;
+
+        // Escalar para llenar todo el ancho disponible (con un pequeño margen)
+        const fitted = Math.max(CLOCK_MIN_FONT_PX, measurePx * (available / needed) * 0.99);
+        clockElement.style.fontSize = `${fitted}px`;
+    };
+    window.addEventListener('resize', fitClockToAvailableWidth);
+    if (typeof ResizeObserver !== 'undefined') {
+        let fitRaf = null;
+        const clockResizeObserver = new ResizeObserver(() => {
+            if (fitRaf) return;
+            fitRaf = requestAnimationFrame(() => {
+                fitRaf = null;
+                fitClockToAvailableWidth();
+            });
+        });
+        clockResizeObserver.observe(timeContainer);
+    }
+    appState.fitClockToAvailableWidth = fitClockToAvailableWidth;
+    requestAnimationFrame(() => {
+        fitClockToAvailableWidth();
+        // Segundo pase tras layout definitivo
+        requestAnimationFrame(fitClockToAvailableWidth);
+    });
+
+    // Fila inferior: reloj secundario + texto de instrucción
+    const clockFooterRow = document.createElement('div');
+    clockFooterRow.id = 'clock-footer-row';
+    clockFooterRow.style.display = 'flex';
+    clockFooterRow.style.alignItems = 'center';
+    clockFooterRow.style.justifyContent = 'stretch';
+    clockFooterRow.style.width = '100%';
+    clockFooterRow.style.gap = '10px';
+    clockFooterRow.style.marginTop = '2px';
+    clockFooterRow.style.minWidth = '0';
+    clockFooterRow.style.boxSizing = 'border-box';
+
+    clockSecondaryElement = document.createElement('div');
+    clockSecondaryElement.id = 'clock-secondary';
+    clockSecondaryElement.setAttribute('aria-live', 'off');
+    clockSecondaryElement.innerHTML = '00:00:00.000';
+    clockSecondaryElement.style.flex = '1 1 0';
+    clockSecondaryElement.style.width = '33.333%';
+    clockSecondaryElement.style.minWidth = '0';
+    clockSecondaryElement.style.textAlign = 'center';
+
     const instructionText = document.createElement('div');
-    instructionText.textContent = 'PREM AQUÍ PER COMENÇAR A REGISTRAR UNA SESSIÓ';
+    instructionText.id = 'clock-instruction';
+    instructionText.textContent = 'PREM AQUÍ PER INICIAR UNA SESSIÓ';
     instructionText.style.fontSize = '0.8em';
     instructionText.style.opacity = '0.7';
-    instructionText.style.marginTop = '10px';
-    clockContainer.appendChild(instructionText);
+    instructionText.style.flex = '2 1 0';
+    instructionText.style.width = '66.666%';
+    instructionText.style.minWidth = '0';
+    instructionText.style.textAlign = 'center';
+    instructionText.style.whiteSpace = 'nowrap';
+    instructionText.style.overflow = 'hidden';
+    instructionText.style.textOverflow = 'ellipsis';
+
+    clockFooterRow.appendChild(clockSecondaryElement);
+    clockFooterRow.appendChild(instructionText);
+    clockContainer.appendChild(clockFooterRow);
 
     // Reanudar grabación si quedó activa al salir
     const restoredActiveRecording = restoreActiveRecordingState();

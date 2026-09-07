@@ -2,20 +2,35 @@
 chcp 65001 >nul
 
 REM ================================================
-REM          CONFIGURACI”N DE VERSI”N
+REM          CONFIGURACIùN DE JAVA (JDK)
 REM ================================================
-set APP_VERSION=3.0.0
+call "%~dp0setup-java.bat"
+if errorlevel 1 (
+    pause
+    exit /b 1
+)
+
+call "%~dp0setup-gradle.bat"
+if errorlevel 1 (
+    pause
+    exit /b 1
+)
+
+REM ================================================
+REM          CONFIGURACIùN DE VERSIùN
+REM ================================================
+set APP_VERSION=4.0.0
 set APP_NAME=ControlVoltes
 set APK_NAME=%APP_NAME%-v%APP_VERSION%.apk
 
 REM ================================================
-REM          CONFIGURACI”N DEL KEYSTORE
+REM          CONFIGURACIùN DEL KEYSTORE
 REM ================================================
 set KEYSTORE_FILE=control-voltes.keystore
 set KEYSTORE_ALIAS=control-voltes
 
 echo +----------------------------------------------------------------+
-echo ¶         CompilaciÛn %APP_NAME% v%APP_VERSION% Release         ¶
+echo ù         Compilaciùn %APP_NAME% v%APP_VERSION% Release         ù
 echo +----------------------------------------------------------------+
 echo.
 
@@ -32,28 +47,28 @@ if not exist "%KEYSTORE_FILE%" (
 )
 
 echo ?? Instrucciones:
-echo    - VersiÛn actual: %APP_VERSION%
+echo    - Versiùn actual: %APP_VERSION%
 echo    - APK final: %APK_NAME%
-echo    - Aseg˙rate de haber actualizado la versiÛn tambiÈn en:
-echo       ï config.xml
-echo       ï package.json
-echo       ï www/manifest.json
-echo       ï www/scripts.js
-echo       ï www/sw.js
+echo    - Asegùrate de haber actualizado la versiùn tambiùn en:
+echo       ù config.xml
+echo       ù package.json
+echo       ù www/manifest.json
+echo       ù www/scripts.js
+echo       ù www/sw.js
 echo.
 
-set /p CONTINUAR="øContinuar con la compilaciÛn Release v%APP_VERSION%? (S/N): "
+set /p CONTINUAR="ùContinuar con la compilaciùn Release v%APP_VERSION%? (S/N): "
 if /i not "%CONTINUAR%"=="S" (
-    echo CompilaciÛn cancelada.
+    echo Compilaciùn cancelada.
     pause
     exit /b 0
 )
 
 echo.
-echo ?? Introduce la contraseÒa del keystore:
-set /p KEYSTORE_PASS="   ContraseÒa: "
+echo ?? Introduce la contraseùa del keystore:
+set /p KEYSTORE_PASS="   Contraseùa: "
 if "%KEYSTORE_PASS%"=="" (
-    echo ? La contraseÒa no puede estar vacÌa.
+    echo ? La contraseùa no puede estar vacùa.
     pause
     exit /b 1
 )
@@ -62,8 +77,11 @@ echo.
 echo ----------------------------------------------------------------
 echo [1/5] ?? Limpiando builds anteriores...
 echo ----------------------------------------------------------------
-call cordova clean android
-if errorlevel 1 (
+cd platforms\android
+call .\gradlew.bat clean
+set CLEAN_ERR=%errorlevel%
+cd ..\..
+if not "%CLEAN_ERR%"=="0" (
     echo ? Error al limpiar
     pause
     exit /b 1
@@ -100,7 +118,7 @@ echo [4/5] ?? Firmando APK con apksigner...
 echo ----------------------------------------------------------------
 echo.
 
-REM Buscar apksigner (versiÛn m·s reciente)
+REM Buscar apksigner (versiùn mùs reciente)
 set APKSIGNER_PATH=
 for /d %%i in ("%ANDROID_HOME%\build-tools\*") do (
     if exist "%%i\apksigner.bat" (
@@ -137,25 +155,25 @@ echo [5/5] ? Verificando firma del APK...
 echo ----------------------------------------------------------------
 call "%APKSIGNER_PATH%" verify --verbose %APK_NAME%
 if errorlevel 1 (
-    echo ? El APK NO est· correctamente firmado
+    echo ? El APK NO estù correctamente firmado
     pause
     exit /b 1
 )
 
 echo.
 echo +----------------------------------------------------------------+
-echo ¶                    ? COMPILACI”N EXITOSA v%APP_VERSION%       ¶
+echo ù                    ? COMPILACIùN EXITOSA v%APP_VERSION%       ù
 echo +----------------------------------------------------------------+
 echo.
 echo ?? APK generado: %APK_NAME%
-echo ?? UbicaciÛn: %CD%\%APK_NAME%
+echo ?? Ubicaciùn: %CD%\%APK_NAME%
 echo.
-echo ?? InformaciÛn del APK:
-for %%I in (%APK_NAME%) do echo    TamaÒo: %%~zI bytes
+echo ?? Informaciùn del APK:
+for %%I in (%APK_NAME%) do echo    Tamaùo: %%~zI bytes
 echo.
-echo ?? PrÛximos pasos:
+echo ?? Prùximos pasos:
 echo    1. Prueba el APK: adb install -r %APK_NAME%
-echo    2. Verifica funcionamiento de botones fÌsicos
-echo    3. °Listo para distribuir!
+echo    2. Verifica funcionamiento de botones fùsicos
+echo    3. ùListo para distribuir!
 echo.
 pause

@@ -36,6 +36,7 @@ body {
   --accent-color: #00aaff;
   --work-color: #28a745;
   --rest-color: #ffc107;
+  --serie-color: #0d6efd;
   --danger-color: #dc3545;
   --card-bg-color: #2c2c2c;
 }
@@ -148,13 +149,16 @@ button:focus-visible,
   gap: 8px;
   flex: 1 1 auto;
   min-width: 0;
+  container-type: inline-size;
 }
 
 .title-left span {
+  flex: 1 1 auto;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 1.4rem;
+  font-size: clamp(1.25rem, 16cqi, 2.25rem);
   line-height: 1;
 }
 
@@ -170,7 +174,7 @@ button:focus-visible,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 10px;
+  padding: 3px;
   cursor: pointer;
   background: #f8f9fa;
   border: 2px solid #dee2e6;
@@ -245,6 +249,7 @@ button:focus-visible,
   /* No crecer ni encoger */
   min-height: 80px;
   /* Altura mínima para evitar colapso */
+  position: relative;
 }
 
 #clock-container:active {
@@ -252,12 +257,50 @@ button:focus-visible,
 }
 
 #clock {
-  font-family: Arial Black, sans-serif;
-  font-size: 3rem;
-  font-weight: 600;
-  text-align: left;
-  letter-spacing: 2px;
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 5rem;
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: -0.02em;
   color: #fff;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  line-height: 1;
+}
+
+#clock-secondary {
+  font-size: 1em;
+  font-weight: bold;
+  font-family: "Arial Narrow", Arial, sans-serif;
+  color: #fff;
+  line-height: 1;
+  flex: 1 1 0;
+  width: 33.333%;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+#clock-instruction {
+  flex: 2 1 0;
+  width: 66.666%;
+  min-width: 0;
+  text-align: center;
+}
+
+#clock-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: stretch;
+  width: 100%;
+  gap: 10px;
+  margin-top: 2px;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .clock-subtitle {
@@ -374,7 +417,7 @@ button:focus-visible,
   display: flex;
   flex-direction: column;
   gap: 5px;
-  padding: 2px 2px 50px 2px !important;
+  padding: 2px 0 50px 0 !important;
   flex: 1 1 0;
   /* Height will be set dynamically by JavaScript */
   overflow-y: auto !important;
@@ -398,12 +441,14 @@ button:focus-visible,
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 3px;
+  padding: 3px 1px;
   background: var(--card-bg-color);
   border-radius: 10px;
   border: 1px solid #3a3a3a;
   border-left: 5px solid var(--secondary-color);
-  margin: 0 2px;
+  margin: 0;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .lap-index {
@@ -419,6 +464,10 @@ button:focus-visible,
 
 .lap-item.rest {
   border-left-color: var(--rest-color);
+}
+
+.lap-item.serie {
+  border-left-color: var(--serie-color);
 }
 
 .lap-time {
@@ -442,7 +491,7 @@ button:focus-visible,
   border: none;
   background: none;
   color: var(--primary-color);
-  padding: 3px;
+  padding: 3px 1px;
   border-radius: 3px;
   width: 100%;
   pointer-events: none;
@@ -464,7 +513,7 @@ button:focus-visible,
   color: var(--secondary-color);
   cursor: pointer;
   font-size: 1.5rem;
-  padding: 0 5px;
+  padding: 0 1px;
   line-height: 1;
   flex: 0 0 auto;
 }
@@ -492,7 +541,7 @@ button:focus-visible,
 }
 
 .lap-type-toggle {
-  padding: 3px;
+  padding: 2px;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 700;
@@ -519,6 +568,12 @@ button:focus-visible,
   border-color: var(--rest-color);
   background: var(--rest-color);
   color: #333;
+}
+
+.lap-type-toggle.serie {
+  border-color: var(--serie-color);
+  background: var(--serie-color);
+  color: #fff;
 }
 
 /* Controls */
@@ -615,8 +670,8 @@ button:focus-visible,
     flex-direction: column;
     align-items: stretch;
     gap: 5px;
-    padding: 3px 3px;
-    margin: 0 1px;
+    padding: 3px 1px;
+    margin: 0;
   }
 
   .lap-time,
