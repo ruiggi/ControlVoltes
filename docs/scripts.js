@@ -2728,7 +2728,7 @@ function initApp() {
         const blockEndIndex = nextSerieIndex != null ? nextSerieIndex - 1 : lapsArray.length - 1;
 
         let interSeriesRestIndex = null;
-        if (blockEndIndex >= serieStartIndex && lapsArray[blockEndIndex].type === 'rest') {
+        if (nextSerieIndex != null && blockEndIndex >= serieStartIndex && lapsArray[blockEndIndex].type === 'rest') {
             interSeriesRestIndex = blockEndIndex;
         }
 
