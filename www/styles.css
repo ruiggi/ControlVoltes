@@ -116,9 +116,9 @@ button:focus-visible,
   overflow-x: hidden;
 }
 
-/* El listado de sesiones gestiona su scroll; el cronómetro sigue pudiendo desplazarse en la vista de registro */
+/* El scroll va solo en #laps-container; el resto de la vista de registro no debe desbordar */
 #registration-view {
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 #sessions-view {
@@ -838,7 +838,7 @@ button:focus-visible,
 /* Controls */
 #controls-container {
   width: 100%;
-  height: auto;
+  height: 40px;
   flex: 0 0 auto;
   /* No crecer ni encoger */
   min-height: 40px;
@@ -876,6 +876,26 @@ button:focus-visible,
 
 .control-btn:hover {
   background: #0088cc;
+}
+
+#finalize-btn {
+  background: #ffcdd2;
+  color: #b71c1c;
+  font-weight: 700;
+  height: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+  line-height: 1;
+}
+
+#finalize-btn:hover {
+  background: #ef9a9a;
 }
 
 /* Sessions */

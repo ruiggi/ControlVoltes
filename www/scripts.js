@@ -75,7 +75,7 @@ function initApp() {
         // Aplicar estilo inicial al botón finalizar
         try {
             if (appState.dom.finalizeBtn) {
-                appState.dom.finalizeBtn.style.height = 'auto';
+                appState.dom.finalizeBtn.style.height = '';
             }
         } catch { }
     }
@@ -111,6 +111,48 @@ function initApp() {
     let lapsOrderDescending = appState.lapsOrderDescending;
     const sessionPrefix = appState.SESSION_PREFIX;
     const ACTIVE_RECORDING_KEY = 'voltes_active_recording';
+
+    const FINALIZE_MIN_FONT_PX = 12;
+    let finalizeFitRaf = null;
+    const fitFinalizeBtnText = () => {
+        if (!finalizeBtn) return;
+        if (getComputedStyle(finalizeBtn).display === 'none') return;
+        if (finalizeBtn.clientWidth <= 0 || finalizeBtn.clientHeight <= 0) return;
+
+        const styles = getComputedStyle(finalizeBtn);
+        const padY = (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
+        const maxByHeight = finalizeBtn.clientHeight - padY;
+        const availableW = finalizeBtn.clientWidth;
+        if (maxByHeight <= 0 || availableW <= 0) return;
+
+        finalizeBtn.style.fontSize = `${maxByHeight}px`;
+        const neededW = finalizeBtn.scrollWidth;
+        if (neededW <= 0) return;
+
+        const maxFit = Math.min(maxByHeight, maxByHeight * (availableW / neededW));
+        const fitted = Math.max(FINALIZE_MIN_FONT_PX, maxFit * 0.75);
+        finalizeBtn.style.fontSize = `${fitted}px`;
+    };
+    const scheduleFitFinalizeBtnText = () => {
+        if (finalizeFitRaf) return;
+        finalizeFitRaf = requestAnimationFrame(() => {
+            finalizeFitRaf = null;
+            fitFinalizeBtnText();
+        });
+    };
+    window.addEventListener('resize', scheduleFitFinalizeBtnText);
+    if (typeof ResizeObserver !== 'undefined') {
+        const finalizeResizeObserver = new ResizeObserver(scheduleFitFinalizeBtnText);
+        const controlsContainerEl = document.getElementById('controls-container');
+        if (controlsContainerEl) finalizeResizeObserver.observe(controlsContainerEl);
+        finalizeResizeObserver.observe(finalizeBtn);
+    }
+    if (typeof MutationObserver !== 'undefined') {
+        const finalizeTextObserver = new MutationObserver(scheduleFitFinalizeBtnText);
+        finalizeTextObserver.observe(finalizeBtn, { childList: true, characterData: true, subtree: true });
+    }
+    appState.fitFinalizeBtnText = fitFinalizeBtnText;
+    scheduleFitFinalizeBtnText();
 
     // Debug temporal: verificar dimensiones del contenedor de vueltas
     setTimeout(() => {
@@ -2368,7 +2410,7 @@ function initApp() {
         finalizeBtn.style.display = '';
         finalizeBtn.style.alignItems = '';
         finalizeBtn.style.justifyContent = '';
-        finalizeBtn.style.height = 'auto';
+        finalizeBtn.style.height = '';
         finalizeBtn.style.borderRadius = '';
         finalizeBtn.style.border = '';
         finalizeBtn.style.backgroundColor = '';
@@ -2934,6 +2976,10 @@ function initApp() {
                 <strong>${formatSummaryDurationHTML(block.totalDurationSeconds)}</strong>
             </div>`;
         }).join('') : '';
+
+        if (typeof window.updateLapsContainerHeight === 'function') {
+            requestAnimationFrame(window.updateLapsContainerHeight);
+        }
     };
 
     const updateSummary = () => {
@@ -5085,7 +5131,7 @@ function initApp() {
         finalizeBtn.style.display = '';
         finalizeBtn.style.alignItems = '';
         finalizeBtn.style.justifyContent = '';
-        finalizeBtn.style.height = 'auto';
+        finalizeBtn.style.height = '';
         finalizeBtn.style.borderRadius = '';
         finalizeBtn.style.border = '';
         finalizeBtn.style.backgroundColor = '';
@@ -8065,32 +8111,42 @@ function initApp() {
         try {
             if (!lapsContainer) return;
 
-            // Get the heights of all fixed elements
-            const appTitle = document.getElementById('app-title');
-            const clockContainer = document.getElementById('clock-container');
-            const summaryContainer = document.getElementById('summary-container');
-            const controlsContainer = document.getElementById('controls-container');
-            const sessionTopBar = document.getElementById('session-top-bar'); // Barra superior cuando se visualiza una sesión guardada
+            const registrationViewEl = document.getElementById('registration-view');
+            const mainContainer = document.getElementById('main-container');
+            const sessionTopBar = document.getElementById('session-top-bar');
 
-            // Calculate total height of fixed elements
-            let fixedHeight = 0;
-            if (appTitle) fixedHeight += appTitle.offsetHeight;
-            if (sessionTopBar) fixedHeight += sessionTopBar.offsetHeight; // Incluir la barra superior si existe
-            if (clockContainer) fixedHeight += clockContainer.offsetHeight;
-            if (summaryContainer) fixedHeight += summaryContainer.offsetHeight;
-            if (controlsContainer) fixedHeight += controlsContainer.offsetHeight;
+            if (!registrationViewEl || registrationViewEl.style.display === 'none') return;
 
-            // Add gaps and padding (2px gap between elements, 5px padding on main-container)
-            const gaps = 2 * 3; // 3 gaps between 4 elements
-            const padding = 10; // 5px top + 5px bottom on main-container
-            const extraSpace = 20; // Safety margin
-            const bottomPadding = 50; // Padding-bottom del contenedor de vueltas para que la última vuelta se vea completa
+            let containerHeight = mainContainer ? mainContainer.clientHeight : window.innerHeight;
 
-            // Calculate available height for laps container
-            const availableHeight = window.innerHeight - fixedHeight - gaps - padding - extraSpace - bottomPadding;
+            if (sessionTopBar && sessionTopBar.offsetHeight > 0 && getComputedStyle(sessionTopBar).display !== 'none') {
+                containerHeight -= sessionTopBar.offsetHeight;
+            }
 
-            // Set the height (minimum 200px)
-            const finalHeight = Math.max(200, availableHeight);
+            const regStyle = getComputedStyle(registrationViewEl);
+            const gap = parseFloat(regStyle.gap) || 0;
+            const regPaddingTop = parseFloat(regStyle.paddingTop) || 0;
+            const regPaddingBottom = parseFloat(regStyle.paddingBottom) || 0;
+
+            let siblingsHeight = 0;
+            let visibleSiblingCount = 0;
+
+            for (const child of registrationViewEl.children) {
+                if (child === lapsContainer) continue;
+                if (child.hidden) continue;
+                const childStyle = getComputedStyle(child);
+                if (childStyle.display === 'none') continue;
+
+                siblingsHeight += child.offsetHeight
+                    + (parseFloat(childStyle.marginTop) || 0)
+                    + (parseFloat(childStyle.marginBottom) || 0);
+                visibleSiblingCount += 1;
+            }
+
+            const gaps = visibleSiblingCount * gap;
+            const availableHeight = containerHeight - siblingsHeight - gaps - regPaddingTop - regPaddingBottom;
+            const finalHeight = Math.max(100, availableHeight);
+
             lapsContainer.style.height = `${finalHeight}px`;
             lapsContainer.style.minHeight = `${finalHeight}px`;
             lapsContainer.style.maxHeight = `${finalHeight}px`;
