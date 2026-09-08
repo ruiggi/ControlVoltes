@@ -26,6 +26,9 @@ function initApp() {
             clockMode: 'elapsed',  // 'elapsed' = tiempo transcurrido (defecto), 'time' = hora actual
             seriesLapTypeEnabled: false,  // Por defecto desactivado (solo TREBALL/DESCANS)
             lapTimeDisplayMode: 'registration',  // 'registration' = hora del registro, 'seriesAccumulated' = acumulado desde inicio de sèrie
+            seriesOutsideDisplayMode: 'partial',  // 'partial' = duración de la volta, 'dash' = guion
+            showSeriesSummary: true,  // Por defecto mostrar el resumen de sèries
+            alternateNewLapTypes: true,  // true = alternar treball/descans al inserir, false = sempre treball
             defaultLapNamePrefix: 'Registro'  // Prefijo por defecto para nombres de vuelta (ej: "Registro 1")
         },
 
@@ -209,6 +212,9 @@ function initApp() {
                 appState.settings.clockMode = settings.clockMode === 'time' ? 'time' : 'elapsed';
                 appState.settings.seriesLapTypeEnabled = settings.seriesLapTypeEnabled === true;
                 appState.settings.lapTimeDisplayMode = settings.lapTimeDisplayMode === 'seriesAccumulated' ? 'seriesAccumulated' : 'registration';
+                appState.settings.seriesOutsideDisplayMode = settings.seriesOutsideDisplayMode === 'dash' ? 'dash' : 'partial';
+                appState.settings.showSeriesSummary = settings.showSeriesSummary !== false;
+                appState.settings.alternateNewLapTypes = settings.alternateNewLapTypes !== false;
                 appState.settings.defaultLapNamePrefix = normalizeLapNamePrefix(
                     settings.defaultLapNamePrefix !== undefined ? settings.defaultLapNamePrefix : 'Registro'
                 );
@@ -223,6 +229,9 @@ function initApp() {
             appState.settings.clockMode = 'elapsed';
             appState.settings.seriesLapTypeEnabled = false;
             appState.settings.lapTimeDisplayMode = 'registration';
+            appState.settings.seriesOutsideDisplayMode = 'partial';
+            appState.settings.showSeriesSummary = true;
+            appState.settings.alternateNewLapTypes = true;
             appState.settings.defaultLapNamePrefix = 'Registro';
         }
     };
@@ -2548,6 +2557,17 @@ function initApp() {
 
     const isWorkLapType = (type) => type === 'work' || type === 'serie';
 
+    const getNewLapTypeForInsert = () => {
+        if (!appState.settings.alternateNewLapTypes) {
+            return 'work';
+        }
+        if (laps.length === 0) {
+            return 'work';
+        }
+        const lastType = laps[laps.length - 1].type;
+        return lastType === 'rest' ? 'work' : 'rest';
+    };
+
     const getLapTypeIcon = (type) => {
         if (type === 'rest') return restIcon;
         if (type === 'serie') return serieIcon;
@@ -2580,32 +2600,231 @@ function initApp() {
         return 'Canvia a treball';
     };
 
-    // Bloque de sèrie: desde el inicio de una sèrie hasta el siguiente descans (inclusive)
-    const getSeriesBlockContext = (lapIndex) => {
-        if (lapIndex < 0 || lapIndex >= laps.length) return null;
+    const isSerieAutoWorkLap = (lap) => lap && lap.serieAutoWork === true;
 
-        let serieStart = -1;
-        for (let i = 0; i <= lapIndex; i++) {
-            const type = laps[i].type;
-            if (type === 'serie') {
-                serieStart = i;
-            } else if (type === 'rest' && serieStart >= 0 && i < lapIndex) {
-                serieStart = -1;
+    const getSerieAutoWorkIndex = (lapsArray, serieIndex) => {
+        const nextIndex = serieIndex + 1;
+        if (nextIndex < lapsArray.length && isSerieAutoWorkLap(lapsArray[nextIndex])) {
+            return nextIndex;
+        }
+        return null;
+    };
+
+    const ensureSerieAutoWorkLap = (serieIndex) => {
+        if (!appState.settings.seriesLapTypeEnabled) return;
+        if (!laps[serieIndex] || laps[serieIndex].type !== 'serie') return;
+        if (getSerieAutoWorkIndex(laps, serieIndex) != null) return;
+
+        const serieTime = laps[serieIndex].time;
+        const workTime = serieTime instanceof Date ? new Date(serieTime.getTime()) : new Date(serieTime);
+        const workLap = {
+            time: workTime,
+            name: formatTypedLapName('work', serieIndex + 2),
+            type: 'work',
+            serieAutoWork: true
+        };
+
+        laps.splice(serieIndex + 1, 0, workLap);
+
+        if (!isReadOnly && laps.length >= 2) {
+            startLastLapUpdate();
+        }
+    };
+
+    const removeSerieAutoWorkLap = (serieIndex) => {
+        const autoWorkIndex = getSerieAutoWorkIndex(laps, serieIndex);
+        if (autoWorkIndex == null) return;
+        laps.splice(autoWorkIndex, 1);
+    };
+
+    const applyLapTypeChange = (index, previousType, newType) => {
+        laps[index].type = newType;
+        applyLapNameForType(laps[index], index + 1, newType);
+
+        if (previousType === 'serie' && newType !== 'serie') {
+            removeSerieAutoWorkLap(index);
+        }
+        if (newType === 'serie') {
+            ensureSerieAutoWorkLap(index);
+        }
+    };
+
+    // --- Motor de sèries ---
+    const getLapTimeMs = (lap) => {
+        const t = lap.time instanceof Date ? lap.time : new Date(lap.time);
+        return t.getTime();
+    };
+
+    const getSeriesEngineOptions = (lapsArray, nowMs = null) => ({
+        nowMs: nowMs != null ? nowMs : Date.now(),
+        isLiveSession: lapsArray === laps && !isReadOnly
+    });
+
+    const findNextSerieIndex = (lapsArray, fromIndex) => {
+        for (let i = fromIndex + 1; i < lapsArray.length; i++) {
+            if (lapsArray[i].type === 'serie') return i;
+        }
+        return null;
+    };
+
+    const getSeriesLastIncludedLapIndex = (block, lapsArrayLength) => {
+        if (block.interSeriesRestIndex != null) {
+            return block.interSeriesRestIndex - 1;
+        }
+        if (block.nextSerieIndex != null) {
+            return block.nextSerieIndex - 1;
+        }
+        return lapsArrayLength - 1;
+    };
+
+    const getSeriesTotalSeconds = (block, lapsArray, options = {}) => {
+        const nowMs = options.nowMs != null ? options.nowMs : Date.now();
+        const isLiveSession = options.isLiveSession === true;
+        const lastIncluded = getSeriesLastIncludedLapIndex(block, lapsArray.length);
+        let total = 0;
+
+        for (let i = block.startIndex; i <= lastIncluded; i++) {
+            if (i < lapsArray.length - 1) {
+                total += (getLapTimeMs(lapsArray[i + 1]) - getLapTimeMs(lapsArray[i])) / 1000;
+            } else if (isLiveSession && block.isOpen) {
+                total += (nowMs - getLapTimeMs(lapsArray[i])) / 1000;
             }
         }
 
-        if (serieStart < 0) return null;
+        return Math.max(0, total);
+    };
 
-        const lapType = laps[lapIndex].type;
-        if (lapType === 'serie' || lapType === 'work' || lapType === 'rest') {
-            return { serieStartIndex: serieStart };
+    const getSeriesWorkRestSeconds = (block, lapsArray, options = {}) => {
+        const nowMs = options.nowMs != null ? options.nowMs : Date.now();
+        const isLiveSession = options.isLiveSession === true;
+        const lastIncluded = getSeriesLastIncludedLapIndex(block, lapsArray.length);
+        let workSeconds = 0;
+        let restSeconds = 0;
+
+        for (let i = block.startIndex; i <= lastIncluded; i++) {
+            let duration = 0;
+            if (i < lapsArray.length - 1) {
+                duration = (getLapTimeMs(lapsArray[i + 1]) - getLapTimeMs(lapsArray[i])) / 1000;
+            } else if (isLiveSession && block.isOpen) {
+                duration = (nowMs - getLapTimeMs(lapsArray[i])) / 1000;
+            }
+
+            if (!lapsArray[i]) continue;
+            if (isWorkLapType(lapsArray[i].type)) {
+                workSeconds += duration;
+            } else {
+                restSeconds += duration;
+            }
         }
-        return null;
+
+        return {
+            workSeconds: Math.max(0, workSeconds),
+            restSeconds: Math.max(0, restSeconds)
+        };
+    };
+
+    const buildSeriesBlock = (lapsArray, serieStartIndex, options = {}, serieNumber = 1) => {
+        const nextSerieIndex = findNextSerieIndex(lapsArray, serieStartIndex);
+        const blockEndIndex = nextSerieIndex != null ? nextSerieIndex - 1 : lapsArray.length - 1;
+
+        let interSeriesRestIndex = null;
+        if (blockEndIndex >= serieStartIndex && lapsArray[blockEndIndex].type === 'rest') {
+            interSeriesRestIndex = blockEndIndex;
+        }
+
+        const memberIndices = [];
+        for (let i = serieStartIndex; i <= blockEndIndex; i++) {
+            if (i !== interSeriesRestIndex) memberIndices.push(i);
+        }
+
+        const block = {
+            id: serieNumber,
+            label: `Sèrie ${serieNumber}`,
+            startIndex: serieStartIndex,
+            nextSerieIndex,
+            interSeriesRestIndex,
+            memberIndices,
+            durationMemberIndices: memberIndices.slice(),
+            isOpen: nextSerieIndex == null
+        };
+
+        block.totalDurationSeconds = getSeriesTotalSeconds(block, lapsArray, options);
+        return block;
+    };
+
+    const getSeriesBlockComposition = (block, lapsArray) => {
+        let workCount = 0;
+        let restCount = 0;
+        const workNumbers = [];
+        const restNumbers = [];
+
+        block.memberIndices.forEach((i) => {
+            const lap = lapsArray[i];
+            if (!lap) return;
+            if (lap.type === 'rest') {
+                restCount += 1;
+                restNumbers.push(i + 1);
+            } else if (lap.type === 'work') {
+                workCount += 1;
+                workNumbers.push(i + 1);
+            }
+        });
+
+        return { workCount, restCount, workNumbers, restNumbers };
+    };
+
+    const setShowSeriesSummary = (visible) => {
+        appState.settings.showSeriesSummary = visible === true;
+        saveSettings();
+        updateSeriesSummary();
+    };
+
+    const buildAllSeriesBlocks = (lapsArray = laps, options = {}) => {
+        const engineOptions = typeof options.isLiveSession === 'boolean'
+            ? options
+            : getSeriesEngineOptions(lapsArray, options.nowMs);
+        const blocks = [];
+        let serieNumber = 0;
+
+        for (let i = 0; i < lapsArray.length; i++) {
+            if (lapsArray[i].type !== 'serie') continue;
+            serieNumber += 1;
+            blocks.push(buildSeriesBlock(lapsArray, i, engineOptions, serieNumber));
+        }
+
+        return blocks;
+    };
+
+    const getSeriesBlockForLap = (lapIndex, lapsArray = laps, options = {}) => {
+        if (lapIndex < 0 || lapIndex >= lapsArray.length) return null;
+        const blocks = buildAllSeriesBlocks(lapsArray, options);
+        return blocks.find((block) => block.memberIndices.includes(lapIndex)) || null;
+    };
+
+    const getSeriesAccumulatedPlain = (lapIndex, lapsArray) => {
+        if (!lapsArray[lapIndex] || lapsArray[lapIndex].type !== 'serie') return '';
+        const block = getSeriesBlockForLap(lapIndex, lapsArray, getSeriesEngineOptions(lapsArray));
+        return block ? formatDurationPlain(block.totalDurationSeconds) : '';
     };
 
     const isSeriesAccumulatedDisplayMode = () =>
         appState.settings.seriesLapTypeEnabled &&
         appState.settings.lapTimeDisplayMode === 'seriesAccumulated';
+
+    const getLapPartialDurationHTML = (index, nowMs = null) => {
+        if (index < 0 || index >= laps.length) return '';
+
+        const t = getLapTimeMs(laps[index]);
+        if (index < laps.length - 1) {
+            const nextT = getLapTimeMs(laps[index + 1]);
+            return formatSummaryDurationHTML((nextT - t) / 1000);
+        }
+        if (!isReadOnly) {
+            const now = nowMs != null ? nowMs : Date.now();
+            return formatSummaryDurationHTML((now - t) / 1000);
+        }
+        return '';
+    };
 
     const getLapDurationDisplayHTML = (index, lap, nowMs = null) => {
         const t = (lap.time instanceof Date) ? lap.time : new Date(lap.time);
@@ -2614,22 +2833,92 @@ function initApp() {
             return formatTime(t);
         }
 
-        const ctx = getSeriesBlockContext(index);
-        if (!ctx) return '—';
+        const block = getSeriesBlockForLap(index, laps, getSeriesEngineOptions(laps, nowMs));
+        if (block && index === block.startIndex) {
+            const seconds = getSeriesTotalSeconds(block, laps, getSeriesEngineOptions(laps, nowMs));
+            return formatSummaryDurationHTML(seconds);
+        }
 
-        const serieStartTime = (laps[ctx.serieStartIndex].time instanceof Date)
-            ? laps[ctx.serieStartIndex].time
-            : new Date(laps[ctx.serieStartIndex].time);
+        if (appState.settings.seriesOutsideDisplayMode === 'partial') {
+            const partial = getLapPartialDurationHTML(index, nowMs);
+            return partial || '—';
+        }
+        return '—';
+    };
 
-        const isOpenLastLap = !isReadOnly &&
-            index === laps.length - 1 &&
-            laps[index].type !== 'rest';
+    const updateOpenSeriesDurationDisplay = (nowMs = null) => {
+        if (!isSeriesAccumulatedDisplayMode()) return;
 
-        const endMs = isOpenLastLap
-            ? (nowMs != null ? nowMs : Date.now())
-            : t.getTime();
-        const seconds = (endMs - serieStartTime.getTime()) / 1000;
-        return formatSummaryDurationHTML(Math.max(0, seconds));
+        const engineOptions = getSeriesEngineOptions(laps, nowMs);
+        const openBlock = buildAllSeriesBlocks(laps, engineOptions).find((block) => block.isOpen);
+        if (!openBlock) return;
+
+        const lapItem = document.getElementById(`lap-item-${openBlock.startIndex}`);
+        if (!lapItem) return;
+
+        const registrationSpan = lapItem.querySelector('.lap-duration');
+        if (!registrationSpan) return;
+
+        const formatted = getLapDurationDisplayHTML(openBlock.startIndex, laps[openBlock.startIndex], engineOptions.nowMs);
+        if (registrationSpan.innerHTML !== formatted) {
+            registrationSpan.innerHTML = formatted;
+        }
+    };
+
+    const updateSeriesSummary = (nowMs = null) => {
+        const summarySeries = document.getElementById('summary-series');
+        const summarySeriesList = document.getElementById('summary-series-list');
+        const summarySeriesToggle = document.getElementById('summary-series-toggle');
+        if (!summarySeries || !summarySeriesList) return;
+
+        const seriesEnabled = appState.settings.seriesLapTypeEnabled === true;
+        const showSummary = appState.settings.showSeriesSummary !== false;
+
+        if (summarySeriesToggle) {
+            summarySeriesToggle.hidden = !seriesEnabled;
+            summarySeriesToggle.classList.toggle('is-expanded', showSummary);
+            summarySeriesToggle.setAttribute('aria-expanded', String(showSummary));
+            summarySeriesToggle.setAttribute('aria-label', showSummary
+                ? 'Ocultar resum de sèries'
+                : 'Mostrar resum de sèries');
+            summarySeriesToggle.title = showSummary ? 'Ocultar resum SERIES' : 'Mostrar resum SERIES';
+        }
+
+        if (!seriesEnabled) {
+            summarySeries.hidden = true;
+            summarySeriesList.innerHTML = '';
+            return;
+        }
+
+        const engineOptions = getSeriesEngineOptions(laps, nowMs);
+        const blocks = buildAllSeriesBlocks(laps, engineOptions);
+        if (blocks.length === 0) {
+            summarySeries.hidden = true;
+            summarySeriesList.innerHTML = '';
+            return;
+        }
+
+        summarySeries.hidden = !showSummary;
+        summarySeriesList.innerHTML = blocks.map((block) => {
+            const composition = getSeriesBlockComposition(block, laps);
+            const times = getSeriesWorkRestSeconds(block, laps, engineOptions);
+            const workText = composition.workCount === 0
+                ? '0'
+                : `${composition.workCount} (${composition.workNumbers.map((n) => '#' + n).join(', ')})`;
+            const restText = composition.restCount === 0
+                ? '0'
+                : `${composition.restCount} (${composition.restNumbers.map((n) => '#' + n).join(', ')})`;
+            return `<div class="summary-series-item">
+                <span class="summary-series-item-info">
+                    <span class="summary-series-item-label">- ${block.label}</span>
+                    <span class="summary-series-item-composition">
+                        <span class="summary-series-count work">${workIcon}<span>${workText}</span><span class="summary-series-count-time">${formatSummaryDurationHTML(times.workSeconds)}</span></span>
+                        <span class="summary-series-count rest">${restIcon}<span>${restText}</span><span class="summary-series-count-time">${formatSummaryDurationHTML(times.restSeconds)}</span></span>
+                    </span>
+                </span>
+                <strong>${formatSummaryDurationHTML(block.totalDurationSeconds)}</strong>
+            </div>`;
+        }).join('');
     };
 
     const updateSummary = () => {
@@ -2650,6 +2939,7 @@ function initApp() {
         totalWorkElement.innerHTML = formatSummaryDurationHTML(totalWorkSeconds);
         totalRestElement.innerHTML = formatSummaryDurationHTML(totalRestSeconds);
         totalTimeElement.innerHTML = formatSummaryDurationHTML(totalWorkSeconds + totalRestSeconds);
+        updateSeriesSummary();
     };
 
     const enforceFinalLapName = () => {
@@ -2688,9 +2978,81 @@ function initApp() {
     const renderLaps = () => {
         // Limpiar contenedor
         while (lapsContainer.firstChild) lapsContainer.removeChild(lapsContainer.firstChild);
+
+        const seriesBlocks = appState.settings.seriesLapTypeEnabled
+            ? buildAllSeriesBlocks(laps, getSeriesEngineOptions(laps))
+            : [];
+        const lapSeriesBlockMap = new Map();
+        seriesBlocks.forEach((block) => {
+            block.memberIndices.forEach((memberIndex) => lapSeriesBlockMap.set(memberIndex, block));
+        });
+
+        let currentSeriesWrapper = null;
+        let currentSeriesLapsContainer = null;
+        let currentSeriesBlock = null;
+
+        const mountLapItem = (lapItem) => {
+            if (currentSeriesLapsContainer) {
+                if (lapsOrderDescending) {
+                    currentSeriesLapsContainer.prepend(lapItem);
+                } else {
+                    currentSeriesLapsContainer.appendChild(lapItem);
+                }
+                return;
+            }
+
+            if (lapsOrderDescending) {
+                lapsContainer.prepend(lapItem);
+            } else {
+                lapsContainer.appendChild(lapItem);
+            }
+        };
+
+        const closeCurrentSeriesBlock = () => {
+            if (!currentSeriesWrapper) return;
+
+            if (lapsOrderDescending) {
+                lapsContainer.prepend(currentSeriesWrapper);
+            } else {
+                lapsContainer.appendChild(currentSeriesWrapper);
+            }
+
+            currentSeriesWrapper = null;
+            currentSeriesLapsContainer = null;
+            currentSeriesBlock = null;
+        };
+
         laps.forEach((lap, index) => {
+            const seriesBlock = lapSeriesBlockMap.get(index);
+
+            if (seriesBlock && index === seriesBlock.startIndex) {
+                currentSeriesWrapper = document.createElement('div');
+                currentSeriesWrapper.className = 'series-block';
+                currentSeriesWrapper.dataset.seriesId = String(seriesBlock.id);
+
+                const seriesHeader = document.createElement('div');
+                seriesHeader.className = 'series-block-header';
+                seriesHeader.textContent = seriesBlock.label;
+
+                currentSeriesLapsContainer = document.createElement('div');
+                currentSeriesLapsContainer.className = 'series-block-laps';
+
+                currentSeriesWrapper.appendChild(seriesHeader);
+                currentSeriesWrapper.appendChild(currentSeriesLapsContainer);
+                currentSeriesBlock = seriesBlock;
+            }
+
+            let lapItemClass = `lap-item ${lap.type}`;
+            if (seriesBlock) {
+                if (index === seriesBlock.startIndex) {
+                    lapItemClass += ' lap-item--series-start';
+                } else {
+                    lapItemClass += ' lap-item--series-member';
+                }
+            }
+
             const lapItem = document.createElement('div');
-            lapItem.className = `lap-item ${lap.type}`;
+            lapItem.className = lapItemClass;
             lapItem.id = `lap-item-${index}`;
 
             // Índice correlativo (1-based)
@@ -2889,15 +3251,19 @@ function initApp() {
             lapTypeToggle.addEventListener('click', () => {
                 // Permitir edición tanto en sesión activa como en sesión guardada
                 if (!isReadOnly || isViewingSession) {
-                    const newType = getNextLapType(laps[index].type);
-                    laps[index].type = newType;
-                    applyLapNameForType(laps[index], index + 1, newType);
+                    const previousType = laps[index].type;
+                    const newType = getNextLapType(previousType);
+                    applyLapTypeChange(index, previousType, newType);
 
                     // Marcar como modificado si estamos viendo una sesión guardada
                     if (isViewingSession) {
                         sessionDirty = true;
                         const saveBtnEnable = document.getElementById('session-save-btn');
                         if (saveBtnEnable) saveBtnEnable.disabled = false;
+                    }
+
+                    if (!isReadOnly) {
+                        persistActiveRecordingState();
                     }
 
                     renderLaps();
@@ -2954,6 +3320,9 @@ function initApp() {
                         cancelButtonStyle: 'background: #f44336; color: white; border: 1px solid #f44336;'
                     });
                     if (confirmDelete) {
+                        if (lap.type === 'serie') {
+                            removeSerieAutoWorkLap(index);
+                        }
                         laps.splice(index, 1);
 
                         // Marcar como modificado si estamos viendo una sesión guardada
@@ -3098,12 +3467,17 @@ function initApp() {
             }
 
             // Agregar al contenedor según preferencia de orden
-            if (lapsOrderDescending) {
-                lapsContainer.prepend(lapItem); // Descendente: más nueva arriba
-            } else {
-                lapsContainer.appendChild(lapItem); // Ascendente: más reciente al final
+            mountLapItem(lapItem);
+
+            if (
+                currentSeriesBlock &&
+                index === currentSeriesBlock.memberIndices[currentSeriesBlock.memberIndices.length - 1]
+            ) {
+                closeCurrentSeriesBlock();
             }
         });
+
+        closeCurrentSeriesBlock();
 
         // Añadir espaciador al final para asegurar que la última vuelta se vea completamente
         const spacer = document.createElement('div');
@@ -3240,11 +3614,14 @@ function initApp() {
             // Montar campo de nombre de sesión para grabación
             mountRecordingNameRow();
         }
-        laps.push({
+        const newType = getNewLapTypeForInsert();
+        const newLap = {
             time: now,
             name: formatDefaultLapName(laps.length + 1),
-            type: 'work'
-        });
+            type: newType
+        };
+        applyLapNameForType(newLap, laps.length + 1, newType);
+        laps.push(newLap);
         renderLaps();
         updateSummary();
         persistActiveRecordingState();
@@ -3276,8 +3653,10 @@ function initApp() {
                 }
             }
 
-            // Actualizar acumulado de sèrie en .lap-duration si aplica
+            // Actualizar total de sèrie oberta en la volta d'inici
             if (isSeriesAccumulatedDisplayMode()) {
+                updateOpenSeriesDurationDisplay(now.getTime());
+
                 const registrationSpan = lastLapElement.querySelector('.lap-duration');
                 if (registrationSpan) {
                     const formattedReg = getLapDurationDisplayHTML(lastIndex, lastLap, now.getTime());
@@ -3285,6 +3664,10 @@ function initApp() {
                         registrationSpan.innerHTML = formattedReg;
                     }
                 }
+            }
+
+            if (appState.settings.seriesLapTypeEnabled) {
+                updateSeriesSummary(now.getTime());
             }
         }
     };
@@ -3319,6 +3702,8 @@ function initApp() {
             }
 
             if (isSeriesAccumulatedDisplayMode()) {
+                updateOpenSeriesDurationDisplay(nowMs);
+
                 const registrationSpan = lastLapElement.querySelector('.lap-duration');
                 if (registrationSpan) {
                     const formattedReg = getLapDurationDisplayHTML(lastIndex, lastLap, nowMs);
@@ -3326,6 +3711,10 @@ function initApp() {
                         registrationSpan.innerHTML = formattedReg;
                     }
                 }
+            }
+
+            if (appState.settings.seriesLapTypeEnabled) {
+                updateSeriesSummary(nowMs);
             }
         }, 100); // Actualizar cada 100ms (suficiente para mostrar cambios)
 
@@ -4766,6 +5155,19 @@ function initApp() {
         }
     };
 
+    const appendSeriesExportSummaryLines = (summaryText, separator, savedLaps) => {
+        if (!appState.settings.seriesLapTypeEnabled) return summaryText;
+        const blocks = buildAllSeriesBlocks(savedLaps, getSeriesEngineOptions(savedLaps));
+        if (blocks.length === 0) return summaryText;
+
+        let out = summaryText;
+        out += `\nResumen${separator}Series${separator}${blocks.length}\n`;
+        blocks.forEach((block, idx) => {
+            out += `Resumen${separator}Serie ${idx + 1}${separator}${formatDurationPlain(block.totalDurationSeconds)}\n`;
+        });
+        return out;
+    };
+
     const shareSession = (sessionKey) => {
         const savedLaps = JSON.parse(localStorage.getItem(sessionKey));
         if (savedLaps) {
@@ -4779,8 +5181,9 @@ function initApp() {
             let totalRestSeconds = 0;
 
             let shareText = `Sesión: ${sessionName}\nFecha: ${startDateStr}\nHora inicio: ${startTimeStr}\n\n`;
+            const includeSeriesColumn = appState.settings.seriesLapTypeEnabled;
             // Encabezado (tabulado) - Orden: #, HORA, DURADA, TIPUS, NOM
-            shareText += `#\tHora\tDurada\tTipus\tNom` + "\n";
+            shareText += `#\tHora\tDurada\tTipus\tNom` + (includeSeriesColumn ? '\tAcumulat serie' : '') + "\n";
 
             savedLaps.forEach((lap, index) => {
                 const lapTime = new Date(lap.time);
@@ -4799,6 +5202,9 @@ function initApp() {
                 }
                 // Añadir tipo y nombre
                 line += `\t${lapTypeLabel}\t${lap.name}`;
+                if (includeSeriesColumn) {
+                    line += `\t${getSeriesAccumulatedPlain(index, savedLaps)}`;
+                }
                 shareText += line + "\n";
             });
 
@@ -4807,6 +5213,7 @@ function initApp() {
             shareText += `  Treball: ${formatDurationPlain(totalWorkSeconds)}\n`;
             shareText += `  Descans: ${formatDurationPlain(totalRestSeconds)}\n`;
             shareText += `  Total: ${formatDurationPlain(totalTimeSeconds)}\n`;
+            shareText = appendSeriesExportSummaryLines(shareText, '\t', savedLaps);
 
             // Cordova: Usar plugin de social sharing
             if (window.cordova && window.plugins && window.plugins.socialsharing) {
@@ -4842,7 +5249,10 @@ function initApp() {
         const startTimeStr = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(startDate.getSeconds()).padStart(2, '0')}.${String(startDate.getMilliseconds()).padStart(3, '0')}`;
 
         let csv = `Sesion,${sessionName}\nFecha,${startDateStr}\nHora inicio,${startTimeStr}\n\n`;
-        csv += `#;Hora;Tipo;Nombre;Duracion\n`; // cabecera CSV con ; separador
+        const includeSeriesColumn = appState.settings.seriesLapTypeEnabled;
+        csv += includeSeriesColumn
+            ? `#;Hora;Tipo;Nombre;Duracion;Acumulat serie\n`
+            : `#;Hora;Tipo;Nombre;Duracion\n`; // cabecera CSV con ; separador
 
         let totalWorkSeconds = 0;
         let totalRestSeconds = 0;
@@ -4860,13 +5270,17 @@ function initApp() {
             }
             // Escapar comillas en nombre
             const safeName = String(lap.name).replaceAll('"', '""');
-            csv += `${index + 1};${lapTimeStr};${lapTypeLabel};"${safeName}";${durationStr}\n`;
+            const accumulatedStr = includeSeriesColumn ? getSeriesAccumulatedPlain(index, savedLaps) : '';
+            csv += includeSeriesColumn
+                ? `${index + 1};${lapTimeStr};${lapTypeLabel};"${safeName}";${durationStr};${accumulatedStr}\n`
+                : `${index + 1};${lapTimeStr};${lapTypeLabel};"${safeName}";${durationStr}\n`;
         });
 
         const totalTimeSeconds = totalWorkSeconds + totalRestSeconds;
         csv += `\nResumen;Treball;${formatDurationPlain(totalWorkSeconds)}\n`;
         csv += `Resumen;Descans;${formatDurationPlain(totalRestSeconds)}\n`;
         csv += `Resumen;Total;${formatDurationPlain(totalTimeSeconds)}\n`;
+        csv = appendSeriesExportSummaryLines(csv, ';', savedLaps);
 
         // Verificar si se debe exportar como archivo o como texto
         if (appState.settings.csvExportAsFile) {
@@ -4951,7 +5365,10 @@ function initApp() {
         const startTimeStr = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(startDate.getSeconds()).padStart(2, '0')}.${String(startDate.getMilliseconds()).padStart(3, '0')}`;
 
         let csv = `Sesion,${sessionName}\nFecha,${startDateStr}\nHora inicio,${startTimeStr}\n\n`;
-        csv += `#,Hora,Tipo,Nombre,Duracion\n`; // cabecera CSV con , separador
+        const includeSeriesColumn = appState.settings.seriesLapTypeEnabled;
+        csv += includeSeriesColumn
+            ? `#,Hora,Tipo,Nombre,Duracion,Acumulat serie\n`
+            : `#,Hora,Tipo,Nombre,Duracion\n`; // cabecera CSV con , separador
 
         let totalWorkSeconds = 0;
         let totalRestSeconds = 0;
@@ -4969,13 +5386,17 @@ function initApp() {
             }
             // Escapar comillas en nombre
             const safeName = String(lap.name).replaceAll('"', '""');
-            csv += `${index + 1},${lapTimeStr},${lapTypeLabel},"${safeName}",${durationStr}\n`;
+            const accumulatedStr = includeSeriesColumn ? getSeriesAccumulatedPlain(index, savedLaps) : '';
+            csv += includeSeriesColumn
+                ? `${index + 1},${lapTimeStr},${lapTypeLabel},"${safeName}",${durationStr},${accumulatedStr}\n`
+                : `${index + 1},${lapTimeStr},${lapTypeLabel},"${safeName}",${durationStr}\n`;
         });
 
         const totalTimeSeconds = totalWorkSeconds + totalRestSeconds;
         csv += `\nResumen,Treball,${formatDurationPlain(totalWorkSeconds)}\n`;
         csv += `Resumen,Descans,${formatDurationPlain(totalRestSeconds)}\n`;
         csv += `Resumen,Total,${formatDurationPlain(totalTimeSeconds)}\n`;
+        csv = appendSeriesExportSummaryLines(csv, ',', savedLaps);
 
         // Verificar si se debe exportar como archivo o como texto
         if (appState.settings.csvExportAsFile) {
@@ -6702,6 +7123,61 @@ function initApp() {
         seriesStateText.style.textAlign = 'right';
         seriesStateText.style.lineHeight = '1.3';
 
+        const showSeriesSummaryOn = appState.settings.showSeriesSummary !== false;
+        const showSeriesSummarySwitchContainer = document.createElement('div');
+        showSeriesSummarySwitchContainer.style.display = appState.settings.seriesLapTypeEnabled ? 'flex' : 'none';
+        showSeriesSummarySwitchContainer.style.alignItems = 'center';
+        showSeriesSummarySwitchContainer.style.justifyContent = 'space-between';
+        showSeriesSummarySwitchContainer.style.gap = '10px';
+        showSeriesSummarySwitchContainer.style.paddingLeft = '16px';
+        showSeriesSummarySwitchContainer.style.marginTop = '2px';
+        showSeriesSummarySwitchContainer.style.borderLeft = '2px solid var(--accent-color)';
+        showSeriesSummarySwitchContainer.style.opacity = '0.95';
+
+        const showSeriesSummaryLabel = document.createElement('span');
+        showSeriesSummaryLabel.textContent = 'Mostrar Resumen SERIES';
+        showSeriesSummaryLabel.style.fontWeight = '600';
+        showSeriesSummaryLabel.style.fontSize = '0.82rem';
+        showSeriesSummaryLabel.style.color = 'var(--text-color)';
+        showSeriesSummaryLabel.style.whiteSpace = 'normal';
+
+        const showSeriesSummarySwitch = document.createElement('div');
+        showSeriesSummarySwitch.role = 'switch';
+        showSeriesSummarySwitch.tabIndex = 0;
+        showSeriesSummarySwitch.setAttribute('aria-checked', String(showSeriesSummaryOn));
+        showSeriesSummarySwitch.style.display = 'inline-flex';
+        showSeriesSummarySwitch.style.alignItems = 'center';
+        showSeriesSummarySwitch.style.padding = '2px';
+        showSeriesSummarySwitch.style.width = '34px';
+        showSeriesSummarySwitch.style.height = '20px';
+        showSeriesSummarySwitch.style.borderRadius = '999px';
+        showSeriesSummarySwitch.style.cursor = 'pointer';
+        showSeriesSummarySwitch.style.transition = 'background 0.2s';
+        showSeriesSummarySwitch.style.boxSizing = 'border-box';
+        showSeriesSummarySwitch.style.background = showSeriesSummaryOn ? '#0d6efd' : '#666';
+        showSeriesSummarySwitch.style.flexShrink = '0';
+
+        const showSeriesSummaryDot = document.createElement('span');
+        showSeriesSummaryDot.style.width = '16px';
+        showSeriesSummaryDot.style.height = '16px';
+        showSeriesSummaryDot.style.borderRadius = '50%';
+        showSeriesSummaryDot.style.background = '#fff';
+        showSeriesSummaryDot.style.transition = 'transform 0.2s';
+        showSeriesSummaryDot.style.transform = showSeriesSummaryOn ? 'translateX(14px)' : 'translateX(0)';
+
+        showSeriesSummarySwitch.appendChild(showSeriesSummaryDot);
+
+        const showSeriesSummaryStateText = document.createElement('span');
+        showSeriesSummaryStateText.innerHTML = showSeriesSummaryOn
+            ? 'ACTIVAT<br>(visible a l\'inici)'
+            : 'DESACTIVAT<br>(ocult a l\'inici)';
+        showSeriesSummaryStateText.style.fontWeight = '500';
+        showSeriesSummaryStateText.style.fontSize = '0.8rem';
+        showSeriesSummaryStateText.style.color = 'var(--text-color)';
+        showSeriesSummaryStateText.style.opacity = '0.9';
+        showSeriesSummaryStateText.style.textAlign = 'right';
+        showSeriesSummaryStateText.style.lineHeight = '1.3';
+
         // Subopció dins de OPCIÓ 'SÈRIE': acumular temps de sèrie
         const lapTimeDisplayIsAccumulated = appState.settings.lapTimeDisplayMode === 'seriesAccumulated';
         const lapTimeDisplaySwitchContainer = document.createElement('div');
@@ -6749,7 +7225,7 @@ function initApp() {
 
         const lapTimeDisplayStateText = document.createElement('span');
         lapTimeDisplayStateText.innerHTML = lapTimeDisplayIsAccumulated
-            ? 'ACUMULAT<br>(des de l\'inici de sèrie)'
+            ? 'TOTAL SÈRIE<br>(duració total al inici de cada sèrie)'
             : 'REGISTRE<br>(hora del registre)';
         lapTimeDisplayStateText.style.fontWeight = '500';
         lapTimeDisplayStateText.style.fontSize = '0.8rem';
@@ -6757,6 +7233,92 @@ function initApp() {
         lapTimeDisplayStateText.style.opacity = '0.9';
         lapTimeDisplayStateText.style.textAlign = 'right';
         lapTimeDisplayStateText.style.lineHeight = '1.3';
+
+        const seriesOutsideIsDash = appState.settings.seriesOutsideDisplayMode === 'dash';
+        const seriesOutsideSwitchContainer = document.createElement('div');
+        seriesOutsideSwitchContainer.style.display = (appState.settings.seriesLapTypeEnabled && lapTimeDisplayIsAccumulated) ? 'flex' : 'none';
+        seriesOutsideSwitchContainer.style.alignItems = 'center';
+        seriesOutsideSwitchContainer.style.justifyContent = 'space-between';
+        seriesOutsideSwitchContainer.style.gap = '10px';
+        seriesOutsideSwitchContainer.style.paddingLeft = '28px';
+        seriesOutsideSwitchContainer.style.marginTop = '2px';
+        seriesOutsideSwitchContainer.style.borderLeft = '2px solid var(--accent-color)';
+        seriesOutsideSwitchContainer.style.opacity = lapTimeDisplayIsAccumulated ? '0.95' : '0.45';
+        seriesOutsideSwitchContainer.style.pointerEvents = lapTimeDisplayIsAccumulated ? 'auto' : 'none';
+
+        const seriesOutsideLabel = document.createElement('span');
+        seriesOutsideLabel.textContent = 'FORA DE SÈRIE:';
+        seriesOutsideLabel.style.fontWeight = '600';
+        seriesOutsideLabel.style.fontSize = '0.78rem';
+        seriesOutsideLabel.style.color = 'var(--text-color)';
+        seriesOutsideLabel.style.whiteSpace = 'nowrap';
+
+        const seriesOutsideSwitch = document.createElement('div');
+        seriesOutsideSwitch.role = 'switch';
+        seriesOutsideSwitch.tabIndex = 0;
+        seriesOutsideSwitch.setAttribute('aria-checked', String(seriesOutsideIsDash));
+        seriesOutsideSwitch.style.display = 'inline-flex';
+        seriesOutsideSwitch.style.alignItems = 'center';
+        seriesOutsideSwitch.style.padding = '2px';
+        seriesOutsideSwitch.style.width = '34px';
+        seriesOutsideSwitch.style.height = '20px';
+        seriesOutsideSwitch.style.borderRadius = '999px';
+        seriesOutsideSwitch.style.cursor = 'pointer';
+        seriesOutsideSwitch.style.transition = 'background 0.2s';
+        seriesOutsideSwitch.style.boxSizing = 'border-box';
+        seriesOutsideSwitch.style.background = seriesOutsideIsDash ? '#0d6efd' : '#666';
+        seriesOutsideSwitch.style.flexShrink = '0';
+
+        const seriesOutsideDot = document.createElement('span');
+        seriesOutsideDot.style.width = '16px';
+        seriesOutsideDot.style.height = '16px';
+        seriesOutsideDot.style.borderRadius = '50%';
+        seriesOutsideDot.style.background = '#fff';
+        seriesOutsideDot.style.transition = 'transform 0.2s';
+        seriesOutsideDot.style.transform = seriesOutsideIsDash ? 'translateX(14px)' : 'translateX(0)';
+
+        seriesOutsideSwitch.appendChild(seriesOutsideDot);
+
+        const seriesOutsideStateText = document.createElement('span');
+        seriesOutsideStateText.innerHTML = seriesOutsideIsDash
+            ? 'GUION<br>(guions en voltes i descansos)'
+            : 'PARCIAL<br>(duració de la volta)';
+        seriesOutsideStateText.style.fontWeight = '500';
+        seriesOutsideStateText.style.fontSize = '0.75rem';
+        seriesOutsideStateText.style.color = 'var(--text-color)';
+        seriesOutsideStateText.style.opacity = '0.9';
+        seriesOutsideStateText.style.textAlign = 'right';
+        seriesOutsideStateText.style.lineHeight = '1.3';
+
+        const syncSeriesSuboptionsUI = () => {
+            const serieOn = appState.settings.seriesLapTypeEnabled;
+            const accumOn = appState.settings.lapTimeDisplayMode === 'seriesAccumulated';
+
+            showSeriesSummarySwitchContainer.style.display = serieOn ? 'flex' : 'none';
+            lapTimeDisplaySwitchContainer.style.display = serieOn ? 'flex' : 'none';
+            seriesOutsideSwitchContainer.style.display = serieOn && accumOn ? 'flex' : 'none';
+            seriesOutsideSwitchContainer.style.opacity = accumOn ? '0.95' : '0.45';
+            seriesOutsideSwitchContainer.style.pointerEvents = accumOn ? 'auto' : 'none';
+        };
+
+        showSeriesSummarySwitch.addEventListener('click', () => {
+            const newValue = appState.settings.showSeriesSummary === false;
+            setShowSeriesSummary(newValue);
+
+            showSeriesSummarySwitch.style.background = newValue ? '#0d6efd' : '#666';
+            showSeriesSummaryDot.style.transform = newValue ? 'translateX(14px)' : 'translateX(0)';
+            showSeriesSummarySwitch.setAttribute('aria-checked', String(newValue));
+            showSeriesSummaryStateText.innerHTML = newValue
+                ? 'ACTIVAT<br>(visible a l\'inici)'
+                : 'DESACTIVAT<br>(ocult a l\'inici)';
+        });
+
+        showSeriesSummarySwitch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                showSeriesSummarySwitch.click();
+            }
+        });
 
         lapTimeDisplaySwitch.addEventListener('click', () => {
             const newIsAccumulated = appState.settings.lapTimeDisplayMode !== 'seriesAccumulated';
@@ -6767,16 +7329,40 @@ function initApp() {
             lapTimeDisplayDot.style.transform = newIsAccumulated ? 'translateX(14px)' : 'translateX(0)';
             lapTimeDisplaySwitch.setAttribute('aria-checked', String(newIsAccumulated));
             lapTimeDisplayStateText.innerHTML = newIsAccumulated
-                ? 'ACUMULAT<br>(des de l\'inici de sèrie)'
+                ? 'TOTAL SÈRIE<br>(duració total al inici de cada sèrie)'
                 : 'REGISTRE<br>(hora del registre)';
 
+            syncSeriesSuboptionsUI();
             renderLaps();
+            updateSummary();
         });
 
         lapTimeDisplaySwitch.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 lapTimeDisplaySwitch.click();
+            }
+        });
+
+        seriesOutsideSwitch.addEventListener('click', () => {
+            const newIsDash = appState.settings.seriesOutsideDisplayMode !== 'dash';
+            appState.settings.seriesOutsideDisplayMode = newIsDash ? 'dash' : 'partial';
+            saveSettings();
+
+            seriesOutsideSwitch.style.background = newIsDash ? '#0d6efd' : '#666';
+            seriesDot.style.transform = newIsDash ? 'translateX(14px)' : 'translateX(0)';
+            seriesOutsideSwitch.setAttribute('aria-checked', String(newIsDash));
+            seriesOutsideStateText.innerHTML = newIsDash
+                ? 'GUION<br>(guions en voltes i descansos)'
+                : 'PARCIAL<br>(duració de la volta)';
+
+            renderLaps();
+        });
+
+        seriesOutsideSwitch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                seriesOutsideSwitch.click();
             }
         });
 
@@ -6792,8 +7378,9 @@ function initApp() {
                 ? 'ACTIVAT<br>(Treball, Descans, Sèrie)'
                 : 'DESACTIVAT<br>(Només Treball/Descans)';
 
-            lapTimeDisplaySwitchContainer.style.display = newValue ? 'flex' : 'none';
+            syncSeriesSuboptionsUI();
             renderLaps();
+            updateSummary();
         });
 
         seriesSwitch.addEventListener('keydown', (e) => {
@@ -6807,13 +7394,104 @@ function initApp() {
         seriesMainRow.appendChild(seriesSwitch);
         seriesMainRow.appendChild(seriesStateText);
 
+        showSeriesSummarySwitchContainer.appendChild(showSeriesSummaryLabel);
+        showSeriesSummarySwitchContainer.appendChild(showSeriesSummarySwitch);
+        showSeriesSummarySwitchContainer.appendChild(showSeriesSummaryStateText);
+
         lapTimeDisplaySwitchContainer.appendChild(lapTimeDisplayLabel);
         lapTimeDisplaySwitchContainer.appendChild(lapTimeDisplaySwitch);
         lapTimeDisplaySwitchContainer.appendChild(lapTimeDisplayStateText);
 
+        seriesOutsideSwitchContainer.appendChild(seriesOutsideLabel);
+        seriesOutsideSwitchContainer.appendChild(seriesOutsideSwitch);
+        seriesOutsideSwitchContainer.appendChild(seriesOutsideStateText);
+
         seriesSwitchContainer.appendChild(seriesMainRow);
+        seriesSwitchContainer.appendChild(showSeriesSummarySwitchContainer);
         seriesSwitchContainer.appendChild(lapTimeDisplaySwitchContainer);
+        seriesSwitchContainer.appendChild(seriesOutsideSwitchContainer);
         modal.appendChild(seriesSwitchContainer);
+
+        // --- Switch per alternar tipus de nous registres ---
+        const alternateLapsSwitchContainer = document.createElement('div');
+        alternateLapsSwitchContainer.style.display = 'flex';
+        alternateLapsSwitchContainer.style.alignItems = 'center';
+        alternateLapsSwitchContainer.style.justifyContent = 'space-between';
+        alternateLapsSwitchContainer.style.gap = '10px';
+        alternateLapsSwitchContainer.style.padding = '8px';
+        alternateLapsSwitchContainer.style.marginTop = '6px';
+        alternateLapsSwitchContainer.style.borderRadius = '8px';
+        alternateLapsSwitchContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
+        alternateLapsSwitchContainer.style.border = '1px solid var(--accent-color)';
+
+        const alternateLapsLabel = document.createElement('span');
+        alternateLapsLabel.textContent = 'ALTERNAR REGISTRES:';
+        alternateLapsLabel.style.fontWeight = '600';
+        alternateLapsLabel.style.fontSize = '0.9rem';
+        alternateLapsLabel.style.color = 'var(--text-color)';
+        alternateLapsLabel.style.whiteSpace = 'nowrap';
+
+        const alternateLapsSwitch = document.createElement('div');
+        alternateLapsSwitch.role = 'switch';
+        alternateLapsSwitch.tabIndex = 0;
+        alternateLapsSwitch.setAttribute('aria-checked', String(appState.settings.alternateNewLapTypes));
+        alternateLapsSwitch.style.display = 'inline-flex';
+        alternateLapsSwitch.style.alignItems = 'center';
+        alternateLapsSwitch.style.padding = '2px';
+        alternateLapsSwitch.style.width = '34px';
+        alternateLapsSwitch.style.height = '20px';
+        alternateLapsSwitch.style.borderRadius = '999px';
+        alternateLapsSwitch.style.cursor = 'pointer';
+        alternateLapsSwitch.style.transition = 'background 0.2s';
+        alternateLapsSwitch.style.boxSizing = 'border-box';
+        alternateLapsSwitch.style.background = appState.settings.alternateNewLapTypes ? '#0d6efd' : '#666';
+        alternateLapsSwitch.style.flexShrink = '0';
+
+        const alternateLapsDot = document.createElement('span');
+        alternateLapsDot.style.width = '16px';
+        alternateLapsDot.style.height = '16px';
+        alternateLapsDot.style.borderRadius = '50%';
+        alternateLapsDot.style.background = '#fff';
+        alternateLapsDot.style.transition = 'transform 0.2s';
+        alternateLapsDot.style.transform = appState.settings.alternateNewLapTypes ? 'translateX(14px)' : 'translateX(0)';
+
+        alternateLapsSwitch.appendChild(alternateLapsDot);
+
+        const alternateLapsStateText = document.createElement('span');
+        alternateLapsStateText.innerHTML = appState.settings.alternateNewLapTypes
+            ? 'ACTIVAT<br>(Treball ↔ Descans)'
+            : 'DESACTIVAT<br>(Sempre treball)';
+        alternateLapsStateText.style.fontWeight = '500';
+        alternateLapsStateText.style.fontSize = '0.85rem';
+        alternateLapsStateText.style.color = 'var(--text-color)';
+        alternateLapsStateText.style.opacity = '0.9';
+        alternateLapsStateText.style.textAlign = 'right';
+        alternateLapsStateText.style.lineHeight = '1.3';
+
+        alternateLapsSwitch.addEventListener('click', () => {
+            const newValue = !appState.settings.alternateNewLapTypes;
+            appState.settings.alternateNewLapTypes = newValue;
+            saveSettings();
+
+            alternateLapsSwitch.style.background = newValue ? '#0d6efd' : '#666';
+            alternateLapsDot.style.transform = newValue ? 'translateX(14px)' : 'translateX(0)';
+            alternateLapsSwitch.setAttribute('aria-checked', String(newValue));
+            alternateLapsStateText.innerHTML = newValue
+                ? 'ACTIVAT<br>(Treball ↔ Descans)'
+                : 'DESACTIVAT<br>(Sempre treball)';
+        });
+
+        alternateLapsSwitch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                alternateLapsSwitch.click();
+            }
+        });
+
+        alternateLapsSwitchContainer.appendChild(alternateLapsLabel);
+        alternateLapsSwitchContainer.appendChild(alternateLapsSwitch);
+        alternateLapsSwitchContainer.appendChild(alternateLapsStateText);
+        modal.appendChild(alternateLapsSwitchContainer);
 
         // --- Switch para botones de volumen ---
         const volumeButtonsSwitchContainer = document.createElement('div');
@@ -7223,6 +7901,16 @@ function initApp() {
         span.style.alignItems = 'center';
         span.style.gap = '5px';
     });
+
+    const summarySeriesToggle = document.getElementById('summary-series-toggle');
+    if (summarySeriesToggle) {
+        summarySeriesToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setShowSeriesSummary(appState.settings.showSeriesSummary === false);
+        });
+    }
+    updateSeriesSummary();
 
     // Clock container styles (estado base verde)
     clockContainer.style.backgroundColor = '#2E7D32';
