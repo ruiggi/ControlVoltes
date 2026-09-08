@@ -1,6 +1,3 @@
-const appVersion = '4.0.0'; // Versión desde manifest.json
-const appDateVersion = '2026-09-07'; // Versión desde manifest.json
-
 // Función principal de inicialización
 function initApp() {
     // Estado centralizado de la aplicación
@@ -27,7 +24,9 @@ function initApp() {
             volumeButtonsEnabled: false,  // Por defecto desactivado (botones de volumen para marcar vueltas)
             csvExportAsFile: false,  // Por defecto exportar como texto (false = texto, true = archivo)
             clockMode: 'elapsed',  // 'elapsed' = tiempo transcurrido (defecto), 'time' = hora actual
-            seriesLapTypeEnabled: false  // Por defecto desactivado (solo TREBALL/DESCANS)
+            seriesLapTypeEnabled: false,  // Por defecto desactivado (solo TREBALL/DESCANS)
+            lapTimeDisplayMode: 'registration',  // 'registration' = hora del registro, 'seriesAccumulated' = acumulado desde inicio de sèrie
+            defaultLapNamePrefix: 'Registro'  // Prefijo por defecto para nombres de vuelta (ej: "Registro 1")
         },
 
         // Intervalos
@@ -62,10 +61,6 @@ function initApp() {
             sessionsView: document.getElementById('sessions-view'),
             sessionsList: document.getElementById('sessions-list'),
             sessionsContainer: document.getElementById('sessions-container'),
-
-            // Import/Export
-            importSessionsBtn: document.getElementById('import-sessions-btn'),
-            exportSessionsBtn: document.getElementById('export-sessions-btn'),
 
             // Header
             toggleViewBtn: document.getElementById('toggle-view-btn'),
@@ -132,6 +127,75 @@ function initApp() {
     // FUNCIONES DE CONFIGURACIÓN
     // =======================
 
+    const DEFAULT_LAP_NAME_PREFIX = 'Registro';
+
+    const normalizeLapNamePrefix = (value) => {
+        const trimmed = String(value ?? '').trim();
+        return trimmed || DEFAULT_LAP_NAME_PREFIX;
+    };
+
+    const getLapNamePrefix = () => normalizeLapNamePrefix(appState.settings.defaultLapNamePrefix);
+
+    const formatDefaultLapName = (lapNumber) => `${getLapNamePrefix()} ${lapNumber}`;
+
+    const LAP_TYPE_NAME_PREFIXES = {
+        work: 'Vuelta',
+        rest: 'Descanso',
+        serie: 'Serie'
+    };
+
+    const LAP_TYPE_NAME_CLASS = {
+        work: 'lap-name--typed-work',
+        rest: 'lap-name--typed-rest',
+        serie: 'lap-name--typed-serie'
+    };
+
+    const nameStartsWithPrefix = (name, prefix) => {
+        const normalizedName = String(name ?? '').trim();
+        const normalizedPrefix = String(prefix ?? '').trim();
+        if (!normalizedPrefix) return false;
+        return normalizedName === normalizedPrefix || normalizedName.startsWith(`${normalizedPrefix} `);
+    };
+
+    const isDefaultPrefixedLapName = (name) => {
+        if (!name || name === '-FINAL-') return false;
+        return nameStartsWithPrefix(name, getLapNamePrefix());
+    };
+
+    const isTypedAutoLapName = (name) => {
+        if (!name || name === '-FINAL-') return false;
+        return [LAP_TYPE_NAME_PREFIXES.work, LAP_TYPE_NAME_PREFIXES.rest, LAP_TYPE_NAME_PREFIXES.serie]
+            .some((prefix) => nameStartsWithPrefix(name, prefix));
+    };
+
+    const isAutoManagedLapName = (name) => {
+        return isDefaultPrefixedLapName(name) || isTypedAutoLapName(name);
+    };
+
+    const extractLapNameNumber = (name, fallbackNumber) => {
+        const match = String(name ?? '').trim().match(/\s+(\d+)\s*$/);
+        return match ? parseInt(match[1], 10) : fallbackNumber;
+    };
+
+    const formatTypedLapName = (type, lapNumber) => {
+        const prefix = LAP_TYPE_NAME_PREFIXES[type] || LAP_TYPE_NAME_PREFIXES.work;
+        return `${prefix} ${lapNumber}`;
+    };
+
+    const applyLapNameForType = (lap, lapNumber, type) => {
+        if (!lap || !isAutoManagedLapName(lap.name)) return;
+        const number = extractLapNameNumber(lap.name, lapNumber);
+        lap.name = formatTypedLapName(type, number);
+    };
+
+    const applyLapNameTypeStyle = (inputEl, lap) => {
+        if (!inputEl || !lap) return;
+        Object.values(LAP_TYPE_NAME_CLASS).forEach((className) => inputEl.classList.remove(className));
+        if (!isAutoManagedLapName(lap.name)) return;
+        const className = LAP_TYPE_NAME_CLASS[lap.type] || LAP_TYPE_NAME_CLASS.work;
+        inputEl.classList.add(className);
+    };
+
     const loadSettings = () => {
         try {
             const saved = localStorage.getItem('voltes_settings');
@@ -144,6 +208,10 @@ function initApp() {
                 appState.settings.csvExportAsFile = settings.csvExportAsFile !== undefined ? settings.csvExportAsFile : false;
                 appState.settings.clockMode = settings.clockMode === 'time' ? 'time' : 'elapsed';
                 appState.settings.seriesLapTypeEnabled = settings.seriesLapTypeEnabled === true;
+                appState.settings.lapTimeDisplayMode = settings.lapTimeDisplayMode === 'seriesAccumulated' ? 'seriesAccumulated' : 'registration';
+                appState.settings.defaultLapNamePrefix = normalizeLapNamePrefix(
+                    settings.defaultLapNamePrefix !== undefined ? settings.defaultLapNamePrefix : 'Registro'
+                );
             }
         } catch (e) {
             console.warn('Error cargando configuración:', e);
@@ -154,6 +222,8 @@ function initApp() {
             appState.settings.csvExportAsFile = false;
             appState.settings.clockMode = 'elapsed';
             appState.settings.seriesLapTypeEnabled = false;
+            appState.settings.lapTimeDisplayMode = 'registration';
+            appState.settings.defaultLapNamePrefix = 'Registro';
         }
     };
 
@@ -2510,6 +2580,58 @@ function initApp() {
         return 'Canvia a treball';
     };
 
+    // Bloque de sèrie: desde el inicio de una sèrie hasta el siguiente descans (inclusive)
+    const getSeriesBlockContext = (lapIndex) => {
+        if (lapIndex < 0 || lapIndex >= laps.length) return null;
+
+        let serieStart = -1;
+        for (let i = 0; i <= lapIndex; i++) {
+            const type = laps[i].type;
+            if (type === 'serie') {
+                serieStart = i;
+            } else if (type === 'rest' && serieStart >= 0 && i < lapIndex) {
+                serieStart = -1;
+            }
+        }
+
+        if (serieStart < 0) return null;
+
+        const lapType = laps[lapIndex].type;
+        if (lapType === 'serie' || lapType === 'work' || lapType === 'rest') {
+            return { serieStartIndex: serieStart };
+        }
+        return null;
+    };
+
+    const isSeriesAccumulatedDisplayMode = () =>
+        appState.settings.seriesLapTypeEnabled &&
+        appState.settings.lapTimeDisplayMode === 'seriesAccumulated';
+
+    const getLapDurationDisplayHTML = (index, lap, nowMs = null) => {
+        const t = (lap.time instanceof Date) ? lap.time : new Date(lap.time);
+
+        if (!isSeriesAccumulatedDisplayMode()) {
+            return formatTime(t);
+        }
+
+        const ctx = getSeriesBlockContext(index);
+        if (!ctx) return '—';
+
+        const serieStartTime = (laps[ctx.serieStartIndex].time instanceof Date)
+            ? laps[ctx.serieStartIndex].time
+            : new Date(laps[ctx.serieStartIndex].time);
+
+        const isOpenLastLap = !isReadOnly &&
+            index === laps.length - 1 &&
+            laps[index].type !== 'rest';
+
+        const endMs = isOpenLastLap
+            ? (nowMs != null ? nowMs : Date.now())
+            : t.getTime();
+        const seconds = (endMs - serieStartTime.getTime()) / 1000;
+        return formatSummaryDurationHTML(Math.max(0, seconds));
+    };
+
     const updateSummary = () => {
         let totalWorkSeconds = 0;
         let totalRestSeconds = 0;
@@ -2535,7 +2657,7 @@ function initApp() {
         // Asegurar que ninguna vuelta que no sea la última tenga el nombre "-FINAL-"
         for (let i = 0; i < laps.length - 1; i++) {
             if (laps[i] && laps[i].name === '-FINAL-') {
-                laps[i].name = `Volta ${i + 1}`;
+                laps[i].name = formatDefaultLapName(i + 1);
             }
         }
         // Forzar nombre de la última vuelta
@@ -2581,7 +2703,7 @@ function initApp() {
             lapTime.className = 'lap-duration';
             lapTime.id = `lap-time-${index}`;
             const t = (lap.time instanceof Date) ? lap.time : new Date(lap.time);
-            lapTime.innerHTML = formatTime(t);
+            lapTime.innerHTML = getLapDurationDisplayHTML(index, lap);
 
             // Contenedor para el tiempo con botón de editar
             const lapTimeContainer = document.createElement('div');
@@ -2614,7 +2736,7 @@ function initApp() {
                     const newTime = await showEditTimeModal(currentTime, index, laps);
                     if (newTime !== null) {
                         laps[index].time = newTime;
-                        lapTime.innerHTML = formatTime(newTime);
+                        lapTime.innerHTML = getLapDurationDisplayHTML(index, laps[index]);
 
                         // Marcar como modificado si estamos viendo una sesión guardada
                         if (isViewingSession) {
@@ -2660,10 +2782,12 @@ function initApp() {
             lapNameInput.value = lap.name;
             lapNameInput.style.textAlign = 'left'; // Alinear el texto a la izquierda
             lapNameInput.style.flex = '1'; // Tomar todo el espacio disponible
+            applyLapNameTypeStyle(lapNameInput, lap);
             lapNameInput.addEventListener('focus', (e) => e.target.select());
             lapNameInput.addEventListener('change', (e) => {
                 if (!isReadOnly) {
                     laps[index].name = e.target.value;
+                    applyLapNameTypeStyle(e.target, laps[index]);
                 }
             });
             if (isReadOnly) {
@@ -2765,7 +2889,9 @@ function initApp() {
             lapTypeToggle.addEventListener('click', () => {
                 // Permitir edición tanto en sesión activa como en sesión guardada
                 if (!isReadOnly || isViewingSession) {
-                    laps[index].type = getNextLapType(laps[index].type);
+                    const newType = getNextLapType(laps[index].type);
+                    laps[index].type = newType;
+                    applyLapNameForType(laps[index], index + 1, newType);
 
                     // Marcar como modificado si estamos viendo una sesión guardada
                     if (isViewingSession) {
@@ -2936,14 +3062,14 @@ function initApp() {
                             laps[index].type = 'rest';
                             // Cambiar el nombre de "-FINAL-" a un nombre normal para que muestre el icono
                             if (laps[index].name === '-FINAL-') {
-                                laps[index].name = `Volta ${index + 1}`;
+                                laps[index].name = formatDefaultLapName(index + 1);
                             }
                         }
 
                         // Crear nueva vuelta con tipo 'rest' por defecto
                         const newLap = {
                             time: newTime,
-                            name: `Volta ${index + 2}`,
+                            name: formatDefaultLapName(index + 2),
                             type: 'rest'
                         };
 
@@ -3116,7 +3242,7 @@ function initApp() {
         }
         laps.push({
             time: now,
-            name: `Volta ${laps.length + 1}`,
+            name: formatDefaultLapName(laps.length + 1),
             type: 'work'
         });
         renderLaps();
@@ -3135,16 +3261,29 @@ function initApp() {
         // Obtener el elemento correcto según el orden
         const lastLapElement = lapsOrderDescending ? lapsContainer.firstChild : lapsContainer.lastChild;
         if (lastLapElement) {
+            const now = new Date();
+            const lastIndex = laps.length - 1;
+            const lastLap = laps[lastIndex];
+
             const durationSpan = lastLapElement.querySelector('.lap-time');
             if (durationSpan) {
-                const now = new Date();
-                const lastLap = laps[laps.length - 1];
                 const duration = (now - lastLap.time) / 1000;
                 const formatted = formatSummaryDurationHTML(duration);
 
                 // Solo actualizar si cambió (optimización)
                 if (durationSpan.innerHTML !== formatted) {
                     durationSpan.innerHTML = formatted;
+                }
+            }
+
+            // Actualizar acumulado de sèrie en .lap-duration si aplica
+            if (isSeriesAccumulatedDisplayMode()) {
+                const registrationSpan = lastLapElement.querySelector('.lap-duration');
+                if (registrationSpan) {
+                    const formattedReg = getLapDurationDisplayHTML(lastIndex, lastLap, now.getTime());
+                    if (registrationSpan.innerHTML !== formattedReg) {
+                        registrationSpan.innerHTML = formattedReg;
+                    }
                 }
             }
         }
@@ -3164,15 +3303,28 @@ function initApp() {
             const lastLapElement = lapsOrderDescending ? lapsContainer.firstChild : lapsContainer.lastChild;
             if (!lastLapElement) return;
 
+            const nowMs = Date.now();
+            const lastIndex = laps.length - 1;
+            const lastLap = laps[lastIndex];
+
             const durationSpan = lastLapElement.querySelector('.lap-time');
             if (durationSpan) {
-                const lastLap = laps[laps.length - 1];
-                const duration = (Date.now() - lastLap.time) / 1000;
+                const duration = (nowMs - lastLap.time) / 1000;
                 const formatted = formatSummaryDurationHTML(duration);
 
                 // Solo actualizar si cambió
                 if (durationSpan.innerHTML !== formatted) {
                     durationSpan.innerHTML = formatted;
+                }
+            }
+
+            if (isSeriesAccumulatedDisplayMode()) {
+                const registrationSpan = lastLapElement.querySelector('.lap-duration');
+                if (registrationSpan) {
+                    const formattedReg = getLapDurationDisplayHTML(lastIndex, lastLap, nowMs);
+                    if (registrationSpan.innerHTML !== formattedReg) {
+                        registrationSpan.innerHTML = formattedReg;
+                    }
                 }
             }
         }, 100); // Actualizar cada 100ms (suficiente para mostrar cambios)
@@ -6132,6 +6284,8 @@ function initApp() {
             return;
         }
 
+        const appVersion = '4.0.1'; // Versión desde manifest.json
+        const appDateVersion = '2026-09-08'; // Versión desde manifest.json
 
         // Crear contenedor del modal con opciones
         const modalContent = document.createElement('div');
@@ -6322,6 +6476,82 @@ function initApp() {
         orderSwitchContainer.appendChild(orderStateText);
         modal.appendChild(orderSwitchContainer);
 
+        // --- Prefijo por defecto del nombre de vuelta ---
+        const lapNamePrefixContainer = document.createElement('div');
+        lapNamePrefixContainer.style.display = 'flex';
+        lapNamePrefixContainer.style.alignItems = 'center';
+        lapNamePrefixContainer.style.justifyContent = 'space-between';
+        lapNamePrefixContainer.style.gap = '10px';
+        lapNamePrefixContainer.style.padding = '8px';
+        lapNamePrefixContainer.style.marginTop = '6px';
+        lapNamePrefixContainer.style.borderRadius = '8px';
+        lapNamePrefixContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
+        lapNamePrefixContainer.style.border = '1px solid var(--accent-color)';
+
+        const lapNamePrefixLabel = document.createElement('span');
+        lapNamePrefixLabel.textContent = 'NOM VOLTA:';
+        lapNamePrefixLabel.style.fontWeight = '600';
+        lapNamePrefixLabel.style.fontSize = '0.9rem';
+        lapNamePrefixLabel.style.color = 'var(--text-color)';
+        lapNamePrefixLabel.style.whiteSpace = 'nowrap';
+
+        const lapNamePrefixControls = document.createElement('div');
+        lapNamePrefixControls.style.display = 'flex';
+        lapNamePrefixControls.style.flexDirection = 'column';
+        lapNamePrefixControls.style.alignItems = 'flex-end';
+        lapNamePrefixControls.style.gap = '4px';
+        lapNamePrefixControls.style.flex = '1';
+
+        const lapNamePrefixInput = document.createElement('input');
+        lapNamePrefixInput.type = 'text';
+        lapNamePrefixInput.value = getLapNamePrefix();
+        lapNamePrefixInput.maxLength = 30;
+        lapNamePrefixInput.setAttribute('aria-label', 'Nom per defecte de cada volta');
+        lapNamePrefixInput.style.width = '100%';
+        lapNamePrefixInput.style.maxWidth = '180px';
+        lapNamePrefixInput.style.padding = '6px 8px';
+        lapNamePrefixInput.style.borderRadius = '6px';
+        lapNamePrefixInput.style.border = '1px solid var(--accent-color)';
+        lapNamePrefixInput.style.backgroundColor = 'var(--bg-color)';
+        lapNamePrefixInput.style.color = 'var(--text-color)';
+        lapNamePrefixInput.style.fontSize = '0.9rem';
+        lapNamePrefixInput.style.fontWeight = '600';
+        lapNamePrefixInput.style.textAlign = 'right';
+
+        const lapNamePrefixPreview = document.createElement('span');
+        lapNamePrefixPreview.style.fontWeight = '500';
+        lapNamePrefixPreview.style.fontSize = '0.8rem';
+        lapNamePrefixPreview.style.color = 'var(--text-color)';
+        lapNamePrefixPreview.style.opacity = '0.9';
+        lapNamePrefixPreview.style.textAlign = 'right';
+        lapNamePrefixPreview.style.lineHeight = '1.3';
+
+        const updateLapNamePrefixPreview = () => {
+            lapNamePrefixPreview.textContent = `Ex: ${formatDefaultLapName(1)}, ${formatDefaultLapName(2)}...`;
+        };
+
+        const saveLapNamePrefixSetting = () => {
+            const normalized = normalizeLapNamePrefix(lapNamePrefixInput.value);
+            appState.settings.defaultLapNamePrefix = normalized;
+            lapNamePrefixInput.value = normalized;
+            updateLapNamePrefixPreview();
+            saveSettings();
+        };
+
+        updateLapNamePrefixPreview();
+        lapNamePrefixInput.addEventListener('input', () => {
+            const previewPrefix = normalizeLapNamePrefix(lapNamePrefixInput.value);
+            lapNamePrefixPreview.textContent = `Ex: ${previewPrefix} 1, ${previewPrefix} 2...`;
+        });
+        lapNamePrefixInput.addEventListener('change', saveLapNamePrefixSetting);
+        lapNamePrefixInput.addEventListener('blur', saveLapNamePrefixSetting);
+
+        lapNamePrefixControls.appendChild(lapNamePrefixInput);
+        lapNamePrefixControls.appendChild(lapNamePrefixPreview);
+        lapNamePrefixContainer.appendChild(lapNamePrefixLabel);
+        lapNamePrefixContainer.appendChild(lapNamePrefixControls);
+        modal.appendChild(lapNamePrefixContainer);
+
         // --- Switch para modo del cronómetro (transcurrido / reloj) ---
         const clockModeIsTime = appState.settings.clockMode === 'time';
 
@@ -6414,14 +6644,19 @@ function initApp() {
         // --- Switch para opción SÈRIE ---
         const seriesSwitchContainer = document.createElement('div');
         seriesSwitchContainer.style.display = 'flex';
-        seriesSwitchContainer.style.alignItems = 'center';
-        seriesSwitchContainer.style.justifyContent = 'space-between';
-        seriesSwitchContainer.style.gap = '10px';
+        seriesSwitchContainer.style.flexDirection = 'column';
+        seriesSwitchContainer.style.gap = '6px';
         seriesSwitchContainer.style.padding = '8px';
         seriesSwitchContainer.style.marginTop = '6px';
         seriesSwitchContainer.style.borderRadius = '8px';
         seriesSwitchContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
         seriesSwitchContainer.style.border = '1px solid var(--accent-color)';
+
+        const seriesMainRow = document.createElement('div');
+        seriesMainRow.style.display = 'flex';
+        seriesMainRow.style.alignItems = 'center';
+        seriesMainRow.style.justifyContent = 'space-between';
+        seriesMainRow.style.gap = '10px';
 
         const seriesLabel = document.createElement('span');
         seriesLabel.textContent = "OPCIÓ 'SÈRIE':";
@@ -6467,6 +6702,84 @@ function initApp() {
         seriesStateText.style.textAlign = 'right';
         seriesStateText.style.lineHeight = '1.3';
 
+        // Subopció dins de OPCIÓ 'SÈRIE': acumular temps de sèrie
+        const lapTimeDisplayIsAccumulated = appState.settings.lapTimeDisplayMode === 'seriesAccumulated';
+        const lapTimeDisplaySwitchContainer = document.createElement('div');
+        lapTimeDisplaySwitchContainer.style.display = appState.settings.seriesLapTypeEnabled ? 'flex' : 'none';
+        lapTimeDisplaySwitchContainer.style.alignItems = 'center';
+        lapTimeDisplaySwitchContainer.style.justifyContent = 'space-between';
+        lapTimeDisplaySwitchContainer.style.gap = '10px';
+        lapTimeDisplaySwitchContainer.style.paddingLeft = '16px';
+        lapTimeDisplaySwitchContainer.style.marginTop = '2px';
+        lapTimeDisplaySwitchContainer.style.borderLeft = '2px solid var(--accent-color)';
+        lapTimeDisplaySwitchContainer.style.opacity = '0.95';
+
+        const lapTimeDisplayLabel = document.createElement('span');
+        lapTimeDisplayLabel.textContent = 'ACUMULAR TEMPS SERIE:';
+        lapTimeDisplayLabel.style.fontWeight = '600';
+        lapTimeDisplayLabel.style.fontSize = '0.82rem';
+        lapTimeDisplayLabel.style.color = 'var(--text-color)';
+        lapTimeDisplayLabel.style.whiteSpace = 'nowrap';
+
+        const lapTimeDisplaySwitch = document.createElement('div');
+        lapTimeDisplaySwitch.role = 'switch';
+        lapTimeDisplaySwitch.tabIndex = 0;
+        lapTimeDisplaySwitch.setAttribute('aria-checked', String(lapTimeDisplayIsAccumulated));
+        lapTimeDisplaySwitch.style.display = 'inline-flex';
+        lapTimeDisplaySwitch.style.alignItems = 'center';
+        lapTimeDisplaySwitch.style.padding = '2px';
+        lapTimeDisplaySwitch.style.width = '34px';
+        lapTimeDisplaySwitch.style.height = '20px';
+        lapTimeDisplaySwitch.style.borderRadius = '999px';
+        lapTimeDisplaySwitch.style.cursor = 'pointer';
+        lapTimeDisplaySwitch.style.transition = 'background 0.2s';
+        lapTimeDisplaySwitch.style.boxSizing = 'border-box';
+        lapTimeDisplaySwitch.style.background = lapTimeDisplayIsAccumulated ? '#0d6efd' : '#666';
+        lapTimeDisplaySwitch.style.flexShrink = '0';
+
+        const lapTimeDisplayDot = document.createElement('span');
+        lapTimeDisplayDot.style.width = '16px';
+        lapTimeDisplayDot.style.height = '16px';
+        lapTimeDisplayDot.style.borderRadius = '50%';
+        lapTimeDisplayDot.style.background = '#fff';
+        lapTimeDisplayDot.style.transition = 'transform 0.2s';
+        lapTimeDisplayDot.style.transform = lapTimeDisplayIsAccumulated ? 'translateX(14px)' : 'translateX(0)';
+
+        lapTimeDisplaySwitch.appendChild(lapTimeDisplayDot);
+
+        const lapTimeDisplayStateText = document.createElement('span');
+        lapTimeDisplayStateText.innerHTML = lapTimeDisplayIsAccumulated
+            ? 'ACUMULAT<br>(des de l\'inici de sèrie)'
+            : 'REGISTRE<br>(hora del registre)';
+        lapTimeDisplayStateText.style.fontWeight = '500';
+        lapTimeDisplayStateText.style.fontSize = '0.8rem';
+        lapTimeDisplayStateText.style.color = 'var(--text-color)';
+        lapTimeDisplayStateText.style.opacity = '0.9';
+        lapTimeDisplayStateText.style.textAlign = 'right';
+        lapTimeDisplayStateText.style.lineHeight = '1.3';
+
+        lapTimeDisplaySwitch.addEventListener('click', () => {
+            const newIsAccumulated = appState.settings.lapTimeDisplayMode !== 'seriesAccumulated';
+            appState.settings.lapTimeDisplayMode = newIsAccumulated ? 'seriesAccumulated' : 'registration';
+            saveSettings();
+
+            lapTimeDisplaySwitch.style.background = newIsAccumulated ? '#0d6efd' : '#666';
+            lapTimeDisplayDot.style.transform = newIsAccumulated ? 'translateX(14px)' : 'translateX(0)';
+            lapTimeDisplaySwitch.setAttribute('aria-checked', String(newIsAccumulated));
+            lapTimeDisplayStateText.innerHTML = newIsAccumulated
+                ? 'ACUMULAT<br>(des de l\'inici de sèrie)'
+                : 'REGISTRE<br>(hora del registre)';
+
+            renderLaps();
+        });
+
+        lapTimeDisplaySwitch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                lapTimeDisplaySwitch.click();
+            }
+        });
+
         seriesSwitch.addEventListener('click', () => {
             const newValue = !appState.settings.seriesLapTypeEnabled;
             appState.settings.seriesLapTypeEnabled = newValue;
@@ -6479,6 +6792,7 @@ function initApp() {
                 ? 'ACTIVAT<br>(Treball, Descans, Sèrie)'
                 : 'DESACTIVAT<br>(Només Treball/Descans)';
 
+            lapTimeDisplaySwitchContainer.style.display = newValue ? 'flex' : 'none';
             renderLaps();
         });
 
@@ -6489,9 +6803,16 @@ function initApp() {
             }
         });
 
-        seriesSwitchContainer.appendChild(seriesLabel);
-        seriesSwitchContainer.appendChild(seriesSwitch);
-        seriesSwitchContainer.appendChild(seriesStateText);
+        seriesMainRow.appendChild(seriesLabel);
+        seriesMainRow.appendChild(seriesSwitch);
+        seriesMainRow.appendChild(seriesStateText);
+
+        lapTimeDisplaySwitchContainer.appendChild(lapTimeDisplayLabel);
+        lapTimeDisplaySwitchContainer.appendChild(lapTimeDisplaySwitch);
+        lapTimeDisplaySwitchContainer.appendChild(lapTimeDisplayStateText);
+
+        seriesSwitchContainer.appendChild(seriesMainRow);
+        seriesSwitchContainer.appendChild(lapTimeDisplaySwitchContainer);
         modal.appendChild(seriesSwitchContainer);
 
         // --- Switch para botones de volumen ---

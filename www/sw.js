@@ -12,11 +12,10 @@
 // ║  Después de CUALQUIER cambio de código, PREGUNTA al usuario:            ║
 // ║  "¿Quieres actualizar la versión para forzar actualización de la app?"  ║
 // ║                                                                           ║
-// ║  VERSIÓN ACTUAL: 4.0.0                                                   ║
-// ║  PRÓXIMA VERSIÓN: 4.0.1 (incrementar al hacer cambios)                  ║
+// ║  VERSIÓN ACTUAL: 4.0.1                                                   ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
-const CACHE_NAME = 'control-voltes-cache-v4.0.0';
+const CACHE_NAME = 'control-voltes-cache-v4.0.1';
 
 // Detectar si estamos en GitHub Pages o local
 const isGitHubPages = self.location.hostname.includes('github.io');

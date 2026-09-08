@@ -37,6 +37,9 @@ body {
   --work-color: #28a745;
   --rest-color: #ffc107;
   --serie-color: #0d6efd;
+  --work-name-bg: #d4edda;
+  --rest-name-bg: #fff3cd;
+  --serie-name-bg: #cce5ff;
   --danger-color: #dc3545;
   --card-bg-color: #2c2c2c;
 }
@@ -505,6 +508,27 @@ button:focus-visible,
 .lap-name:focus {
   outline: none;
   background: #444;
+}
+
+.lap-name.lap-name--typed-work {
+  background-color: var(--work-name-bg) !important;
+  color: #155724;
+}
+
+.lap-name.lap-name--typed-rest {
+  background-color: var(--rest-name-bg) !important;
+  color: #856404;
+}
+
+.lap-name.lap-name--typed-serie {
+  background-color: var(--serie-name-bg) !important;
+  color: #004085;
+}
+
+.lap-name.lap-name--typed-work:focus,
+.lap-name.lap-name--typed-rest:focus,
+.lap-name.lap-name--typed-serie:focus {
+  filter: brightness(0.95);
 }
 
 .delete-btn {
