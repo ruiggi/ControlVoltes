@@ -86,19 +86,31 @@
             <div id="clock-container">
                 <div id="clock" aria-live="polite" aria-atomic="true">00:00:00.000</div>
             </div>
-            <div id="summary-container">
-                <div id="summary-work" class="summary-item">
-                    <span id="summary-work-label">Trabajo</span>
-                    <strong id="total-work" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
+            <div id="summary-row">
+                <button type="button" id="summary-series-toggle" class="summary-series-toggle" hidden
+                    aria-expanded="true" aria-controls="summary-series" title="Mostrar resum SERIES">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <polygon points="12,18 4,8 20,8" fill="currentColor" />
+                    </svg>
+                </button>
+                <div id="summary-container">
+                    <div id="summary-work" class="summary-item">
+                        <span id="summary-work-label">Trabajo</span>
+                        <strong id="total-work" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
+                    </div>
+                    <div id="summary-rest" class="summary-item">
+                        <span id="summary-rest-label">Reposo</span>
+                        <strong id="total-rest" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
+                    </div>
+                    <div id="summary-total" class="summary-item">
+                        <span id="summary-total-label">Total</span>
+                        <strong id="total-time" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
+                    </div>
                 </div>
-                <div id="summary-rest" class="summary-item">
-                    <span id="summary-rest-label">Reposo</span>
-                    <strong id="total-rest" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
-                </div>
-                <div id="summary-total" class="summary-item">
-                    <span id="summary-total-label">Total</span>
-                    <strong id="total-time" aria-live="polite" aria-atomic="true">0:00:00.000</strong>
-                </div>
+            </div>
+            <div id="summary-series" class="summary-series" hidden>
+                <span id="summary-series-label">Sèries</span>
+                <div id="summary-series-list"></div>
             </div>
             <div id="controls-container">
                 <button id="finalize-btn" class="control-btn">PREM EL RELLOTGE PER COMENÇAR</button>
