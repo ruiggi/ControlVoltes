@@ -2398,6 +2398,7 @@ function initApp() {
         startClock();
 
         // Renderizar elementos actualizados
+        updateSummary();
     };
 
     const parseSessionKey = (fullKey) => {
@@ -2537,6 +2538,7 @@ function initApp() {
                 clockContainer.style.display = 'flex';
                 finalizeBtn.style.display = 'block';
                 updateToggleViewBtnLabel();
+                updateSummary();
 
                 // Refresh display
                 startClock();
@@ -2866,13 +2868,16 @@ function initApp() {
     };
 
     const updateSeriesSummary = (nowMs = null) => {
+        const summarySeriesRow = document.getElementById('summary-series-row');
         const summarySeries = document.getElementById('summary-series');
         const summarySeriesList = document.getElementById('summary-series-list');
         const summarySeriesToggle = document.getElementById('summary-series-toggle');
+        const summarySeriesAdd = document.getElementById('summary-series-add');
         if (!summarySeries || !summarySeriesList) return;
 
         const seriesEnabled = appState.settings.seriesLapTypeEnabled === true;
         const showSummary = appState.settings.showSeriesSummary !== false;
+        const canShowAdd = seriesEnabled && showSummary && !isReadOnly;
 
         if (summarySeriesToggle) {
             summarySeriesToggle.hidden = !seriesEnabled;
@@ -2884,22 +2889,32 @@ function initApp() {
             summarySeriesToggle.title = showSummary ? 'Ocultar resum SERIES' : 'Mostrar resum SERIES';
         }
 
-        if (!seriesEnabled) {
+        if (!seriesEnabled || !showSummary) {
+            if (summarySeriesRow) summarySeriesRow.hidden = true;
             summarySeries.hidden = true;
+            if (summarySeriesAdd) summarySeriesAdd.hidden = true;
             summarySeriesList.innerHTML = '';
             return;
         }
 
         const engineOptions = getSeriesEngineOptions(laps, nowMs);
         const blocks = buildAllSeriesBlocks(laps, engineOptions);
-        if (blocks.length === 0) {
+        const hasBlocks = blocks.length > 0;
+        const canShowPanel = hasBlocks && (isRecording || isViewingSession || isReadOnly);
+        const showRow = canShowAdd || canShowPanel;
+
+        if (!showRow) {
+            if (summarySeriesRow) summarySeriesRow.hidden = true;
             summarySeries.hidden = true;
+            if (summarySeriesAdd) summarySeriesAdd.hidden = true;
             summarySeriesList.innerHTML = '';
             return;
         }
 
-        summarySeries.hidden = !showSummary;
-        summarySeriesList.innerHTML = blocks.map((block) => {
+        if (summarySeriesRow) summarySeriesRow.hidden = false;
+        if (summarySeriesAdd) summarySeriesAdd.hidden = !canShowAdd;
+        summarySeries.hidden = !canShowPanel;
+        summarySeriesList.innerHTML = hasBlocks ? blocks.map((block) => {
             const composition = getSeriesBlockComposition(block, laps);
             const times = getSeriesWorkRestSeconds(block, laps, engineOptions);
             const workText = composition.workCount === 0
@@ -2918,7 +2933,7 @@ function initApp() {
                 </span>
                 <strong>${formatSummaryDurationHTML(block.totalDurationSeconds)}</strong>
             </div>`;
-        }).join('');
+        }).join('') : '';
     };
 
     const updateSummary = () => {
@@ -3598,7 +3613,7 @@ function initApp() {
         }
     };
 
-    const addLap = () => {
+    const addLap = (options = {}) => {
         if (isReadOnly) return;
         const now = new Date();
         if (!isRecording) {
@@ -3614,7 +3629,8 @@ function initApp() {
             // Montar campo de nombre de sesión para grabación
             mountRecordingNameRow();
         }
-        const newType = getNewLapTypeForInsert();
+        const forcedType = options && options.forcedType;
+        const newType = forcedType || getNewLapTypeForInsert();
         const newLap = {
             time: now,
             name: formatDefaultLapName(laps.length + 1),
@@ -3622,6 +3638,9 @@ function initApp() {
         };
         applyLapNameForType(newLap, laps.length + 1, newType);
         laps.push(newLap);
+        if (newType === 'serie') {
+            ensureSerieAutoWorkLap(laps.length - 1);
+        }
         renderLaps();
         updateSummary();
         persistActiveRecordingState();
@@ -3630,6 +3649,11 @@ function initApp() {
         if (laps.length >= 2) {
             startLastLapUpdate();
         }
+    };
+
+    const addSeriesLap = () => {
+        if (!appState.settings.seriesLapTypeEnabled) return;
+        addLap({ forcedType: 'serie' });
     };
 
     // Actualizar solo la duración de la última vuelta (optimizado)
@@ -5155,15 +5179,75 @@ function initApp() {
         }
     };
 
-    const appendSeriesExportSummaryLines = (summaryText, separator, savedLaps) => {
-        if (!appState.settings.seriesLapTypeEnabled) return summaryText;
-        const blocks = buildAllSeriesBlocks(savedLaps, getSeriesEngineOptions(savedLaps));
-        if (blocks.length === 0) return summaryText;
+    const getSeriesExportData = (savedLaps) => {
+        if (!appState.settings.seriesLapTypeEnabled || !Array.isArray(savedLaps) || savedLaps.length === 0) {
+            return null;
+        }
+        const engineOptions = getSeriesEngineOptions(savedLaps);
+        const blocks = buildAllSeriesBlocks(savedLaps, engineOptions);
+        if (blocks.length === 0) return null;
 
+        return {
+            engineOptions,
+            blocks,
+            rows: blocks.map((block) => {
+                const composition = getSeriesBlockComposition(block, savedLaps);
+                const times = getSeriesWorkRestSeconds(block, savedLaps, engineOptions);
+                return {
+                    label: block.label,
+                    workCount: composition.workCount,
+                    workNumbers: composition.workNumbers,
+                    workSeconds: times.workSeconds,
+                    restCount: composition.restCount,
+                    restNumbers: composition.restNumbers,
+                    restSeconds: times.restSeconds,
+                    totalSeconds: block.totalDurationSeconds
+                };
+            })
+        };
+    };
+
+    const getSeriesMembershipLabel = (lapIndex, blocks) => {
+        if (!Array.isArray(blocks)) return '';
+        for (const block of blocks) {
+            if (block.memberIndices.includes(lapIndex)) return block.label;
+            if (block.interSeriesRestIndex === lapIndex) return 'Entre sèries';
+        }
+        return '';
+    };
+
+    const getSeriesAccumulatedPlainFromBlocks = (lapIndex, lapsArray, blocks) => {
+        if (!lapsArray[lapIndex] || lapsArray[lapIndex].type !== 'serie') return '';
+        const block = blocks.find((item) => item.startIndex === lapIndex);
+        return block ? formatDurationPlain(block.totalDurationSeconds) : '';
+    };
+
+    const formatSeriesItemsPlain = (count, numbers) => {
+        if (count === 0) return '0';
+        return `${count} (${numbers.map((n) => '#' + n).join(', ')})`;
+    };
+
+    const csvQuote = (value) => `"${String(value).replaceAll('"', '""')}"`;
+
+    const appendSeriesExportSummaryPlain = (summaryText, seriesData) => {
+        if (!seriesData) return summaryText;
+        let out = summaryText + `\nResumen series (${seriesData.blocks.length}):\n`;
+        seriesData.rows.forEach((row) => {
+            out += `- ${row.label}\n`;
+            out += `  Treball: ${formatDurationPlain(row.workSeconds)}  Voltes: ${formatSeriesItemsPlain(row.workCount, row.workNumbers)}\n`;
+            out += `  Descans: ${formatDurationPlain(row.restSeconds)}  Descansos: ${formatSeriesItemsPlain(row.restCount, row.restNumbers)}\n`;
+            out += `  Total: ${formatDurationPlain(row.totalSeconds)}\n`;
+        });
+        return out;
+    };
+
+    const appendSeriesExportSummaryCsv = (summaryText, separator, seriesData) => {
+        if (!seriesData) return summaryText;
         let out = summaryText;
-        out += `\nResumen${separator}Series${separator}${blocks.length}\n`;
-        blocks.forEach((block, idx) => {
-            out += `Resumen${separator}Serie ${idx + 1}${separator}${formatDurationPlain(block.totalDurationSeconds)}\n`;
+        out += `\nResumen series${separator}${seriesData.blocks.length}\n`;
+        out += `Sèrie${separator}Voltes${separator}Treball${separator}Descansos${separator}Descans${separator}Total\n`;
+        seriesData.rows.forEach((row) => {
+            out += `${csvQuote(row.label)}${separator}${csvQuote(formatSeriesItemsPlain(row.workCount, row.workNumbers))}${separator}${formatDurationPlain(row.workSeconds)}${separator}${csvQuote(formatSeriesItemsPlain(row.restCount, row.restNumbers))}${separator}${formatDurationPlain(row.restSeconds)}${separator}${formatDurationPlain(row.totalSeconds)}\n`;
         });
         return out;
     };
@@ -5181,9 +5265,10 @@ function initApp() {
             let totalRestSeconds = 0;
 
             let shareText = `Sesión: ${sessionName}\nFecha: ${startDateStr}\nHora inicio: ${startTimeStr}\n\n`;
-            const includeSeriesColumn = appState.settings.seriesLapTypeEnabled;
+            const seriesData = getSeriesExportData(savedLaps);
+            const includeSeriesColumn = !!seriesData;
             // Encabezado (tabulado) - Orden: #, HORA, DURADA, TIPUS, NOM
-            shareText += `#\tHora\tDurada\tTipus\tNom` + (includeSeriesColumn ? '\tAcumulat serie' : '') + "\n";
+            shareText += `#\tHora\tDurada\tTipus\tNom` + (includeSeriesColumn ? '\tSerie\tAcumulat serie' : '') + "\n";
 
             savedLaps.forEach((lap, index) => {
                 const lapTime = new Date(lap.time);
@@ -5203,7 +5288,7 @@ function initApp() {
                 // Añadir tipo y nombre
                 line += `\t${lapTypeLabel}\t${lap.name}`;
                 if (includeSeriesColumn) {
-                    line += `\t${getSeriesAccumulatedPlain(index, savedLaps)}`;
+                    line += `\t${getSeriesMembershipLabel(index, seriesData.blocks)}\t${getSeriesAccumulatedPlainFromBlocks(index, savedLaps, seriesData.blocks)}`;
                 }
                 shareText += line + "\n";
             });
@@ -5213,7 +5298,7 @@ function initApp() {
             shareText += `  Treball: ${formatDurationPlain(totalWorkSeconds)}\n`;
             shareText += `  Descans: ${formatDurationPlain(totalRestSeconds)}\n`;
             shareText += `  Total: ${formatDurationPlain(totalTimeSeconds)}\n`;
-            shareText = appendSeriesExportSummaryLines(shareText, '\t', savedLaps);
+            shareText = appendSeriesExportSummaryPlain(shareText, seriesData);
 
             // Cordova: Usar plugin de social sharing
             if (window.cordova && window.plugins && window.plugins.socialsharing) {
@@ -5249,9 +5334,10 @@ function initApp() {
         const startTimeStr = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(startDate.getSeconds()).padStart(2, '0')}.${String(startDate.getMilliseconds()).padStart(3, '0')}`;
 
         let csv = `Sesion,${sessionName}\nFecha,${startDateStr}\nHora inicio,${startTimeStr}\n\n`;
-        const includeSeriesColumn = appState.settings.seriesLapTypeEnabled;
+        const seriesData = getSeriesExportData(savedLaps);
+        const includeSeriesColumn = !!seriesData;
         csv += includeSeriesColumn
-            ? `#;Hora;Tipo;Nombre;Duracion;Acumulat serie\n`
+            ? `#;Hora;Tipo;Nombre;Duracion;Serie;Acumulat serie\n`
             : `#;Hora;Tipo;Nombre;Duracion\n`; // cabecera CSV con ; separador
 
         let totalWorkSeconds = 0;
@@ -5270,9 +5356,10 @@ function initApp() {
             }
             // Escapar comillas en nombre
             const safeName = String(lap.name).replaceAll('"', '""');
-            const accumulatedStr = includeSeriesColumn ? getSeriesAccumulatedPlain(index, savedLaps) : '';
+            const seriesLabel = includeSeriesColumn ? getSeriesMembershipLabel(index, seriesData.blocks) : '';
+            const accumulatedStr = includeSeriesColumn ? getSeriesAccumulatedPlainFromBlocks(index, savedLaps, seriesData.blocks) : '';
             csv += includeSeriesColumn
-                ? `${index + 1};${lapTimeStr};${lapTypeLabel};"${safeName}";${durationStr};${accumulatedStr}\n`
+                ? `${index + 1};${lapTimeStr};${lapTypeLabel};"${safeName}";${durationStr};${csvQuote(seriesLabel)};${accumulatedStr}\n`
                 : `${index + 1};${lapTimeStr};${lapTypeLabel};"${safeName}";${durationStr}\n`;
         });
 
@@ -5280,7 +5367,7 @@ function initApp() {
         csv += `\nResumen;Treball;${formatDurationPlain(totalWorkSeconds)}\n`;
         csv += `Resumen;Descans;${formatDurationPlain(totalRestSeconds)}\n`;
         csv += `Resumen;Total;${formatDurationPlain(totalTimeSeconds)}\n`;
-        csv = appendSeriesExportSummaryLines(csv, ';', savedLaps);
+        csv = appendSeriesExportSummaryCsv(csv, ';', seriesData);
 
         // Verificar si se debe exportar como archivo o como texto
         if (appState.settings.csvExportAsFile) {
@@ -5365,9 +5452,10 @@ function initApp() {
         const startTimeStr = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(startDate.getSeconds()).padStart(2, '0')}.${String(startDate.getMilliseconds()).padStart(3, '0')}`;
 
         let csv = `Sesion,${sessionName}\nFecha,${startDateStr}\nHora inicio,${startTimeStr}\n\n`;
-        const includeSeriesColumn = appState.settings.seriesLapTypeEnabled;
+        const seriesData = getSeriesExportData(savedLaps);
+        const includeSeriesColumn = !!seriesData;
         csv += includeSeriesColumn
-            ? `#,Hora,Tipo,Nombre,Duracion,Acumulat serie\n`
+            ? `#,Hora,Tipo,Nombre,Duracion,Serie,Acumulat serie\n`
             : `#,Hora,Tipo,Nombre,Duracion\n`; // cabecera CSV con , separador
 
         let totalWorkSeconds = 0;
@@ -5386,9 +5474,10 @@ function initApp() {
             }
             // Escapar comillas en nombre
             const safeName = String(lap.name).replaceAll('"', '""');
-            const accumulatedStr = includeSeriesColumn ? getSeriesAccumulatedPlain(index, savedLaps) : '';
+            const seriesLabel = includeSeriesColumn ? getSeriesMembershipLabel(index, seriesData.blocks) : '';
+            const accumulatedStr = includeSeriesColumn ? getSeriesAccumulatedPlainFromBlocks(index, savedLaps, seriesData.blocks) : '';
             csv += includeSeriesColumn
-                ? `${index + 1},${lapTimeStr},${lapTypeLabel},"${safeName}",${durationStr},${accumulatedStr}\n`
+                ? `${index + 1},${lapTimeStr},${lapTypeLabel},"${safeName}",${durationStr},${csvQuote(seriesLabel)},${accumulatedStr}\n`
                 : `${index + 1},${lapTimeStr},${lapTypeLabel},"${safeName}",${durationStr}\n`;
         });
 
@@ -5396,7 +5485,7 @@ function initApp() {
         csv += `\nResumen,Treball,${formatDurationPlain(totalWorkSeconds)}\n`;
         csv += `Resumen,Descans,${formatDurationPlain(totalRestSeconds)}\n`;
         csv += `Resumen,Total,${formatDurationPlain(totalTimeSeconds)}\n`;
-        csv = appendSeriesExportSummaryLines(csv, ',', savedLaps);
+        csv = appendSeriesExportSummaryCsv(csv, ',', seriesData);
 
         // Verificar si se debe exportar como archivo o como texto
         if (appState.settings.csvExportAsFile) {
@@ -5485,8 +5574,10 @@ function initApp() {
         let totalRestSeconds = 0;
 
         let shareText = `Sesión: ${sessionName}\nFecha: ${startDateStr}\nHora inicio: ${startTimeStr}\n\n`;
+        const seriesData = getSeriesExportData(savedLaps);
+        const includeSeriesColumn = !!seriesData;
         // Encabezado (tabulado) - Orden: #, HORA, DURADA, TIPUS, NOM
-        shareText += `#\tHora\tDurada\tTipus\tNom` + "\n";
+        shareText += `#\tHora\tDurada\tTipus\tNom` + (includeSeriesColumn ? '\tSerie\tAcumulat serie' : '') + "\n";
 
         savedLaps.forEach((lap, index) => {
             const lapTime = new Date(lap.time);
@@ -5505,6 +5596,9 @@ function initApp() {
             }
             // Añadir tipo y nombre
             line += `\t${lapTypeLabel}\t${lap.name}`;
+            if (includeSeriesColumn) {
+                line += `\t${getSeriesMembershipLabel(index, seriesData.blocks)}\t${getSeriesAccumulatedPlainFromBlocks(index, savedLaps, seriesData.blocks)}`;
+            }
             shareText += line + "\n";
         });
 
@@ -5513,6 +5607,7 @@ function initApp() {
         shareText += `  Treball: ${formatDurationPlain(totalWorkSeconds)}\n`;
         shareText += `  Descans: ${formatDurationPlain(totalRestSeconds)}\n`;
         shareText += `  Total: ${formatDurationPlain(totalTimeSeconds)}\n`;
+        shareText = appendSeriesExportSummaryPlain(shareText, seriesData);
 
         // Intentar copiar al portapapeles
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -7908,6 +8003,20 @@ function initApp() {
             e.preventDefault();
             e.stopPropagation();
             setShowSeriesSummary(appState.settings.showSeriesSummary === false);
+        });
+    }
+    const summarySeriesAdd = document.getElementById('summary-series-add');
+    if (summarySeriesAdd) {
+        summarySeriesAdd.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            addSeriesLap();
+        });
+        summarySeriesAdd.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                addSeriesLap();
+            }
         });
     }
     updateSeriesSummary();
