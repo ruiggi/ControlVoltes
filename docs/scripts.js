@@ -3988,8 +3988,8 @@ function initApp() {
                     title: 'CONFIRMAR CANCEL.LACIÓ',
                     message: 'Estàs segur que vols cancel·lar la sessió actual?\n Es perdran totes les dades registrades.',
                     type: 'confirm',
-                    okText: 'SÍ\nCANCEL·LAR',
-                    cancelText: 'NO\nCONTINUAR',
+                    okText: 'SÍ, \n(CANCEL·LAR)',
+                    cancelText: 'NO, \n(CONTINUAR)',
                     okButtonStyle: 'background: #f44336; color: white; border: 1px solid #f44336;',
                     cancelButtonStyle: 'background: #4CAF50; color: white; border: 1px solid #4CAF50;',
                     buttonLayout: 'horizontal',
@@ -6895,7 +6895,7 @@ function initApp() {
         }
 
         const appVersion = '4.0.2'; // Versión desde manifest.json
-        const appDateVersion = '2026-09-08'; // Versión desde manifest.json
+        const appDateVersion = '2026-09-10'; // Versión desde manifest.json
 
         // Crear contenedor del modal con opciones
         const modalContent = document.createElement('div');
