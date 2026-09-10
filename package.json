@@ -1,7 +1,7 @@
 {
   "name": "control-voltes",
   "displayName": "VOLTES",
-  "version": "5.0.1",
+  "version": "4.0.3",
   "description": "Cronómetro deportivo para control de vueltas con botones físicos",
   "main": "index.js",
   "scripts": {
