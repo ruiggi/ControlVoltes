@@ -26,10 +26,11 @@ function initApp() {
             clockMode: 'elapsed',  // 'elapsed' = tiempo transcurrido (defecto), 'time' = hora actual
             seriesLapTypeEnabled: false,  // Por defecto desactivado (solo TREBALL/DESCANS)
             lapTimeDisplayMode: 'registration',  // 'registration' = hora del registro, 'seriesAccumulated' = acumulado desde inicio de sèrie
-            seriesOutsideDisplayMode: 'partial',  // 'partial' = duración de la volta, 'dash' = guion
+            seriesOutsideDisplayMode: 'registration',  // 'registration' = hora del registre, 'partial' = valor actual, 'dash' = guion
             showSeriesSummary: true,  // Por defecto mostrar el resumen de sèries
             alternateNewLapTypes: true,  // true = alternar treball/descans al inserir, false = sempre treball
-            defaultLapNamePrefix: 'Registro'  // Prefijo por defecto para nombres de vuelta (ej: "Registro 1")
+            defaultLapNamePrefix: 'Registro',  // Prefijo por defecto para nombres de vuelta (ej: "Registro 1")
+            clockSecondaryFontRem: 0.72  // Tamany del rellotge secundari (peu del cronòmetre)
         },
 
         // Intervalos
@@ -241,6 +242,28 @@ function initApp() {
         inputEl.classList.add(className);
     };
 
+    const CLOCK_SECONDARY_FONT_DEFAULT = 0.72;
+    const CLOCK_SECONDARY_FONT_MIN = 0.5;
+    const CLOCK_SECONDARY_FONT_MAX = 2;
+
+    const clampClockSecondaryFontRem = (value) => {
+        const n = parseFloat(value);
+        if (!Number.isFinite(n)) return CLOCK_SECONDARY_FONT_DEFAULT;
+        const clamped = Math.min(CLOCK_SECONDARY_FONT_MAX, Math.max(CLOCK_SECONDARY_FONT_MIN, n));
+        return Math.round(clamped * 50) / 50;
+    };
+
+    const applyClockSecondaryFontSize = (remValue) => {
+        const rem = clampClockSecondaryFontRem(
+            remValue !== undefined ? remValue : appState.settings.clockSecondaryFontRem
+        );
+        appState.settings.clockSecondaryFontRem = rem;
+        document.documentElement.style.setProperty('--clock-secondary-font-size', `${rem}rem`);
+        if (clockSecondaryElement) {
+            clockSecondaryElement.style.fontSize = `${rem}rem`;
+        }
+    };
+
     const loadSettings = () => {
         try {
             const saved = localStorage.getItem('voltes_settings');
@@ -254,11 +277,20 @@ function initApp() {
                 appState.settings.clockMode = settings.clockMode === 'time' ? 'time' : 'elapsed';
                 appState.settings.seriesLapTypeEnabled = settings.seriesLapTypeEnabled === true;
                 appState.settings.lapTimeDisplayMode = settings.lapTimeDisplayMode === 'seriesAccumulated' ? 'seriesAccumulated' : 'registration';
-                appState.settings.seriesOutsideDisplayMode = settings.seriesOutsideDisplayMode === 'dash' ? 'dash' : 'partial';
+                if (settings.seriesOutsideDisplayMode === 'partial') {
+                    appState.settings.seriesOutsideDisplayMode = 'partial';
+                } else if (settings.seriesOutsideDisplayMode === 'dash') {
+                    appState.settings.seriesOutsideDisplayMode = 'dash';
+                } else {
+                    appState.settings.seriesOutsideDisplayMode = 'registration';
+                }
                 appState.settings.showSeriesSummary = settings.showSeriesSummary !== false;
                 appState.settings.alternateNewLapTypes = settings.alternateNewLapTypes !== false;
                 appState.settings.defaultLapNamePrefix = normalizeLapNamePrefix(
                     settings.defaultLapNamePrefix !== undefined ? settings.defaultLapNamePrefix : 'Registro'
+                );
+                appState.settings.clockSecondaryFontRem = clampClockSecondaryFontRem(
+                    settings.clockSecondaryFontRem !== undefined ? settings.clockSecondaryFontRem : 0.72
                 );
             }
         } catch (e) {
@@ -271,10 +303,11 @@ function initApp() {
             appState.settings.clockMode = 'elapsed';
             appState.settings.seriesLapTypeEnabled = false;
             appState.settings.lapTimeDisplayMode = 'registration';
-            appState.settings.seriesOutsideDisplayMode = 'partial';
+            appState.settings.seriesOutsideDisplayMode = 'registration';
             appState.settings.showSeriesSummary = true;
             appState.settings.alternateNewLapTypes = true;
             appState.settings.defaultLapNamePrefix = 'Registro';
+            appState.settings.clockSecondaryFontRem = CLOCK_SECONDARY_FONT_DEFAULT;
         }
     };
 
@@ -2342,7 +2375,7 @@ function initApp() {
             renderLaps();
             updateSummary();
 
-            if (laps.length >= 2) {
+            if (laps.length >= 1) {
                 startLastLapUpdate();
             }
 
@@ -2670,7 +2703,7 @@ function initApp() {
 
         laps.splice(serieIndex + 1, 0, workLap);
 
-        if (!isReadOnly && laps.length >= 2) {
+        if (!isReadOnly && laps.length >= 1) {
             startLastLapUpdate();
         }
     };
@@ -2758,6 +2791,48 @@ function initApp() {
                 workSeconds += duration;
             } else {
                 restSeconds += duration;
+            }
+        }
+
+        return {
+            workSeconds: Math.max(0, workSeconds),
+            restSeconds: Math.max(0, restSeconds)
+        };
+    };
+
+    const getSessionWorkRestSeconds = (lapsArray, options = {}) => {
+        const engineOptions = typeof options.isLiveSession === 'boolean'
+            ? options
+            : getSeriesEngineOptions(lapsArray, options.nowMs);
+        const nowMs = engineOptions.nowMs != null ? engineOptions.nowMs : Date.now();
+        const isLiveSession = engineOptions.isLiveSession === true;
+
+        let workSeconds = 0;
+        let restSeconds = 0;
+
+        if (!Array.isArray(lapsArray) || lapsArray.length === 0) {
+            return { workSeconds: 0, restSeconds: 0 };
+        }
+
+        const lastIndex = lapsArray.length - 1;
+        for (let i = 0; i < lastIndex; i++) {
+            const duration = (getLapTimeMs(lapsArray[i + 1]) - getLapTimeMs(lapsArray[i])) / 1000;
+            if (!Number.isFinite(duration) || duration < 0) continue;
+            if (isWorkLapType(lapsArray[i].type)) {
+                workSeconds += duration;
+            } else {
+                restSeconds += duration;
+            }
+        }
+
+        if (isLiveSession) {
+            const liveDuration = (nowMs - getLapTimeMs(lapsArray[lastIndex])) / 1000;
+            if (Number.isFinite(liveDuration) && liveDuration > 0) {
+                if (isWorkLapType(lapsArray[lastIndex].type)) {
+                    workSeconds += liveDuration;
+                } else {
+                    restSeconds += liveDuration;
+                }
             }
         }
 
@@ -2878,11 +2953,13 @@ function initApp() {
         }
 
         const block = getSeriesBlockForLap(index, laps, getSeriesEngineOptions(laps, nowMs));
-        if (block && index === block.startIndex) {
-            const seconds = getSeriesTotalSeconds(block, laps, getSeriesEngineOptions(laps, nowMs));
-            return formatSummaryDurationHTML(seconds);
+        if (block && block.memberIndices.includes(index)) {
+            return formatTime(t);
         }
 
+        if (appState.settings.seriesOutsideDisplayMode === 'registration') {
+            return formatTime(t);
+        }
         if (appState.settings.seriesOutsideDisplayMode === 'partial') {
             const partial = getLapPartialDurationHTML(index, nowMs);
             return partial || '—';
@@ -2890,23 +2967,45 @@ function initApp() {
         return '—';
     };
 
-    const updateOpenSeriesDurationDisplay = (nowMs = null) => {
-        if (!isSeriesAccumulatedDisplayMode()) return;
+    const isSerieStartLapIndex = (index, lapsArray = laps) => {
+        const lap = lapsArray[index];
+        if (!lap || lap.type !== 'serie' || !appState.settings.seriesLapTypeEnabled) return false;
+        const block = getSeriesBlockForLap(index, lapsArray, getSeriesEngineOptions(lapsArray));
+        return block != null && block.startIndex === index;
+    };
+
+    const getSerieStartLapTimeHTML = (index, nowMs = null) => {
+        if (!isSerieStartLapIndex(index)) return '';
+        const engineOptions = getSeriesEngineOptions(laps, nowMs);
+        const block = getSeriesBlockForLap(index, laps, engineOptions);
+        if (!block) return '';
+        const seconds = getSeriesTotalSeconds(block, laps, engineOptions);
+        return formatSummaryDurationHTML(seconds);
+    };
+
+    const refreshSerieStartLapTimeDisplay = (nowMs = null) => {
+        if (!appState.settings.seriesLapTypeEnabled || isReadOnly || laps.length === 0) return;
 
         const engineOptions = getSeriesEngineOptions(laps, nowMs);
         const openBlock = buildAllSeriesBlocks(laps, engineOptions).find((block) => block.isOpen);
-        if (!openBlock) return;
+        if (!openBlock || !isSerieStartLapIndex(openBlock.startIndex)) return;
 
-        const lapItem = document.getElementById(`lap-item-${openBlock.startIndex}`);
-        if (!lapItem) return;
+        const serieRow = document.getElementById(`lap-item-${openBlock.startIndex}`);
+        const serieTimeSpan = serieRow?.querySelector('.lap-time');
+        if (!serieTimeSpan) return;
 
-        const registrationSpan = lapItem.querySelector('.lap-duration');
-        if (!registrationSpan) return;
-
-        const formatted = getLapDurationDisplayHTML(openBlock.startIndex, laps[openBlock.startIndex], engineOptions.nowMs);
-        if (registrationSpan.innerHTML !== formatted) {
-            registrationSpan.innerHTML = formatted;
+        const formatted = getSerieStartLapTimeHTML(openBlock.startIndex, engineOptions.nowMs);
+        if (formatted && serieTimeSpan.innerHTML !== formatted) {
+            serieTimeSpan.innerHTML = formatted;
         }
+    };
+
+    const getLapTimeColumnHTML = (index, nowMs = null) => {
+        if (isSerieStartLapIndex(index)) {
+            return getSerieStartLapTimeHTML(index, nowMs);
+        }
+
+        return getLapPartialDurationHTML(index, nowMs);
     };
 
     const updateSeriesSummary = (nowMs = null) => {
@@ -2982,25 +3081,15 @@ function initApp() {
         }
     };
 
-    const updateSummary = () => {
-        let totalWorkSeconds = 0;
-        let totalRestSeconds = 0;
-
-        if (laps.length > 1) {
-            for (let i = 0; i < laps.length - 1; i++) {
-                const duration = (laps[i + 1].time - laps[i].time) / 1000;
-                if (isWorkLapType(laps[i].type)) {
-                    totalWorkSeconds += duration;
-                } else {
-                    totalRestSeconds += duration;
-                }
-            }
-        }
+    const updateSummary = (nowMs = null) => {
+        const engineOptions = getSeriesEngineOptions(laps, nowMs);
+        const { workSeconds: totalWorkSeconds, restSeconds: totalRestSeconds } =
+            getSessionWorkRestSeconds(laps, engineOptions);
 
         totalWorkElement.innerHTML = formatSummaryDurationHTML(totalWorkSeconds);
         totalRestElement.innerHTML = formatSummaryDurationHTML(totalRestSeconds);
         totalTimeElement.innerHTML = formatSummaryDurationHTML(totalWorkSeconds + totalRestSeconds);
-        updateSeriesSummary();
+        updateSeriesSummary(engineOptions.nowMs);
     };
 
     const enforceFinalLapName = () => {
@@ -3287,15 +3376,9 @@ function initApp() {
             durationSpan.className = 'lap-time';
             durationSpan.id = `lap-duration-${index}`;
 
-            if (index < laps.length - 1) {
-                const nextRaw = laps[index + 1].time;
-                const nextT = (nextRaw instanceof Date) ? nextRaw : new Date(nextRaw);
-                const duration = (nextT - t) / 1000;
-                durationSpan.innerHTML = formatSummaryDurationHTML(duration);
-            } else if (!isReadOnly) {
-                const now = new Date();
-                const duration = (now - t) / 1000;
-                durationSpan.innerHTML = formatSummaryDurationHTML(duration);
+            const lapTimeColumnHtml = getLapTimeColumnHTML(index);
+            if (lapTimeColumnHtml) {
+                durationSpan.innerHTML = lapTimeColumnHtml;
             }
 
             const lapTypeToggle = document.createElement('button');
@@ -3692,7 +3775,7 @@ function initApp() {
         persistActiveRecordingState();
 
         // Iniciar actualización incremental de la última vuelta
-        if (laps.length >= 2) {
+        if (laps.length >= 1) {
             startLastLapUpdate();
         }
     };
@@ -3705,41 +3788,22 @@ function initApp() {
     // Actualizar solo la duración de la última vuelta (optimizado)
     const updateLastLapDuration = () => {
         if (isReadOnly || laps.length === 0) return;
-        // Obtener el elemento correcto según el orden
-        const lastLapElement = lapsOrderDescending ? lapsContainer.firstChild : lapsContainer.lastChild;
-        if (lastLapElement) {
-            const now = new Date();
-            const lastIndex = laps.length - 1;
-            const lastLap = laps[lastIndex];
 
-            const durationSpan = lastLapElement.querySelector('.lap-time');
-            if (durationSpan) {
-                const duration = (now - lastLap.time) / 1000;
-                const formatted = formatSummaryDurationHTML(duration);
+        const now = new Date();
+        const nowMs = now.getTime();
+        const lastIndex = laps.length - 1;
+        const lastLapElement = document.getElementById(`lap-item-${lastIndex}`);
+        const durationSpan = lastLapElement?.querySelector('.lap-time');
 
-                // Solo actualizar si cambió (optimización)
-                if (durationSpan.innerHTML !== formatted) {
-                    durationSpan.innerHTML = formatted;
-                }
-            }
-
-            // Actualizar total de sèrie oberta en la volta d'inici
-            if (isSeriesAccumulatedDisplayMode()) {
-                updateOpenSeriesDurationDisplay(now.getTime());
-
-                const registrationSpan = lastLapElement.querySelector('.lap-duration');
-                if (registrationSpan) {
-                    const formattedReg = getLapDurationDisplayHTML(lastIndex, lastLap, now.getTime());
-                    if (registrationSpan.innerHTML !== formattedReg) {
-                        registrationSpan.innerHTML = formattedReg;
-                    }
-                }
-            }
-
-            if (appState.settings.seriesLapTypeEnabled) {
-                updateSeriesSummary(now.getTime());
+        if (durationSpan && !isSerieStartLapIndex(lastIndex)) {
+            const formatted = getLapTimeColumnHTML(lastIndex, nowMs);
+            if (formatted && durationSpan.innerHTML !== formatted) {
+                durationSpan.innerHTML = formatted;
             }
         }
+
+        refreshSerieStartLapTimeDisplay(nowMs);
+        updateSummary(nowMs);
     };
 
     // Variables para actualización incremental de última vuelta
@@ -3750,42 +3814,22 @@ function initApp() {
         if (lastLapUpdateId) return; // Ya está actualizando
 
         lastLapUpdateId = setInterval(() => {
-            if (laps.length < 2) return;
-
-            // Obtener el elemento correcto según el orden
-            const lastLapElement = lapsOrderDescending ? lapsContainer.firstChild : lapsContainer.lastChild;
-            if (!lastLapElement) return;
+            if (laps.length < 1) return;
 
             const nowMs = Date.now();
             const lastIndex = laps.length - 1;
-            const lastLap = laps[lastIndex];
+            const lastLapElement = document.getElementById(`lap-item-${lastIndex}`);
+            const durationSpan = lastLapElement?.querySelector('.lap-time');
 
-            const durationSpan = lastLapElement.querySelector('.lap-time');
-            if (durationSpan) {
-                const duration = (nowMs - lastLap.time) / 1000;
-                const formatted = formatSummaryDurationHTML(duration);
-
-                // Solo actualizar si cambió
-                if (durationSpan.innerHTML !== formatted) {
+            if (durationSpan && !isSerieStartLapIndex(lastIndex)) {
+                const formatted = getLapTimeColumnHTML(lastIndex, nowMs);
+                if (formatted && durationSpan.innerHTML !== formatted) {
                     durationSpan.innerHTML = formatted;
                 }
             }
 
-            if (isSeriesAccumulatedDisplayMode()) {
-                updateOpenSeriesDurationDisplay(nowMs);
-
-                const registrationSpan = lastLapElement.querySelector('.lap-duration');
-                if (registrationSpan) {
-                    const formattedReg = getLapDurationDisplayHTML(lastIndex, lastLap, nowMs);
-                    if (registrationSpan.innerHTML !== formattedReg) {
-                        registrationSpan.innerHTML = formattedReg;
-                    }
-                }
-            }
-
-            if (appState.settings.seriesLapTypeEnabled) {
-                updateSeriesSummary(nowMs);
-            }
+            refreshSerieStartLapTimeDisplay(nowMs);
+            updateSummary(nowMs);
         }, 100); // Actualizar cada 100ms (suficiente para mostrar cambios)
 
     }
@@ -3811,14 +3855,18 @@ function initApp() {
             lastClockUpdate = now;
 
             const timeFormatted = formatTime(new Date());
-            const elapsedSeconds = laps.length > 0
+            const sessionElapsedSeconds = laps.length > 0
                 ? (now - new Date(laps[0].time).getTime()) / 1000
                 : 0;
-            const elapsedFormatted = formatSummaryDurationHTML(elapsedSeconds);
+            const currentLapElapsedSeconds = laps.length > 0
+                ? (now - new Date(laps[laps.length - 1].time).getTime()) / 1000
+                : 0;
+            const sessionElapsedFormatted = formatSummaryDurationHTML(sessionElapsedSeconds);
+            const currentLapElapsedFormatted = formatSummaryDurationHTML(currentLapElapsedSeconds);
 
             const isElapsedMode = appState.settings.clockMode !== 'time';
-            const primaryFormatted = isElapsedMode ? elapsedFormatted : timeFormatted;
-            const secondaryFormatted = isElapsedMode ? timeFormatted : elapsedFormatted;
+            const primaryFormatted = isElapsedMode ? currentLapElapsedFormatted : timeFormatted;
+            const secondaryFormatted = sessionElapsedFormatted;
 
             // Solo actualizar DOM si cambió el contenido
             if (clockElement.innerHTML !== primaryFormatted) {
@@ -6846,7 +6894,7 @@ function initApp() {
             return;
         }
 
-        const appVersion = '4.0.1'; // Versión desde manifest.json
+        const appVersion = '4.0.2'; // Versión desde manifest.json
         const appDateVersion = '2026-09-08'; // Versión desde manifest.json
 
         // Crear contenedor del modal con opciones
@@ -6856,17 +6904,15 @@ function initApp() {
 
         const infoText = document.createElement('div');
         infoText.innerHTML = `
-            <div style="text-align: center; margin-bottom: 8px;">
-                
-                <strong style="font-size: 1.9rem; border: 3px solid black; padding: 6px 12px; display: block; border-radius: 6px; background-color: yellow; color: black;">CONTROL VOLTES</strong>
+            <div style="text-align: center; margin-bottom: 4px;">
+                <strong style="font-size: 1.25rem; border: 2px solid black; padding: 3px 8px; display: block; border-radius: 6px; background-color: yellow; color: black;">CONTROL VOLTES</strong>
             </div>
-            <div style="text-align: center; margin-bottom: 6px; line-height: 1.3;">
+            <div style="text-align: center; margin-bottom: 2px; line-height: 1.15; font-size: 0.8rem;">
                 <span style="opacity: 0.8;">Versió: ${appVersion} ( ${appDateVersion} )</span>
             </div>
-            <div style="text-align: center; margin-bottom: 8px; line-height: 1.3;">
-                <strong>© 2025 - Albert Ruiz Pujol</strong><br>
-                <a href="mailto:ruiggi@gmail.com" style="color:rgb(255, 255, 255); text-decoration: none;">ruiggi@gmail.com</a><br>
-                <u><a href="https://ruiggi.github.io/ControlVoltes/" target="_blank" style="color:rgb(255, 255, 255); text-decoration: none;">https://ruiggi.github.io/ControlVoltes/</a></u>
+            <div style="text-align: center; margin-bottom: 4px; line-height: 1.15; font-size: 0.75rem;">
+                <strong>© 2025 - Albert Ruiz Pujol</strong>
+                · <a href="mailto:ruiggi@gmail.com" style="color:rgb(255, 255, 255); text-decoration: none;">ruiggi@gmail.com</a>
             </div>
         `;
         modalContent.appendChild(infoText);
@@ -6875,20 +6921,20 @@ function initApp() {
         const actionsContainer = document.createElement('div');
         actionsContainer.style.display = 'flex';
         actionsContainer.style.flexDirection = 'row';
-        actionsContainer.style.gap = '8px';
-        actionsContainer.style.marginTop = '10px';
+        actionsContainer.style.gap = '6px';
+        actionsContainer.style.marginTop = '4px';
 
         // Botón Forzar instalación
         const forceInstallBtn = document.createElement('button');
         forceInstallBtn.textContent = '📲  INSTAL·LAR';
-        forceInstallBtn.style.padding = '10px';
+        forceInstallBtn.style.padding = '5px';
         forceInstallBtn.style.backgroundColor = '#0d6efd';
         forceInstallBtn.style.color = '#fff';
         forceInstallBtn.style.border = 'none';
         forceInstallBtn.style.borderRadius = '6px';
         forceInstallBtn.style.fontWeight = '700';
         forceInstallBtn.style.cursor = 'pointer';
-        forceInstallBtn.style.fontSize = '0.9rem';
+        forceInstallBtn.style.fontSize = '0.8rem';
         forceInstallBtn.style.flex = '1';
         forceInstallBtn.addEventListener('click', () => {
             const forceBtn = document.getElementById('force-install-btn');
@@ -6900,14 +6946,14 @@ function initApp() {
         // Botón Actualizar aplicación
         const updateBtn = document.createElement('button');
         updateBtn.textContent = '🔄  ACTUALITZAR';
-        updateBtn.style.padding = '10px';
+        updateBtn.style.padding = '5px';
         updateBtn.style.backgroundColor = '#0d6efd';
         updateBtn.style.color = '#fff';
         updateBtn.style.border = 'none';
         updateBtn.style.borderRadius = '6px';
         updateBtn.style.fontWeight = '700';
         updateBtn.style.cursor = 'pointer';
-        updateBtn.style.fontSize = '0.9rem';
+        updateBtn.style.fontSize = '0.8rem';
         updateBtn.style.flex = '1';
         updateBtn.addEventListener('click', async () => {
             try {
@@ -6930,27 +6976,36 @@ function initApp() {
         overlay.id = 'info-modal-overlay';
         overlay.className = 'info-modal-overlay';
         overlay.style.position = 'fixed';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.width = '100vw';
-        overlay.style.height = '100vh';
+        overlay.style.inset = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.height = '100dvh';
         overlay.style.backgroundColor = 'rgba(0,0,0,0.75)';
         overlay.style.zIndex = '9999';
         overlay.style.display = 'flex';
+        overlay.style.flexDirection = 'column';
         overlay.style.alignItems = 'center';
-        overlay.style.justifyContent = 'center';
-        overlay.style.padding = '20px';
+        overlay.style.justifyContent = 'flex-start';
+        overlay.style.overflowX = 'hidden';
+        overlay.style.overflowY = 'auto';
+        overlay.style.webkitOverflowScrolling = 'touch';
+        overlay.style.padding = '8px';
         overlay.style.boxSizing = 'border-box';
 
         const modal = document.createElement('div');
         modal.className = 'info-modal';
         modal.style.backgroundColor = 'var(--card-bg-color)';
         modal.style.borderRadius = '12px';
-        modal.style.padding = '16px';
+        modal.style.padding = '8px 10px';
         modal.style.maxWidth = '500px';
-        modal.style.width = '95vw';
+        modal.style.width = '100%';
         modal.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
         modal.style.border = '1px solid var(--accent-color)';
+        modal.style.flexShrink = '0';
+        modal.style.marginTop = 'auto';
+        modal.style.marginBottom = 'auto';
+        modal.style.overflow = 'visible';
+        modal.style.boxSizing = 'border-box';
 
         modal.appendChild(modalContent);
 
@@ -7037,6 +7092,94 @@ function initApp() {
         orderSwitchContainer.appendChild(orderSwitch);
         orderSwitchContainer.appendChild(orderStateText);
         modal.appendChild(orderSwitchContainer);
+
+        // --- Columna .lap-duration: hora de registre o valor actual (acumulat de sèrie) ---
+        const lapTimeDisplayIsAccumulated = appState.settings.lapTimeDisplayMode === 'seriesAccumulated';
+        const lapTimeDisplaySwitchContainer = document.createElement('div');
+        lapTimeDisplaySwitchContainer.style.display = 'flex';
+        lapTimeDisplaySwitchContainer.style.alignItems = 'center';
+        lapTimeDisplaySwitchContainer.style.justifyContent = 'space-between';
+        lapTimeDisplaySwitchContainer.style.gap = '10px';
+        lapTimeDisplaySwitchContainer.style.padding = '8px';
+        lapTimeDisplaySwitchContainer.style.marginTop = '6px';
+        lapTimeDisplaySwitchContainer.style.borderRadius = '8px';
+        lapTimeDisplaySwitchContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
+        lapTimeDisplaySwitchContainer.style.border = '1px solid var(--accent-color)';
+
+        const lapTimeDisplayLabel = document.createElement('span');
+        lapTimeDisplayLabel.textContent = 'HORA VOLTA:';
+        lapTimeDisplayLabel.style.fontWeight = '600';
+        lapTimeDisplayLabel.style.fontSize = '0.9rem';
+        lapTimeDisplayLabel.style.color = 'var(--text-color)';
+        lapTimeDisplayLabel.style.whiteSpace = 'nowrap';
+
+        const lapTimeDisplaySwitch = document.createElement('div');
+        lapTimeDisplaySwitch.role = 'switch';
+        lapTimeDisplaySwitch.tabIndex = 0;
+        lapTimeDisplaySwitch.setAttribute('aria-checked', String(lapTimeDisplayIsAccumulated));
+        lapTimeDisplaySwitch.style.display = 'inline-flex';
+        lapTimeDisplaySwitch.style.alignItems = 'center';
+        lapTimeDisplaySwitch.style.padding = '2px';
+        lapTimeDisplaySwitch.style.width = '34px';
+        lapTimeDisplaySwitch.style.height = '20px';
+        lapTimeDisplaySwitch.style.borderRadius = '999px';
+        lapTimeDisplaySwitch.style.cursor = 'pointer';
+        lapTimeDisplaySwitch.style.transition = 'background 0.2s';
+        lapTimeDisplaySwitch.style.boxSizing = 'border-box';
+        lapTimeDisplaySwitch.style.background = lapTimeDisplayIsAccumulated ? '#0d6efd' : '#666';
+        lapTimeDisplaySwitch.style.flexShrink = '0';
+
+        const lapTimeDisplayDot = document.createElement('span');
+        lapTimeDisplayDot.style.width = '16px';
+        lapTimeDisplayDot.style.height = '16px';
+        lapTimeDisplayDot.style.borderRadius = '50%';
+        lapTimeDisplayDot.style.background = '#fff';
+        lapTimeDisplayDot.style.transition = 'transform 0.2s';
+        lapTimeDisplayDot.style.transform = lapTimeDisplayIsAccumulated ? 'translateX(14px)' : 'translateX(0)';
+
+        lapTimeDisplaySwitch.appendChild(lapTimeDisplayDot);
+
+        const lapTimeDisplayStateText = document.createElement('span');
+        lapTimeDisplayStateText.innerHTML = lapTimeDisplayIsAccumulated
+            ? 'ACUMULAT<br>(total sèrie a lap-time; hora a lap-duration)'
+            : 'NORMAL<br>(duració parcial a lap-time)';
+        lapTimeDisplayStateText.style.fontWeight = '500';
+        lapTimeDisplayStateText.style.fontSize = '0.85rem';
+        lapTimeDisplayStateText.style.color = 'var(--text-color)';
+        lapTimeDisplayStateText.style.opacity = '0.9';
+        lapTimeDisplayStateText.style.textAlign = 'right';
+        lapTimeDisplayStateText.style.lineHeight = '1.3';
+
+        lapTimeDisplaySwitch.addEventListener('click', () => {
+            const newIsAccumulated = appState.settings.lapTimeDisplayMode !== 'seriesAccumulated';
+            appState.settings.lapTimeDisplayMode = newIsAccumulated ? 'seriesAccumulated' : 'registration';
+            saveSettings();
+
+            lapTimeDisplaySwitch.style.background = newIsAccumulated ? '#0d6efd' : '#666';
+            lapTimeDisplayDot.style.transform = newIsAccumulated ? 'translateX(14px)' : 'translateX(0)';
+            lapTimeDisplaySwitch.setAttribute('aria-checked', String(newIsAccumulated));
+            lapTimeDisplayStateText.innerHTML = newIsAccumulated
+                ? 'ACUMULAT<br>(total sèrie a lap-time; hora a lap-duration)'
+                : 'NORMAL<br>(duració parcial a lap-time)';
+
+            if (typeof syncSeriesSuboptionsUI === 'function') {
+                syncSeriesSuboptionsUI();
+            }
+            renderLaps();
+            updateSummary();
+        });
+
+        lapTimeDisplaySwitch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                lapTimeDisplaySwitch.click();
+            }
+        });
+
+        lapTimeDisplaySwitchContainer.appendChild(lapTimeDisplayLabel);
+        lapTimeDisplaySwitchContainer.appendChild(lapTimeDisplaySwitch);
+        lapTimeDisplaySwitchContainer.appendChild(lapTimeDisplayStateText);
+        modal.appendChild(lapTimeDisplaySwitchContainer);
 
         // --- Prefijo por defecto del nombre de vuelta ---
         const lapNamePrefixContainer = document.createElement('div');
@@ -7164,7 +7307,7 @@ function initApp() {
         const clockModeStateText = document.createElement('span');
         clockModeStateText.innerHTML = clockModeIsTime
             ? 'RELOJ<br>(hora actual)'
-            : 'TRANSCURRIDO<br>(tiempo transcurrido)';
+            : 'TRANSCURRIDO<br>(volta actual; sessió al peu)';
         clockModeStateText.style.fontWeight = '500';
         clockModeStateText.style.fontSize = '0.85rem';
         clockModeStateText.style.color = 'var(--text-color)';
@@ -7182,7 +7325,7 @@ function initApp() {
             clockModeSwitch.setAttribute('aria-checked', String(newIsTime));
             clockModeStateText.innerHTML = newIsTime
                 ? 'RELOJ<br>(hora actual)'
-                : 'TRANSCURRIDO<br>(tiempo transcurrido)';
+                : 'TRANSCURRIDO<br>(volta actual; sessió al peu)';
 
             // Forzar refresco inmediato del reloj
             lastClockUpdate = 0;
@@ -7202,6 +7345,67 @@ function initApp() {
         clockModeSwitchContainer.appendChild(clockModeSwitch);
         clockModeSwitchContainer.appendChild(clockModeStateText);
         modal.appendChild(clockModeSwitchContainer);
+
+        // --- Slider tamany del rellotge secundari (peu) ---
+        const clockSecondarySizeContainer = document.createElement('div');
+        clockSecondarySizeContainer.style.display = 'flex';
+        clockSecondarySizeContainer.style.flexDirection = 'row';
+        clockSecondarySizeContainer.style.alignItems = 'center';
+        clockSecondarySizeContainer.style.justifyContent = 'space-between';
+        clockSecondarySizeContainer.style.gap = '8px';
+        clockSecondarySizeContainer.style.padding = '8px';
+        clockSecondarySizeContainer.style.marginTop = '6px';
+        clockSecondarySizeContainer.style.borderRadius = '8px';
+        clockSecondarySizeContainer.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
+        clockSecondarySizeContainer.style.border = '1px solid var(--accent-color)';
+
+        const clockSecondarySizeLabel = document.createElement('span');
+        clockSecondarySizeLabel.textContent = 'TAMANY PEU:';
+        clockSecondarySizeLabel.style.fontWeight = '600';
+        clockSecondarySizeLabel.style.fontSize = '0.9rem';
+        clockSecondarySizeLabel.style.color = 'var(--text-color)';
+        clockSecondarySizeLabel.style.whiteSpace = 'nowrap';
+        clockSecondarySizeLabel.style.flexShrink = '0';
+
+        const clockSecondarySizeSlider = document.createElement('input');
+        clockSecondarySizeSlider.type = 'range';
+        clockSecondarySizeSlider.min = String(CLOCK_SECONDARY_FONT_MIN);
+        clockSecondarySizeSlider.max = String(CLOCK_SECONDARY_FONT_MAX);
+        clockSecondarySizeSlider.step = '0.02';
+        clockSecondarySizeSlider.value = String(clampClockSecondaryFontRem(appState.settings.clockSecondaryFontRem));
+        clockSecondarySizeSlider.className = 'settings-range';
+        clockSecondarySizeSlider.setAttribute('aria-label', 'Tamany del rellotge secundari');
+
+        const clockSecondarySizeValue = document.createElement('span');
+        clockSecondarySizeValue.style.fontWeight = '500';
+        clockSecondarySizeValue.style.fontSize = '0.85rem';
+        clockSecondarySizeValue.style.color = 'var(--text-color)';
+        clockSecondarySizeValue.style.opacity = '0.9';
+        clockSecondarySizeValue.style.flexShrink = '0';
+        clockSecondarySizeValue.style.minWidth = '2.6em';
+        clockSecondarySizeValue.style.textAlign = 'right';
+
+        const updateClockSecondarySizeUI = (rem) => {
+            const size = clampClockSecondaryFontRem(rem);
+            clockSecondarySizeValue.textContent = `${Math.round((size / CLOCK_SECONDARY_FONT_DEFAULT) * 100)}%`;
+            clockSecondarySizeSlider.value = String(size);
+        };
+
+        const onClockSecondarySizeInput = () => {
+            const size = clampClockSecondaryFontRem(clockSecondarySizeSlider.value);
+            applyClockSecondaryFontSize(size);
+            updateClockSecondarySizeUI(size);
+            saveSettings();
+        };
+
+        updateClockSecondarySizeUI(appState.settings.clockSecondaryFontRem);
+        clockSecondarySizeSlider.addEventListener('input', onClockSecondarySizeInput);
+        clockSecondarySizeSlider.addEventListener('change', onClockSecondarySizeInput);
+
+        clockSecondarySizeContainer.appendChild(clockSecondarySizeLabel);
+        clockSecondarySizeContainer.appendChild(clockSecondarySizeSlider);
+        clockSecondarySizeContainer.appendChild(clockSecondarySizeValue);
+        modal.appendChild(clockSecondarySizeContainer);
 
         // --- Switch para opción SÈRIE ---
         const seriesSwitchContainer = document.createElement('div');
@@ -7319,63 +7523,7 @@ function initApp() {
         showSeriesSummaryStateText.style.textAlign = 'right';
         showSeriesSummaryStateText.style.lineHeight = '1.3';
 
-        // Subopció dins de OPCIÓ 'SÈRIE': acumular temps de sèrie
-        const lapTimeDisplayIsAccumulated = appState.settings.lapTimeDisplayMode === 'seriesAccumulated';
-        const lapTimeDisplaySwitchContainer = document.createElement('div');
-        lapTimeDisplaySwitchContainer.style.display = appState.settings.seriesLapTypeEnabled ? 'flex' : 'none';
-        lapTimeDisplaySwitchContainer.style.alignItems = 'center';
-        lapTimeDisplaySwitchContainer.style.justifyContent = 'space-between';
-        lapTimeDisplaySwitchContainer.style.gap = '10px';
-        lapTimeDisplaySwitchContainer.style.paddingLeft = '16px';
-        lapTimeDisplaySwitchContainer.style.marginTop = '2px';
-        lapTimeDisplaySwitchContainer.style.borderLeft = '2px solid var(--accent-color)';
-        lapTimeDisplaySwitchContainer.style.opacity = '0.95';
-
-        const lapTimeDisplayLabel = document.createElement('span');
-        lapTimeDisplayLabel.textContent = 'ACUMULAR TEMPS SERIE:';
-        lapTimeDisplayLabel.style.fontWeight = '600';
-        lapTimeDisplayLabel.style.fontSize = '0.82rem';
-        lapTimeDisplayLabel.style.color = 'var(--text-color)';
-        lapTimeDisplayLabel.style.whiteSpace = 'nowrap';
-
-        const lapTimeDisplaySwitch = document.createElement('div');
-        lapTimeDisplaySwitch.role = 'switch';
-        lapTimeDisplaySwitch.tabIndex = 0;
-        lapTimeDisplaySwitch.setAttribute('aria-checked', String(lapTimeDisplayIsAccumulated));
-        lapTimeDisplaySwitch.style.display = 'inline-flex';
-        lapTimeDisplaySwitch.style.alignItems = 'center';
-        lapTimeDisplaySwitch.style.padding = '2px';
-        lapTimeDisplaySwitch.style.width = '34px';
-        lapTimeDisplaySwitch.style.height = '20px';
-        lapTimeDisplaySwitch.style.borderRadius = '999px';
-        lapTimeDisplaySwitch.style.cursor = 'pointer';
-        lapTimeDisplaySwitch.style.transition = 'background 0.2s';
-        lapTimeDisplaySwitch.style.boxSizing = 'border-box';
-        lapTimeDisplaySwitch.style.background = lapTimeDisplayIsAccumulated ? '#0d6efd' : '#666';
-        lapTimeDisplaySwitch.style.flexShrink = '0';
-
-        const lapTimeDisplayDot = document.createElement('span');
-        lapTimeDisplayDot.style.width = '16px';
-        lapTimeDisplayDot.style.height = '16px';
-        lapTimeDisplayDot.style.borderRadius = '50%';
-        lapTimeDisplayDot.style.background = '#fff';
-        lapTimeDisplayDot.style.transition = 'transform 0.2s';
-        lapTimeDisplayDot.style.transform = lapTimeDisplayIsAccumulated ? 'translateX(14px)' : 'translateX(0)';
-
-        lapTimeDisplaySwitch.appendChild(lapTimeDisplayDot);
-
-        const lapTimeDisplayStateText = document.createElement('span');
-        lapTimeDisplayStateText.innerHTML = lapTimeDisplayIsAccumulated
-            ? 'TOTAL SÈRIE<br>(duració total al inici de cada sèrie)'
-            : 'REGISTRE<br>(hora del registre)';
-        lapTimeDisplayStateText.style.fontWeight = '500';
-        lapTimeDisplayStateText.style.fontSize = '0.8rem';
-        lapTimeDisplayStateText.style.color = 'var(--text-color)';
-        lapTimeDisplayStateText.style.opacity = '0.9';
-        lapTimeDisplayStateText.style.textAlign = 'right';
-        lapTimeDisplayStateText.style.lineHeight = '1.3';
-
-        const seriesOutsideIsDash = appState.settings.seriesOutsideDisplayMode === 'dash';
+        const seriesOutsideIsPartial = appState.settings.seriesOutsideDisplayMode === 'partial';
         const seriesOutsideSwitchContainer = document.createElement('div');
         seriesOutsideSwitchContainer.style.display = (appState.settings.seriesLapTypeEnabled && lapTimeDisplayIsAccumulated) ? 'flex' : 'none';
         seriesOutsideSwitchContainer.style.alignItems = 'center';
@@ -7397,7 +7545,7 @@ function initApp() {
         const seriesOutsideSwitch = document.createElement('div');
         seriesOutsideSwitch.role = 'switch';
         seriesOutsideSwitch.tabIndex = 0;
-        seriesOutsideSwitch.setAttribute('aria-checked', String(seriesOutsideIsDash));
+        seriesOutsideSwitch.setAttribute('aria-checked', String(seriesOutsideIsPartial));
         seriesOutsideSwitch.style.display = 'inline-flex';
         seriesOutsideSwitch.style.alignItems = 'center';
         seriesOutsideSwitch.style.padding = '2px';
@@ -7407,7 +7555,7 @@ function initApp() {
         seriesOutsideSwitch.style.cursor = 'pointer';
         seriesOutsideSwitch.style.transition = 'background 0.2s';
         seriesOutsideSwitch.style.boxSizing = 'border-box';
-        seriesOutsideSwitch.style.background = seriesOutsideIsDash ? '#0d6efd' : '#666';
+        seriesOutsideSwitch.style.background = seriesOutsideIsPartial ? '#0d6efd' : '#666';
         seriesOutsideSwitch.style.flexShrink = '0';
 
         const seriesOutsideDot = document.createElement('span');
@@ -7416,14 +7564,14 @@ function initApp() {
         seriesOutsideDot.style.borderRadius = '50%';
         seriesOutsideDot.style.background = '#fff';
         seriesOutsideDot.style.transition = 'transform 0.2s';
-        seriesOutsideDot.style.transform = seriesOutsideIsDash ? 'translateX(14px)' : 'translateX(0)';
+        seriesOutsideDot.style.transform = seriesOutsideIsPartial ? 'translateX(14px)' : 'translateX(0)';
 
         seriesOutsideSwitch.appendChild(seriesOutsideDot);
 
         const seriesOutsideStateText = document.createElement('span');
-        seriesOutsideStateText.innerHTML = seriesOutsideIsDash
-            ? 'GUION<br>(guions en voltes i descansos)'
-            : 'PARCIAL<br>(duració de la volta)';
+        seriesOutsideStateText.innerHTML = seriesOutsideIsPartial
+            ? 'VALOR ACTUAL<br>(duració de la volta)'
+            : 'REGISTRE<br>(hora del registre)';
         seriesOutsideStateText.style.fontWeight = '500';
         seriesOutsideStateText.style.fontSize = '0.75rem';
         seriesOutsideStateText.style.color = 'var(--text-color)';
@@ -7436,7 +7584,6 @@ function initApp() {
             const accumOn = appState.settings.lapTimeDisplayMode === 'seriesAccumulated';
 
             showSeriesSummarySwitchContainer.style.display = serieOn ? 'flex' : 'none';
-            lapTimeDisplaySwitchContainer.style.display = serieOn ? 'flex' : 'none';
             seriesOutsideSwitchContainer.style.display = serieOn && accumOn ? 'flex' : 'none';
             seriesOutsideSwitchContainer.style.opacity = accumOn ? '0.95' : '0.45';
             seriesOutsideSwitchContainer.style.pointerEvents = accumOn ? 'auto' : 'none';
@@ -7461,41 +7608,17 @@ function initApp() {
             }
         });
 
-        lapTimeDisplaySwitch.addEventListener('click', () => {
-            const newIsAccumulated = appState.settings.lapTimeDisplayMode !== 'seriesAccumulated';
-            appState.settings.lapTimeDisplayMode = newIsAccumulated ? 'seriesAccumulated' : 'registration';
-            saveSettings();
-
-            lapTimeDisplaySwitch.style.background = newIsAccumulated ? '#0d6efd' : '#666';
-            lapTimeDisplayDot.style.transform = newIsAccumulated ? 'translateX(14px)' : 'translateX(0)';
-            lapTimeDisplaySwitch.setAttribute('aria-checked', String(newIsAccumulated));
-            lapTimeDisplayStateText.innerHTML = newIsAccumulated
-                ? 'TOTAL SÈRIE<br>(duració total al inici de cada sèrie)'
-                : 'REGISTRE<br>(hora del registre)';
-
-            syncSeriesSuboptionsUI();
-            renderLaps();
-            updateSummary();
-        });
-
-        lapTimeDisplaySwitch.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                lapTimeDisplaySwitch.click();
-            }
-        });
-
         seriesOutsideSwitch.addEventListener('click', () => {
-            const newIsDash = appState.settings.seriesOutsideDisplayMode !== 'dash';
-            appState.settings.seriesOutsideDisplayMode = newIsDash ? 'dash' : 'partial';
+            const newIsPartial = appState.settings.seriesOutsideDisplayMode !== 'partial';
+            appState.settings.seriesOutsideDisplayMode = newIsPartial ? 'partial' : 'registration';
             saveSettings();
 
-            seriesOutsideSwitch.style.background = newIsDash ? '#0d6efd' : '#666';
-            seriesDot.style.transform = newIsDash ? 'translateX(14px)' : 'translateX(0)';
-            seriesOutsideSwitch.setAttribute('aria-checked', String(newIsDash));
-            seriesOutsideStateText.innerHTML = newIsDash
-                ? 'GUION<br>(guions en voltes i descansos)'
-                : 'PARCIAL<br>(duració de la volta)';
+            seriesOutsideSwitch.style.background = newIsPartial ? '#0d6efd' : '#666';
+            seriesOutsideDot.style.transform = newIsPartial ? 'translateX(14px)' : 'translateX(0)';
+            seriesOutsideSwitch.setAttribute('aria-checked', String(newIsPartial));
+            seriesOutsideStateText.innerHTML = newIsPartial
+                ? 'VALOR ACTUAL<br>(duració de la volta)'
+                : 'REGISTRE<br>(hora del registre)';
 
             renderLaps();
         });
@@ -7539,17 +7662,12 @@ function initApp() {
         showSeriesSummarySwitchContainer.appendChild(showSeriesSummarySwitch);
         showSeriesSummarySwitchContainer.appendChild(showSeriesSummaryStateText);
 
-        lapTimeDisplaySwitchContainer.appendChild(lapTimeDisplayLabel);
-        lapTimeDisplaySwitchContainer.appendChild(lapTimeDisplaySwitch);
-        lapTimeDisplaySwitchContainer.appendChild(lapTimeDisplayStateText);
-
         seriesOutsideSwitchContainer.appendChild(seriesOutsideLabel);
         seriesOutsideSwitchContainer.appendChild(seriesOutsideSwitch);
         seriesOutsideSwitchContainer.appendChild(seriesOutsideStateText);
 
         seriesSwitchContainer.appendChild(seriesMainRow);
         seriesSwitchContainer.appendChild(showSeriesSummarySwitchContainer);
-        seriesSwitchContainer.appendChild(lapTimeDisplaySwitchContainer);
         seriesSwitchContainer.appendChild(seriesOutsideSwitchContainer);
         modal.appendChild(seriesSwitchContainer);
 
@@ -7826,19 +7944,31 @@ function initApp() {
         csvExportSwitchContainer.appendChild(csvExportStateText);
         modal.appendChild(csvExportSwitchContainer);
 
+        [
+            orderSwitchContainer,
+            lapTimeDisplaySwitchContainer,
+            lapNamePrefixContainer,
+            clockModeSwitchContainer,
+            clockSecondarySizeContainer,
+            seriesSwitchContainer,
+            alternateLapsSwitchContainer,
+            volumeButtonsSwitchContainer,
+            csvExportSwitchContainer
+        ].forEach((el) => el.classList.add('info-setting-row'));
+
         // Botón ACEPTAR
         const okButton = document.createElement('button');
         okButton.textContent = 'TANCAR';
         okButton.style.width = '100%';
-        okButton.style.padding = '10px';
-        okButton.style.marginTop = '10px';
+        okButton.style.padding = '6px';
+        okButton.style.marginTop = '6px';
         okButton.style.backgroundColor = '#28a745';
         okButton.style.color = '#fff';
         okButton.style.border = 'none';
         okButton.style.borderRadius = '6px';
         okButton.style.fontWeight = '700';
         okButton.style.cursor = 'pointer';
-        okButton.style.fontSize = '1rem';
+        okButton.style.fontSize = '0.9rem';
         okButton.style.textTransform = 'uppercase';
         okButton.addEventListener('click', () => overlay.remove());
 
@@ -7911,6 +8041,7 @@ function initApp() {
     timeContainer.style.padding = '0 5px';
     timeContainer.style.gap = '8px';
     timeContainer.style.minWidth = '0';
+    timeContainer.style.lineHeight = '0';
 
     const playIconSpan = document.createElement('span');
     playIconSpan.innerHTML = playIcon;
@@ -7924,7 +8055,7 @@ function initApp() {
     clockElement.style.textAlign = 'center';
     clockElement.style.margin = '0';
     clockElement.style.fontFamily = '"Arial Narrow", Arial, sans-serif';
-    clockElement.style.lineHeight = '1';
+    clockElement.style.lineHeight = '0.72';
     clockElement.style.fontWeight = 'bold';
     clockElement.style.letterSpacing = '-0.02em';
     clockElement.style.whiteSpace = 'nowrap';
@@ -7978,7 +8109,7 @@ function initApp() {
     clockFooterRow.style.justifyContent = 'stretch';
     clockFooterRow.style.width = '100%';
     clockFooterRow.style.gap = '10px';
-    clockFooterRow.style.marginTop = '2px';
+    clockFooterRow.style.marginTop = '0';
     clockFooterRow.style.minWidth = '0';
     clockFooterRow.style.boxSizing = 'border-box';
 
@@ -7990,6 +8121,7 @@ function initApp() {
     clockSecondaryElement.style.width = '33.333%';
     clockSecondaryElement.style.minWidth = '0';
     clockSecondaryElement.style.textAlign = 'center';
+    applyClockSecondaryFontSize();
 
     const instructionText = document.createElement('div');
     instructionText.id = 'clock-instruction';
@@ -8019,7 +8151,7 @@ function initApp() {
     // Fondo por defecto (no en grabación)
     clockContainer.style.backgroundColor = '#2E7D32';
     clockContainer.style.cursor = 'pointer';
-    clockContainer.style.padding = '20px';
+    clockContainer.style.padding = '0';
     clockContainer.style.borderRadius = '8px';
     clockContainer.style.transition = 'background-color 0.2s ease';
 
@@ -8073,7 +8205,7 @@ function initApp() {
     clockContainer.style.flexDirection = 'column';
     clockContainer.style.alignItems = 'center';
     clockContainer.style.justifyContent = 'center';
-    clockContainer.style.padding = '20px';
+    clockContainer.style.padding = '0';
     clockContainer.style.borderRadius = '8px';
     clockContainer.style.cursor = 'pointer';
     clockContainer.style.transition = 'background-color 0.2s ease';
@@ -8085,7 +8217,7 @@ function initApp() {
     clockContainer.style.flexDirection = 'column';
     clockContainer.style.alignItems = 'center';
     clockContainer.style.justifyContent = 'center';
-    clockContainer.style.padding = '20px';
+    clockContainer.style.padding = '0';
     clockContainer.style.borderRadius = '8px';
     clockContainer.style.cursor = 'pointer';
     clockContainer.style.transition = 'background-color 0.2s ease';
