@@ -6894,8 +6894,8 @@ function initApp() {
             return;
         }
 
-        const appVersion = '4.0.2'; // Versión desde manifest.json
-        const appDateVersion = '2026-09-10'; // Versión desde manifest.json
+        const appVersion = typeof APP_VERSION !== 'undefined' ? APP_VERSION : '?';
+        const appDateVersion = typeof APP_RELEASE_DATE !== 'undefined' ? APP_RELEASE_DATE : '?';
 
         // Crear contenedor del modal con opciones
         const modalContent = document.createElement('div');
