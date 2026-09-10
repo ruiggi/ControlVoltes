@@ -62,12 +62,18 @@ if not exist "%KEYSTORE_FILE%" (
 echo ?? Instrucciones:
 echo    - Version (app-version.json): %APP_VERSION% (%APP_RELEASE_DATE%)
 echo    - APK final: %APK_NAME%
-echo    - Para cambiar version: ejecuta sync-version.bat antes de compilar
+echo.
+echo +----------------------------------------------------------------+
+echo   AVISO: Si vas a cambiar de version o de fecha, PRIMERO ejecuta
+echo   sync-version.bat (edita app-version.json y sincroniza todo).
+echo   Si compilas sin sync, el APK y la PWA pueden quedar desalineados.
+echo +----------------------------------------------------------------+
 echo.
 
-set /p CONTINUAR="?Continuar con la compilaci?n Release v%APP_VERSION%? (S/N): "
+set /p CONTINUAR="Confirmas sync-version.bat si hubo cambio de version, y compilas v%APP_VERSION%? (S/N): "
 if /i not "%CONTINUAR%"=="S" (
-    echo Compilaci?n cancelada.
+    echo.
+    echo Compilacion cancelada. Si faltaba sync, ejecuta sync-version.bat y vuelve a intentar.
     pause
     exit /b 0
 )
