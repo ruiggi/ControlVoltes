@@ -1,8 +1,9 @@
 @echo off
 chcp 65001 >nul
+cd /d "%~dp0"
 
 REM ================================================
-REM          CONFIGURACIùN DE JAVA (JDK)
+REM          CONFIGURACI?N DE JAVA (JDK)
 REM ================================================
 call "%~dp0setup-java.bat"
 if errorlevel 1 (
@@ -17,20 +18,32 @@ if errorlevel 1 (
 )
 
 REM ================================================
-REM          CONFIGURACIùN DE VERSIùN
+REM          CONFIGURACI?N DE VERSI?N (app-version.json)
 REM ================================================
-set APP_VERSION=4.0.0
+where node >nul 2>&1
+if errorlevel 1 (
+    echo ? ERROR: Node.js no esta en el PATH. Necesario para leer app-version.json
+    pause
+    exit /b 1
+)
+if not exist "app-version.json" (
+    echo ? ERROR: No se encuentra app-version.json
+    pause
+    exit /b 1
+)
+for /f "delims=" %%a in ('node -e "const d=require('./app-version.json');console.log(d.version)"') do set APP_VERSION=%%a
+for /f "delims=" %%a in ('node -e "const d=require('./app-version.json');console.log(d.releaseDate)"') do set APP_RELEASE_DATE=%%a
 set APP_NAME=ControlVoltes
 set APK_NAME=%APP_NAME%-v%APP_VERSION%.apk
 
 REM ================================================
-REM          CONFIGURACIùN DEL KEYSTORE
+REM          CONFIGURACI?N DEL KEYSTORE
 REM ================================================
 set KEYSTORE_FILE=control-voltes.keystore
 set KEYSTORE_ALIAS=control-voltes
 
 echo +----------------------------------------------------------------+
-echo ù         Compilaciùn %APP_NAME% v%APP_VERSION% Release         ù
+echo ?         Compilaci?n %APP_NAME% v%APP_VERSION% Release         ?
 echo +----------------------------------------------------------------+
 echo.
 
@@ -47,28 +60,34 @@ if not exist "%KEYSTORE_FILE%" (
 )
 
 echo ?? Instrucciones:
-echo    - Versiùn actual: %APP_VERSION%
+echo    - Version (app-version.json): %APP_VERSION% (%APP_RELEASE_DATE%)
 echo    - APK final: %APK_NAME%
-echo    - Asegùrate de haber actualizado la versiùn tambiùn en:
-echo       ù config.xml
-echo       ù package.json
-echo       ù www/manifest.json
-echo       ù www/scripts.js
-echo       ù www/sw.js
+echo    - Para cambiar version: ejecuta sync-version.bat antes de compilar
 echo.
 
-set /p CONTINUAR="ùContinuar con la compilaciùn Release v%APP_VERSION%? (S/N): "
+set /p CONTINUAR="?Continuar con la compilaci?n Release v%APP_VERSION%? (S/N): "
 if /i not "%CONTINUAR%"=="S" (
-    echo Compilaciùn cancelada.
+    echo Compilaci?n cancelada.
     pause
     exit /b 0
 )
 
 echo.
-echo ?? Introduce la contraseùa del keystore:
-set /p KEYSTORE_PASS="   Contraseùa: "
+echo ?? Introduce la contrase?a del keystore:
+set /p KEYSTORE_PASS="   Contrase?a: "
 if "%KEYSTORE_PASS%"=="" (
-    echo ? La contraseùa no puede estar vacùa.
+    echo ? La contrase?a no puede estar vac?a.
+    pause
+    exit /b 1
+)
+
+echo.
+echo ----------------------------------------------------------------
+echo [0/5] ?? Sincronizando versi?n en config.xml, package.json, www...
+echo ----------------------------------------------------------------
+node "%~dp0scripts\sync-version.js"
+if errorlevel 1 (
+    echo ? Error al sincronizar la versi?n
     pause
     exit /b 1
 )
@@ -89,7 +108,7 @@ if not "%CLEAN_ERR%"=="0" (
 
 echo.
 echo ----------------------------------------------------------------
-echo [2/5] ?? Preparando plataforma Android...
+echo [2/5] ?? Preparando plataforma Android (cordova prepare)...
 echo ----------------------------------------------------------------
 call cordova prepare android
 if errorlevel 1 (
@@ -118,7 +137,7 @@ echo [4/5] ?? Firmando APK con apksigner...
 echo ----------------------------------------------------------------
 echo.
 
-REM Buscar apksigner (versiùn mùs reciente)
+REM Buscar apksigner (versi?n m?s reciente)
 set APKSIGNER_PATH=
 for /d %%i in ("%ANDROID_HOME%\build-tools\*") do (
     if exist "%%i\apksigner.bat" (
@@ -155,25 +174,25 @@ echo [5/5] ? Verificando firma del APK...
 echo ----------------------------------------------------------------
 call "%APKSIGNER_PATH%" verify --verbose %APK_NAME%
 if errorlevel 1 (
-    echo ? El APK NO estù correctamente firmado
+    echo ? El APK NO est? correctamente firmado
     pause
     exit /b 1
 )
 
 echo.
 echo +----------------------------------------------------------------+
-echo ù                    ? COMPILACIùN EXITOSA v%APP_VERSION%       ù
+echo ?                    ? COMPILACI?N EXITOSA v%APP_VERSION%       ?
 echo +----------------------------------------------------------------+
 echo.
 echo ?? APK generado: %APK_NAME%
-echo ?? Ubicaciùn: %CD%\%APK_NAME%
+echo ?? Ubicaci?n: %CD%\%APK_NAME%
 echo.
-echo ?? Informaciùn del APK:
-for %%I in (%APK_NAME%) do echo    Tamaùo: %%~zI bytes
+echo ?? Informaci?n del APK:
+for %%I in (%APK_NAME%) do echo    Tama?o: %%~zI bytes
 echo.
-echo ?? Prùximos pasos:
+echo ?? Pr?ximos pasos:
 echo    1. Prueba el APK: adb install -r %APK_NAME%
-echo    2. Verifica funcionamiento de botones fùsicos
-echo    3. ùListo para distribuir!
+echo    2. Verifica funcionamiento de botones f?sicos
+echo    3. ?Listo para distribuir!
 echo.
 pause
